@@ -441,21 +441,9 @@
 
 /* ---------------------------------------------------------------- popover */
 
-/* A panel that is no arrow panel takes the system menu's colours, and on
- * macOS no fill at all with the system's appearance (`popup.css`), which the
- * stem's outline would be filled with. The popover takes the window's popup
- * colours instead, as a menu does (`sval-header.css`). */
 .sval-pins-popover {
-  --panel-background-color: inherit;
-  --panel-text-color: inherit;
-  --panel-border-color: inherit;
   --panel-border-radius: 14px;
   --panel-padding: 8px;
-
-  @media (-moz-platform: macos) {
-    appearance: none;
-    background-color: transparent;
-  }
 }
 
 .sval-pins-popover-box {

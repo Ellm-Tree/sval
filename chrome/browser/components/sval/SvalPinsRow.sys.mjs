@@ -40,6 +40,11 @@ import * as SvalPanelModel from "moz-src:///browser/components/sval/SvalPanelMod
 import * as SvalTree from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
 import {
+  MENU_ID_ATTR,
+  SvalMenu,
+} from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
+import { SvalPopover } from "moz-src:///browser/components/sval/SvalPopover.sys.mjs";
+import {
   ariaShortcut,
   keyOf,
   shortcutText,
@@ -108,128 +113,96 @@ export function showInWorkspaces(nodes) {
     }));
 }
 
+/** The ids a "Show in" submenu's items carry (`showInItem`). */
+const SHOW_IN_ALL = "showInAll";
+const SHOW_IN_NONE = "showInNone";
+const SHOW_IN_BOX = "showIn:";
+
+/** The selector of a "Show in" submenu's boxes. */
+const SHOW_IN_BOXES = `[${MENU_ID_ATTR}^="${SHOW_IN_BOX}"]`;
+
 /**
- * @param {Document} doc
- * @param {string} command The `data-command` a context menu runs it by.
- * @param {string} label
- * @returns {Element} a context menu's `menuitem`.
+ * A context menu's "Show in" submenu (§7), for SvalMenu: Select all,
+ * Deselect all, then one checkbox per workspace, ticked where the pin
+ * shows, each `showIn:` and the workspace's id. The items leave the menu
+ * open while the user ticks (`closemenu="none"`), and what they hold is
+ * written as the submenu closes.
+ *
+ * @param {() => string} guidOf The pin the menu is open on.
+ * @param {() => {id: string, name: string}[]} workspacesOf
+ * @param {(err: Error) => void} onError A scope that was not saved.
+ * @returns {object} the submenu's item.
  */
-export function menuItem(doc, command, label) {
-  const el = doc.createXULElement("menuitem");
-  el.dataset.command = command;
-  el.setAttribute("label", label);
-  return el;
+export function showInItem(guidOf, workspacesOf, onError) {
+  return {
+    id: "showIn",
+    label: "Show the pin in",
+    fill: popup => fillShowIn(popup, guidOf(), workspacesOf()),
+    onHidden: popup => applyShowIn(popup).catch(onError),
+  };
 }
 
 /**
- * Shows a context menu's separators only between two runs of items that both
- * show something, once its items' `hidden` is set.
- *
- * @param {Element} menu A `menupopup`.
- */
-export function tidySeparators(menu) {
-  let before = false;
-  let pending = null;
-  for (const el of menu.children) {
-    if (el.localName === "menuseparator") {
-      el.hidden = true;
-      if (before) {
-        pending = el;
-      }
-    } else if (!el.hidden) {
-      if (pending) {
-        pending.hidden = false;
-        pending = null;
-      }
-      before = true;
-    }
-  }
-}
-
-/**
- * A context menu's "Show in" submenu (§7), empty until `fillShowIn`.
- *
- * @param {Document} doc
- * @returns {{menu: Element, popup: Element}}
- */
-export function showInMenu(doc) {
-  const menu = doc.createXULElement("menu");
-  menu.dataset.command = "showIn";
-  menu.setAttribute("label", "Show the pin in");
-  const popup = doc.createXULElement("menupopup");
-  menu.append(popup);
-  return { menu, popup };
-}
-
-/**
- * Fills a "Show in" submenu (§7) for the pin `guid`: Select all, Deselect
- * all, then one checkbox per workspace, ticked where it shows. The items
- * leave the menu open while the user ticks (`closemenu="none"`).
- *
  * @param {Element} popup The submenu's `menupopup`.
  * @param {string} guid
  * @param {{id: string, name: string}[]} workspaces
+ * @returns {Array<object|string>} its items.
  */
-export function fillShowIn(popup, guid, workspaces) {
-  const doc = popup.ownerDocument;
+function fillShowIn(popup, guid, workspaces) {
   const scope = lazy.SvalFavoritesStore.readyInstance?.pinScopeOf(guid) ?? null;
   const live = (scope ?? []).filter(id => workspaces.some(w => w.id === id));
-  popup.replaceChildren();
-  const item = (label, command) => {
-    const el = doc.createXULElement("menuitem");
-    el.setAttribute("label", label);
-    el.setAttribute("closemenu", "none");
-    el.dataset.showIn = command;
-    return el;
-  };
-  popup.append(
-    item("Select all", "all"),
-    item("Deselect all", "none"),
-    doc.createXULElement("menuseparator")
-  );
-  for (const { id, name } of workspaces) {
-    const el = item(name, "workspace");
-    el.setAttribute("type", "checkbox");
-    // Ticked by `onShowInCommand`, so every way a box is chosen ticks it
-    // once.
-    el.setAttribute("autocheck", "false");
-    el.dataset.workspace = id;
-    if (!live.length || live.includes(id)) {
-      el.setAttribute("checked", "true");
-    }
-    popup.append(el);
-  }
   popup._svalShowIn = {
     guid,
     before: scope,
     workspaces: workspaces.map(w => w.id),
   };
+  return [
+    { id: SHOW_IN_ALL, label: "Select all", closemenu: "none" },
+    { id: SHOW_IN_NONE, label: "Deselect all", closemenu: "none" },
+    "separator",
+    ...workspaces.map(({ id, name }) => ({
+      id: `${SHOW_IN_BOX}${id}`,
+      label: name,
+      type: "checkbox",
+      // Ticked by `onShowInCommand`, so every way a box is chosen ticks it
+      // once.
+      autocheck: false,
+      closemenu: "none",
+      checked: !live.length || live.includes(id),
+      data: id,
+    })),
+  ];
 }
 
 /**
- * Handles a command in a "Show in" submenu: Select all and Deselect all
- * tick every box or none.
+ * Handles a command in a "Show in" submenu, if it is one: a box ticks or
+ * unticks, and Select all and Deselect all tick every box or none.
  *
- * @param {Element} popup
- * @param {Element} item The item chosen.
+ * @param {string} id The item's id in the menu.
+ * @param {Event} event Its `command`.
+ * @returns {boolean} Whether it was the submenu's.
  */
-export function onShowInCommand(popup, item) {
-  const command = item.dataset.showIn;
-  if (command === "workspace") {
+export function onShowInCommand(id, event) {
+  const item = event.target;
+  if (id.startsWith(SHOW_IN_BOX)) {
     if (item.getAttribute("checked") === "true") {
       item.removeAttribute("checked");
     } else {
       item.setAttribute("checked", "true");
     }
-  } else if (command === "all" || command === "none") {
-    for (const box of popup.querySelectorAll("[data-workspace]")) {
-      if (command === "all") {
-        box.setAttribute("checked", "true");
-      } else {
-        box.removeAttribute("checked");
-      }
+    return true;
+  }
+  if (id !== SHOW_IN_ALL && id !== SHOW_IN_NONE) {
+    return false;
+  }
+  for (const box of item.parentElement.querySelectorAll(SHOW_IN_BOXES)) {
+    if (id === SHOW_IN_ALL) {
+      box.setAttribute("checked", "true");
+    } else {
+      box.removeAttribute("checked");
     }
   }
+  return true;
 }
 
 /**
@@ -240,16 +213,16 @@ export function onShowInCommand(popup, item) {
  * @param {Element} popup
  * @returns {Promise<void>}
  */
-export async function applyShowIn(popup) {
+async function applyShowIn(popup) {
   const state = popup._svalShowIn;
   popup._svalShowIn = null;
   const store = lazy.SvalFavoritesStore.readyInstance;
   if (!state || !store) {
     return;
   }
-  const ticked = [...popup.querySelectorAll("[data-workspace]")]
+  const ticked = [...popup.querySelectorAll(SHOW_IN_BOXES)]
     .filter(box => box.getAttribute("checked") === "true")
-    .map(box => box.dataset.workspace);
+    .map(box => SvalMenu.dataOf(box));
   const scope = scopeFor(ticked, state.workspaces);
   if (scope === undefined) {
     return;
@@ -348,8 +321,14 @@ export class SvalPinsRow {
   #pressedSelected = false;
 
   #numbersTimer = null;
+  /** The pin menu and the row's menu, as `SvalMenu.create` gave them. */
   #menu = null;
+  #rowMenu = null;
+  /** What the pin menu is open on: `{ pin, top }`. */
+  #menuPin = null;
   #popover = null;
+  /** The pins' popover, as `SvalPopover.create` gave it, once made. */
+  #popoverHandle = null;
   #observer = {
     observe: (subject, topic, data) => {
       if (data === PINS_QUICK_PEEK_PREF) {
@@ -1266,49 +1245,9 @@ export class SvalPinsRow {
    * @param {object|null} folder The pin folder, or null for "+N".
    */
   #openPopover(anchor, caption, items, folder) {
-    const doc = this.#window.document;
-    let panel = doc.getElementById(POPOVER_ID);
-    if (!panel) {
-      panel = doc.createXULElement("panel");
-      panel.id = POPOVER_ID;
-      panel.className = "sval-pins-popover";
-      panel.setAttribute("noautofocus", "true");
-      panel.setAttribute("sval-stem-host", "");
-      panel.setAttribute("role", "dialog");
-      // The popover's window reaches past what it draws, over the row, so a
-      // pin dragged out of it would never reach the row. It closes once the
-      // drag leaves what it draws, as Firefox's bookmark menus close
-      // (`places-menupopup.js`), except where closing the drag's source
-      // popup ends the drag.
-      panel.addEventListener("dragover", event => {
-        if (
-          this.#drag &&
-          !event.target.closest?.(".sval-pins-popover-box") &&
-          !panel.isWaylandDragSource
-        ) {
-          this.#closePopover();
-        }
-      });
-      doc.getElementById("mainPopupSet").append(panel);
-    }
+    const panel = this.popoverHandle.popup;
     const key = anchor?.dataset?.key ?? null;
-    const state = { anchor, key, stack: [{ caption, items, folder }] };
-    this.#popover = state;
-    panel.addEventListener(
-      "popuphidden",
-      event => {
-        if (event.target !== panel) {
-          return;
-        }
-        if (this.#popover === state) {
-          this.#popover = null;
-        }
-        for (const el of this.#block.querySelectorAll("[data-open]")) {
-          el.removeAttribute("data-open");
-        }
-      },
-      { once: true }
-    );
+    this.#popover = { anchor, key, stack: [{ caption, items, folder }] };
     this.#drawPopover(panel);
     anchor?.closest(".sval-pin-slot")?.setAttribute("data-open", "true");
     const narrow = this.#block.hasAttribute("data-narrow");
@@ -1319,16 +1258,51 @@ export class SvalPinsRow {
         ? "left"
         : "right";
     panel.setAttribute("sval-stem-side", narrow ? end : "bottom");
-    panel.openPopup(anchor, narrow ? "end_before" : "after_start", 0, 0);
-    panel.addEventListener(
-      "popupshown",
-      () => panel.querySelector("button[data-guid]")?.focus(),
-      { once: true }
-    );
+    this.popoverHandle.openFrom(anchor, narrow ? "end_before" : "after_start", {
+      button: null,
+    });
+  }
+
+  /** The pins' popover, as `SvalPopover.create` gave it, made once. */
+  get popoverHandle() {
+    if (this.#popoverHandle?.popup.isConnected) {
+      return this.#popoverHandle;
+    }
+    const handle = SvalPopover.create(this.#window.document, {
+      name: POPOVER_ID,
+      arrow: false,
+      className: "sval-pins-popover",
+      attributes: { noautofocus: "true" },
+      stem: {},
+      onShown: () => handle.popup.querySelector("button[data-guid]")?.focus(),
+      onHidden: () => {
+        this.#popover = null;
+        for (const el of this.#block.querySelectorAll("[data-open]")) {
+          el.removeAttribute("data-open");
+        }
+      },
+    });
+    const panel = handle.popup;
+    // The popover's window reaches past what it draws, over the row, so a
+    // pin dragged out of it would never reach the row. It closes once the
+    // drag leaves what it draws, as Firefox's bookmark menus close
+    // (`places-menupopup.js`), except where closing the drag's source popup
+    // ends the drag.
+    panel.addEventListener("dragover", event => {
+      if (
+        this.#drag &&
+        !event.target.closest?.(".sval-pins-popover-box") &&
+        !panel.isWaylandDragSource
+      ) {
+        this.#closePopover();
+      }
+    });
+    this.#popoverHandle = handle;
+    return handle;
   }
 
   #closePopover() {
-    this.#window.document.getElementById(POPOVER_ID)?.hidePopup();
+    this.#popoverHandle?.close();
   }
 
   #drawPopover(panel) {
@@ -1537,13 +1511,18 @@ export class SvalPinsRow {
    * @param {MouseEvent} event
    */
   #openRowMenu(event) {
-    const doc = this.#window.document;
-    let menu = doc.getElementById(ROW_MENU_ID);
-    if (!menu) {
-      menu = doc.createXULElement("menupopup");
-      menu.id = ROW_MENU_ID;
-      menu.append(menuItem(doc, "newPinFolder", "New Pin Folder…"));
-      menu.addEventListener("command", () =>
+    this.rowMenu.openAt(event, this.#block);
+  }
+
+  /** The row's own menu, as `SvalMenu.create` gave it. */
+  get rowMenu() {
+    if (this.#rowMenu?.popup.isConnected) {
+      return this.#rowMenu;
+    }
+    this.#rowMenu = SvalMenu.create(this.#window.document, {
+      name: ROW_MENU_ID,
+      items: [{ id: "newPinFolder", label: "New Pin Folder…" }],
+      onCommand: () =>
         lazy.SvalFavoritesMenu._newFolder(this.#window, {
           guid: lazy.PINS_ROOT,
           kind: "folder",
@@ -1551,15 +1530,9 @@ export class SvalPinsRow {
           SvalLog.warn(
             `pins: a pin folder was not made: ${SvalLog.errorName(err)}`
           )
-        )
-      );
-      doc.getElementById("mainPopupSet").append(menu);
-    }
-    if (event.screenX) {
-      menu.openPopupAtScreen(event.screenX, event.screenY, true);
-    } else {
-      menu.openPopup(this.#block, "after_start", 0, 0, true);
-    }
+        ),
+    });
+    return this.#rowMenu;
   }
 
   /**
@@ -1584,110 +1557,57 @@ export class SvalPinsRow {
       const selected = this.#pages.selectedGuid;
       slot = pinsInFolder(slot).find(p => p.guid === selected) ?? slot;
     }
-    const menu = this.#ensureMenu();
-    menu._svalPin = {
+    this.#menuPin = {
       pin: slot,
       top:
         this.#slots.includes(slot) ||
         this.#slots.some(s => s.guid === slot.guid),
     };
-    if (event && event.screenX) {
-      menu.openPopupAtScreen(event.screenX, event.screenY, true);
-    } else {
-      menu.openPopup(anchor, "after_start", 0, 0, true);
-    }
+    this.pinMenu.openAt(event, anchor);
   }
 
-  #ensureMenu() {
-    if (this.#menu?.isConnected) {
+  /** A pin's menu, as `SvalMenu.create` gave it. */
+  get pinMenu() {
+    if (this.#menu?.popup.isConnected) {
       return this.#menu;
     }
-    const doc = this.#window.document;
-    const menu = doc.createXULElement("menupopup");
-    menu.id = PIN_MENU_ID;
-    const item = (command, label) => menuItem(doc, command, label);
-    const { menu: showIn, popup: showInPopup } = showInMenu(doc);
-    const moveTo = doc.createXULElement("menu");
-    moveTo.dataset.command = "moveToPinFolder";
-    moveTo.setAttribute("label", "Move to Pin Folder");
-    const moveToPopup = doc.createXULElement("menupopup");
-    moveTo.append(moveToPopup);
-    menu.append(
-      item("reset", "Back to saved page"),
-      item("saveCurrent", "Save current page as this pin"),
-      doc.createXULElement("menuseparator"),
-      showIn,
-      moveTo,
-      doc.createXULElement("menuseparator"),
-      item("rename", "Rename…"),
-      item("editAddress", "Edit address…"),
-      doc.createXULElement("menuseparator"),
-      item("moveContents", "Move Contents to Row"),
-      item("moveToFavorites", "Move to Favorites"),
-      item("delete", "Delete")
-    );
-    menu.addEventListener("popupshowing", event => {
-      if (event.target === menu) {
-        this.#menuShowing(menu);
-      } else if (event.target === showInPopup) {
-        fillShowIn(
-          showInPopup,
-          menu._svalPin.pin.guid,
-          showInWorkspaces(this.#panel.nodes ?? {})
+    this.#menu = SvalMenu.create(this.#window.document, {
+      name: PIN_MENU_ID,
+      build: () => this.#pinMenuItems(),
+      onCommand: (id, folder, event) => {
+        if (onShowInCommand(id, event)) {
+          return;
+        }
+        const { pin } = this.#menuPin;
+        const done = id.startsWith("folder:")
+          ? lazy.SvalFavoritesStore.readyInstance?.movePin(pin.guid, {
+              parentGuid: folder,
+            })
+          : this.#run(id, pin);
+        Promise.resolve(done).catch(err =>
+          SvalLog.warn(`pins: a menu command failed: ${SvalLog.errorName(err)}`)
         );
-      } else if (event.target === moveToPopup) {
-        this.#fillMoveTo(moveToPopup, menu._svalPin.pin);
-      }
+      },
     });
-    showInPopup.addEventListener("popuphidden", event => {
-      if (event.target === showInPopup) {
-        applyShowIn(showInPopup).catch(err =>
-          SvalLog.warn(`pins: a scope was not saved: ${SvalLog.errorName(err)}`)
-        );
-      }
-    });
-    menu.addEventListener("command", event => {
-      if (event.target.dataset.showIn) {
-        onShowInCommand(showInPopup, event.target);
-        return;
-      }
-      const pin = menu._svalPin.pin;
-      const folder = event.target.dataset.folder;
-      const done = folder
-        ? lazy.SvalFavoritesStore.readyInstance?.movePin(pin.guid, {
-            parentGuid: folder,
-          })
-        : this.#run(event.target.dataset.command, pin);
-      Promise.resolve(done).catch(err =>
-        SvalLog.warn(`pins: a menu command failed: ${SvalLog.errorName(err)}`)
-      );
-    });
-    doc.getElementById("mainPopupSet").append(menu);
-    this.#menu = menu;
-    return menu;
+    return this.#menu;
   }
 
   /**
    * Lists the row's pin folders in "Move to Pin Folder" (pins-root spec
    * §5), the pin's own disabled.
    *
-   * @param {Element} popup
    * @param {object} pin
+   * @returns {object[]}
    */
-  #fillMoveTo(popup, pin) {
-    const doc = this.#window.document;
+  #moveToItems(pin) {
     const store = lazy.SvalFavoritesStore.readyInstance;
     const current = store?.get(pin.guid)?.parentGuid;
-    popup.replaceChildren();
-    for (const folder of this.#pinFolders()) {
-      const el = doc.createXULElement("menuitem");
-      el.dataset.folder = folder.guid;
-      el.setAttribute("label", folder.name || NEW_PIN_FOLDER_NAME);
-      if (folder.guid === current) {
-        el.setAttribute("disabled", "true");
-      }
-      popup.append(el);
-    }
+    return this.#pinFolders().map(folder => ({
+      id: `folder:${folder.guid}`,
+      label: folder.name || NEW_PIN_FOLDER_NAME,
+      disabled: folder.guid === current,
+      data: folder.guid,
+    }));
   }
 
   /**
@@ -1700,38 +1620,61 @@ export class SvalPinsRow {
     return this.#slots.filter(slot => slot.kind === "folder");
   }
 
-  #menuShowing(menu) {
-    const { pin, top } = menu._svalPin;
+  /**
+   * The pin menu's items for the pin it opens on.
+   *
+   * @returns {Array<object|string>}
+   */
+  #pinMenuItems() {
+    const { pin, top } = this.#menuPin;
     const folder = pin.kind === "folder";
     const state = folder ? null : this.#pages.stateOf(pin.guid);
-    const show = {
-      reset: !folder,
-      saveCurrent: !folder,
+    const offSaved = !state?.off;
+    const showIn = showInItem(
+      () => this.#menuPin.pin.guid,
+      () => showInWorkspaces(this.#panel.nodes ?? {}),
+      err =>
+        SvalLog.warn(`pins: a scope was not saved: ${SvalLog.errorName(err)}`)
+    );
+    return [
+      {
+        id: "reset",
+        label: "Back to saved page",
+        hidden: folder,
+        disabled: offSaved,
+      },
+      {
+        id: "saveCurrent",
+        label: "Save current page as this pin",
+        hidden: folder,
+        disabled: offSaved,
+      },
+      "separator",
       // A pin inside a pin folder goes where its folder goes (§7).
-      showIn: top,
-      moveToPinFolder: !folder && !!this.#pinFolders().length,
-      rename: true,
-      editAddress: !folder,
+      {
+        ...showIn,
+        label: folder ? "Show the folder in" : "Show the pin in",
+        hidden: !top,
+      },
+      {
+        id: "moveToPinFolder",
+        label: "Move to Pin Folder",
+        hidden: folder || !this.#pinFolders().length,
+        fill: () => this.#moveToItems(this.#menuPin.pin),
+      },
+      "separator",
+      { id: "rename", label: "Rename…" },
+      { id: "editAddress", label: "Edit address…", hidden: folder },
+      "separator",
       // A folder in a folder's popover has the row only beyond its parent.
-      moveContents: folder && top,
-      moveToFavorites: top,
-      delete: true,
-    };
-    for (const el of menu.querySelectorAll(":scope > [data-command]")) {
-      el.hidden = !show[el.dataset.command];
-    }
-    menu
-      .querySelector(':scope > [data-command="showIn"]')
-      ?.setAttribute(
-        "label",
-        folder ? "Show the folder in" : "Show the pin in"
-      );
-    for (const command of ["reset", "saveCurrent"]) {
-      menu
-        .querySelector(`[data-command="${command}"]`)
-        .toggleAttribute("disabled", !state?.off);
-    }
-    tidySeparators(menu);
+      {
+        id: "moveContents",
+        label: "Move Contents to Row",
+        hidden: !(folder && top),
+      },
+      { id: "moveToFavorites", label: "Move to Favorites", hidden: !top },
+      { id: "delete", label: "Delete" },
+    ];
   }
 
   async #run(command, pin) {
@@ -1945,7 +1888,7 @@ export class SvalPinsRow {
    * redraw can take that row out of the panel before its `dragend`.
    */
   dragEnded() {
-    const popover = this.#window.document.getElementById(POPOVER_ID);
+    const popover = this.#popoverHandle?.popup;
     for (const el of [
       ...this.#linesEl.querySelectorAll("[data-dragging]"),
       ...(popover?.querySelectorAll("[data-dragging], [data-drop-into]") ?? []),

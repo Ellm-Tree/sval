@@ -40,7 +40,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalFavorites: "moz-src:///browser/components/sval/SvalFavorites.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-  tidySeparators: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
 });
 
 /** An item of a Favorites menu being dragged, by guid. */
@@ -206,49 +206,6 @@ function acceptable(dt) {
   ].some(type => types.includes(type));
 }
 
-/**
- * The items of `els` already in `popup` that can stay where they are while
- * the rest move around them: the longest run whose order in the popup is
- * the order of `els`, and of those, one holding an open folder where one
- * does.
- *
- * @param {Element[]} els A folder's items, in the document's order.
- * @param {Element} popup
- * @returns {Set<Element>}
- */
-function inOrder(els, popup) {
-  const children = [...popup.children];
-  const placed = els
-    .map(el => ({ el, at: children.indexOf(el) }))
-    .filter(({ at }) => at >= 0);
-  const weight = ({ el }) => (el.open ? placed.length + 1 : 1);
-  // Each item's best run ending in it, and the item before it in that run.
-  const best = [];
-  const prev = [];
-  let end = -1;
-  for (let i = 0; i < placed.length; i++) {
-    best[i] = weight(placed[i]);
-    prev[i] = -1;
-    for (let j = 0; j < i; j++) {
-      if (
-        placed[j].at < placed[i].at &&
-        best[j] + weight(placed[i]) > best[i]
-      ) {
-        best[i] = best[j] + weight(placed[i]);
-        prev[i] = j;
-      }
-    }
-    if (end < 0 || best[i] > best[end]) {
-      end = i;
-    }
-  }
-  const stay = new Set();
-  for (let i = end; i >= 0; i = prev[i]) {
-    stay.add(placed[i].el);
-  }
-  return stay;
-}
-
 /** One menu tree of Favorites, from a folder down. */
 export class SvalFavoritesView {
   #root;
@@ -336,7 +293,8 @@ export class SvalFavoritesView {
   handleEvent(event) {
     switch (event.type) {
       case "popupshowing":
-        if (event.target.dataset.folderGuid) {
+        // A folder's submenu is filled by its item's `fill` (`#itemOf`).
+        if (event.target === this.#root) {
           this.#fill(event.target);
         }
         break;
@@ -400,33 +358,23 @@ export class SvalFavoritesView {
    * @param {Element} popup
    */
   #fill(popup) {
-    const doc = popup.ownerDocument;
-    const guid = popup.dataset.folderGuid;
     popup.setAttribute("data-drawn", "");
+    // A folder is drawn as the menu it opens from (`SvalMenu`'s looks), and
+    // a menu SvalMenu does not style keeps its own.
+    lazy.SvalMenu.fill(popup, this.#itemsOf(popup), { look: null });
+  }
+
+  /**
+   * The items of the folder `popup` shows, as `SvalMenu` draws them, each
+   * favorite's item found again by its guid.
+   *
+   * @param {Element} popup
+   * @returns {Array<object|string>}
+   */
+  #itemsOf(popup) {
+    const guid = popup.dataset.folderGuid;
     const store = lazy.SvalFavoritesStore.readyInstance;
-    const rows = store?.children(guid) ?? [];
-    const kept = new Map();
-    // Items the menu puts ahead of the favorites (`data-fixed`), as the menu
-    // bar's Favorites menu does (`SvalMenuBar`), stay at its top.
-    for (const el of [...popup.children]) {
-      if (el.dataset.guid) {
-        kept.set(el.dataset.guid, el);
-      } else if (!el.hasAttribute("data-fixed")) {
-        el.remove();
-      }
-    }
-    const els = [];
-    const place = row => {
-      let el = kept.get(row.guid);
-      kept.delete(row.guid);
-      if (!el || el.dataset.kind !== row.kind) {
-        el?.remove();
-        el = this.#make(doc, row);
-      }
-      this.#update(el, row);
-      els.push(el);
-    };
-    rows.forEach(place);
+    const items = (store?.children(guid) ?? []).map(row => this.#itemOf(row));
     const then =
       this.#then && popup === this.#root
         ? (store?.children(this.#then.guid) ?? [])
@@ -434,98 +382,80 @@ export class SvalFavoritesView {
     if (then.length) {
       // A `menucaption`, a menu's own heading, which the arrow keys pass
       // over.
-      const caption = doc.createXULElement("menucaption");
-      caption.setAttribute("label", this.#then.heading);
-      els.push(doc.createXULElement("menuseparator"), caption);
-      then.forEach(place);
+      items.push(
+        { id: "thenSeparator", type: "separator" },
+        { id: "thenHeading", type: "caption", label: this.#then.heading },
+        ...then.map(row => this.#itemOf(row))
+      );
     }
-    for (const el of kept.values()) {
-      el.remove();
-    }
-    // Moving an item takes it out of the document, and an open folder's
-    // submenu loses its frame (`nsXULPopupManager::PopupDestroyed`). So
-    // only the items out of order move, around the longest run already in
-    // order, the one holding an open folder where one does.
-    const stay = inOrder(els, popup);
-    for (let i = els.length - 1; i >= 0; i--) {
-      if (!stay.has(els[i])) {
-        popup.insertBefore(els[i], i + 1 < els.length ? els[i + 1] : null);
-      }
-    }
-    if (!els.length) {
+    if (!items.length) {
       // What Firefox's bookmarks menus show for an empty folder
       // (`PlacesViewBase._setEmptyPopupStatus`).
-      const empty = doc.createXULElement("menuitem");
-      empty.setAttribute("disabled", "true");
-      empty.className = "bookmark-item";
-      doc.l10n.setAttributes(empty, "places-empty-bookmarks-folder");
-      popup.append(empty);
+      items.push({
+        id: "empty",
+        l10n: { id: "places-empty-bookmarks-folder" },
+        className: "bookmark-item",
+        disabled: true,
+      });
     }
     if (this.#folderPickLabel) {
-      const pick = doc.createXULElement("menuitem");
-      pick.dataset.pickFolder = guid;
-      pick.setAttribute("label", this.#folderPickLabel);
-      pick.disabled =
-        !lazy.SvalFavoritesStore.readyInstance?.favoritesIn(guid).length;
-      popup.append(doc.createXULElement("menuseparator"), pick);
+      items.push(
+        { id: "pickSeparator", type: "separator" },
+        {
+          id: "pickFolder",
+          label: this.#folderPickLabel,
+          disabled: !store?.favoritesIn(guid).length,
+          attributes: { "data-pick-folder": guid },
+        }
+      );
     }
     // A separator the person put between favorites can end up beside
-    // another or at an end, with the pins left out or a folder emptied.
-    lazy.tidySeparators(popup);
+    // another or at an end, with the pins left out or a folder emptied,
+    // which `SvalMenu` tidies.
+    return items;
   }
 
-  #make(doc, row) {
-    let el;
+  /**
+   * @param {object} row A favorite, folder or separator.
+   * @returns {object} its item.
+   */
+  #itemOf(row) {
+    const attributes = { "data-guid": row.guid, "data-kind": row.kind };
     if (row.kind === "separator") {
-      el = doc.createXULElement("menuseparator");
-    } else if (row.kind === "folder") {
-      el = doc.createXULElement("menu");
-      el.setAttribute("container", "true");
-      el.className = "menu-iconic bookmark-item";
-      const popup = doc.createXULElement("menupopup");
-      popup.setAttribute("nonnative", "");
-      popup.dataset.folderGuid = row.guid;
-      el.append(popup);
-    } else {
-      el = doc.createXULElement("menuitem");
-      el.className = "menuitem-iconic bookmark-item menuitem-with-favicon";
-    }
-    el.dataset.guid = row.guid;
-    el.dataset.kind = row.kind;
-    return el;
-  }
-
-  #update(el, row) {
-    if (row.kind === "separator") {
-      return;
-    }
-    el.setAttribute("label", labelOf(row));
-    if (row.kind === "favorite") {
-      el.dataset.url = row.url ?? "";
-      el.setAttribute(
-        "scheme",
-        lazy.PlacesUIUtils.guessUrlSchemeForUI(row.url ?? "")
-      );
-      const icon = iconOf(row.url);
-      if (icon) {
-        el.setAttribute("image", icon);
-      } else {
-        el.removeAttribute("image");
-      }
-      // Another device's address that no device opens is drawn so it can be
-      // deleted, and does nothing else (decision 1372).
-      el.toggleAttribute("disabled", row.refused);
-      if (row.local) {
-        el.setAttribute("tooltiptext", `${labelOf(row)}\n${LOCAL_TOOLTIP}`);
-      } else {
-        el.removeAttribute("tooltiptext");
-      }
+      return { id: row.guid, type: "separator", attributes };
     }
     if (this.#dragAndDrop && !row.refused) {
-      el.setAttribute("draggable", "true");
-    } else {
-      el.removeAttribute("draggable");
+      attributes.draggable = "true";
     }
+    if (row.kind === "folder") {
+      return {
+        id: row.guid,
+        label: labelOf(row),
+        className: "menu-iconic bookmark-item",
+        attributes: { ...attributes, container: "true" },
+        popupAttributes: { nonnative: "" },
+        fill: popup => {
+          popup.dataset.folderGuid = row.guid;
+          popup.setAttribute("data-drawn", "");
+          return this.#itemsOf(popup);
+        },
+      };
+    }
+    attributes["data-url"] = row.url ?? "";
+    attributes.scheme = lazy.PlacesUIUtils.guessUrlSchemeForUI(row.url ?? "");
+    if (row.local) {
+      attributes.tooltiptext = `${labelOf(row)}\n${LOCAL_TOOLTIP}`;
+    }
+    return {
+      id: row.guid,
+      label: labelOf(row),
+      icon: iconOf(row.url) ?? undefined,
+      className: "menuitem-iconic bookmark-item menuitem-with-favicon",
+      // Another device's address that no device opens is drawn so it can be
+      // deleted, and does nothing else (decision 1372).
+      disabled: row.refused,
+      attributes,
+    };
   }
 
   #onCommand(event) {

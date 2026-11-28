@@ -598,6 +598,30 @@ add_task(async function the_site_menu_lists_and_changes_permissions() {
         byId("sval-site-perm-geo").dataset.state,
         String(SitePermissions.UNKNOWN)
       );
+      // A value's menu sets the permission, and the site menu stays open.
+      const shown = BrowserTestUtils.waitForEvent(
+        document,
+        "popupshown",
+        false,
+        event => event.target.id === "sval-site-perm-menu"
+      );
+      byId("sval-site-perm-geo").click();
+      const { target: values } = await within(
+        shown,
+        10_000,
+        "the permission's values"
+      );
+      await chooseMenuItem(
+        menuItem({ popup: values }, String(SitePermissions.BLOCK)),
+        values,
+        "Block"
+      );
+      Assert.equal(
+        SitePermissions.getForPrincipal(browser.contentPrincipal, "geo").state,
+        SitePermissions.BLOCK,
+        "the value chosen is the permission"
+      );
+      Assert.equal(menuIn().state, "open", "the site menu stays open");
       // The page keeps what it was granted until it loads again.
       const reloaded = BrowserTestUtils.browserLoaded(browser);
       await closeMenu();

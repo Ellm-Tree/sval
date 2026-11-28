@@ -7,14 +7,22 @@
  * built once, shows the entries that fit what it was opened on, and runs
  * them through the panel's `run`, as a key does.
  *
+ * Each entry's id in the menu is the command it runs. A submenu's entries
+ * are `moveParent:`, `joinSplit:` or `moveWorkspace:` and the node they
+ * name, which is their data, and `newGroup`.
+ *
  * The panel makes one of these for its window.
  */
 
 import {
   MENU_KEYS,
   STYLE_KEY,
-  ariaShortcut,
 } from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
+import {
+  MENU_ID_ATTR,
+  SvalMenu,
+  tidySeparators,
+} from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
 import {
   SELECTION_COMMANDS,
   addToSplitChoices,
@@ -39,7 +47,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
   canUnload: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   isKeptLoaded: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   styleScopeOf: "moz-src:///browser/components/sval/SvalSiteStylePanel.sys.mjs",
-  tidySeparators: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
 });
 
 /**
@@ -69,21 +76,6 @@ const TAB_MENU_LABELS = {
 };
 
 /**
- * Opens a context `menupopup`.
- *
- * @param {Element} menu
- * @param {Element} anchor What a key opened it on.
- * @param {MouseEvent} [event] A `contextmenu`, which opens it at the pointer.
- */
-export function openContextMenu(menu, anchor, event) {
-  if (event) {
-    menu.openPopupAtScreen(event.screenX, event.screenY, true, event);
-  } else {
-    menu.openPopup(anchor, { position: "after_start", isContextMenu: true });
-  }
-}
-
-/**
  * What the row menu reads of its panel, and asks of it.
  *
  * @typedef {object} PanelView
@@ -108,8 +100,8 @@ export function openContextMenu(menu, anchor, event) {
  *   closes a selection.
  * @property {() => Set<string>} transparentIds Groups drawn as their
  *   contents.
- * @property {(popup: Element, ids: string[]) => void} fillMoveToWorkspace
- *   Fills a popup with the Workspaces rows can move to.
+ * @property {(ids: string[]) => Array<object|string>} moveToWorkspaceItems
+ *   The Workspaces rows can move to, as `SvalMenu` items.
  * @property {(what: string, action: Function) => Promise} guard Runs a
  *   command, as a key's runs.
  * @property {(command: string, row: object) => void} run Runs a row's
@@ -127,7 +119,7 @@ export class SvalPanelRowMenu {
   /** @type {PanelView} */
   #view;
 
-  /** The row menu's `menupopup`, once built. */
+  /** The row menu, as `SvalMenu.create` gave it, once built. */
   #menu = null;
 
   /** The row the menu was last opened on, as a node id. */
@@ -147,13 +139,16 @@ export class SvalPanelRowMenu {
     return this.#rowId;
   }
 
+  /** The row menu, as `SvalMenu.create` gave it. */
+  get menu() {
+    return this.#menu;
+  }
+
   /**
-   * Builds the row context menu once and parks it in `#mainPopupSet`, which
-   * `browser.xhtml` already declares. A `<menupopup>` is what gives the menu
-   * keyboard navigation, dismissal and platform placement for free, which is
-   * why `sidebar-context-menu` and `tabContextMenu` are XUL popups too, and
-   * creating it here needs no patch to that markup, only an element appended
-   * to a popupset Mozilla already ships.
+   * Builds the row context menu once in `#mainPopupSet`. A `<menupopup>` is
+   * what gives the menu keyboard navigation, dismissal and platform
+   * placement for free, which is why `sidebar-context-menu` and
+   * `tabContextMenu` are XUL popups too.
    *
    * One item per possible command, shown or hidden per row kind on
    * `popupshowing` (`#onShowing`) rather than rebuilt each time: the menu's
@@ -163,23 +158,21 @@ export class SvalPanelRowMenu {
    * @returns {Element} the `menupopup`.
    */
   build() {
-    const menu = this.#window.document.createXULElement("menupopup");
-    menu.id = "sval-row-context-menu";
-    this.#window.document.getElementById(menu.id)?.remove();
-    menu.append(...this.#items());
-    menu.addEventListener("popupshowing", event => this.#onShowing(event));
-    menu.addEventListener("command", event => this.#onCommand(event));
-    this.#menu = menu;
-    this.#window.document.getElementById("mainPopupSet").append(menu);
-    return menu;
+    this.#menu = SvalMenu.create(this.#window.document, {
+      name: "sval-row-context-menu",
+      items: this.#items(),
+      onShowing: () => this.#onShowing(),
+      onCommand: (id, data, event) => this.#onCommand(event),
+    });
+    return this.#menu.popup;
   }
 
   /**
-   * One element per command a row's menu can offer, in the row menu's order,
+   * One item per command a row's menu can offer, in the row menu's order,
    * for the row menu and the menu bar's Tab menu (`SvalMenuBar`).
    *
    * @param {object} [labels] Labels by command, over the row menu's own.
-   * @returns {Element[]}
+   * @returns {Array<object>}
    */
   #items(labels = {}) {
     // An item a row's key also runs names that key (`SvalShortcuts`). A key
@@ -187,40 +180,25 @@ export class SvalPanelRowMenu {
     // accelerator is left to the item's accessible
     // (`XULMenuitemAccessible::KeyboardShortcut`), which reads the key as it
     // is.
-    const item = (command, label, key) => {
-      const el = this.#window.document.createXULElement("menuitem");
-      el.setAttribute("data-command", command);
-      el.setAttribute("label", labels[command] ?? label);
-      if (key) {
-        el.setAttribute("key", key.id);
-      }
-      if (key?.keycode) {
-        el.setAttribute("aria-keyshortcuts", ariaShortcut(key));
-      }
-      return el;
-    };
-    const checkItem = (command, label) => {
-      const el = item(command, label);
-      el.setAttribute("type", "checkbox");
-      return el;
-    };
-    const submenu = (command, label) => {
-      const el = this.#window.document.createXULElement("menu");
-      el.setAttribute("data-command", command);
-      el.setAttribute("label", labels[command] ?? label);
-      el.append(this.#window.document.createXULElement("menupopup"));
-      return el;
-    };
+    const item = (command, label, key) => ({
+      id: command,
+      label: labels[command] ?? label,
+      key,
+    });
+    const checkItem = (command, label) => ({
+      ...item(command, label),
+      type: "checkbox",
+    });
+    const submenu = (command, label) => ({
+      ...item(command, label),
+      items: [],
+    });
     const keys = MENU_KEYS;
     const splitKey = { id: "key_addTabSplitView" };
 
     // Each block of like entries follows a separator, in the order
     // `SvalPanelModel.contextMenuItems` lists them.
-    const separator = command => {
-      const el = this.#window.document.createXULElement("menuseparator");
-      el.setAttribute("data-command", command);
-      return el;
-    };
+    const separator = command => ({ id: command, type: "separator" });
 
     return [
       // Accel+T opens a new tab too, at the top of the Workspace
@@ -235,8 +213,8 @@ export class SvalPanelRowMenu {
       separator("moveSeparator"),
       item("moveBefore", "Move up", keys.moveUp),
       item("moveAfter", "Move down", keys.moveDown),
-      // "Move to group" is a submenu filled on every `popupshowing`, because
-      // which groups it lists depends on the row and on a document another
+      // "Move to group" is filled on every `popupshowing`, because which
+      // groups it lists depends on the row and on a document another
       // device may have changed since the last time it opened.
       submenu("moveToGroup", "Move to group"),
       item("groupSelection", "New group with selection"),
@@ -252,9 +230,7 @@ export class SvalPanelRowMenu {
       item("favorite", "Add to Favorites"),
       item("copyMarkdownLink", "Copy Markdown Link"),
       // Shown where the row's page can have a style (`#syncStyle`).
-      item("styleSite", "Colorshift This Site…", {
-        id: STYLE_KEY,
-      }),
+      item("styleSite", "Colorshift This Site…", { id: STYLE_KEY }),
       separator("createSplitSeparator"),
       item("createSplit", "Create Split", splitKey),
       // Filled each time the menu opens, with the splits that have room.
@@ -301,24 +277,18 @@ export class SvalPanelRowMenu {
       this.#view.selection.select(row.id);
     }
     this.#rowId = row.id;
-    openContextMenu(this.#menu, this.#view.rowElementFor(row.id), event);
+    this.#menu.openAt(event, this.#view.rowElementFor(row.id));
   }
 
   /**
    * Shows only the commands {@link SvalPanelModel.contextMenuItems} names for
-   * the row the menu was opened on.
-   *
-   * @param {Event} event `popupshowing` on `#sval-row-context-menu`.
+   * the row the menu was opened on. An entry the row's list names can still
+   * be hidden here, as a pin is where `canPin` refuses, and SvalMenu hides
+   * its block's separator with it.
    */
-  #onShowing(event) {
-    if (event.target !== this.#menu) {
-      return;
-    }
+  #onShowing() {
     const row = this.#view.rowFor(this.#rowId);
-    this.sync(this.#menu, row, this.#view.selection.around(row));
-    // An entry the row's list names can still be hidden here, as a pin is
-    // where `canPin` refuses, and its block's separator goes with it.
-    lazy.tidySeparators(this.#menu);
+    this.sync(this.#menu.popup, row, this.#view.selection.around(row));
   }
 
   /**
@@ -340,19 +310,20 @@ export class SvalPanelRowMenu {
           })
         : []
     );
-    for (const child of menu.children) {
-      child.hidden = !shown.has(child.dataset.command);
+    for (const child of menu.querySelectorAll(`:scope > [${MENU_ID_ATTR}]`)) {
+      child.hidden = !shown.has(child.getAttribute(MENU_ID_ATTR));
       child.removeAttribute("disabled");
     }
+    const item = command => itemOf(menu, command);
     // An agent's workspace shows no pins (pins spec §7), and a pin is a web
     // page's.
     for (const command of ["pin", "pinHere"]) {
-      const pin = menu.querySelector(`[data-command="${command}"]`);
+      const pin = item(command);
       if (pin && !pin.hidden && row) {
         pin.hidden = !this.#view.pins?.canPin(row.id);
       }
     }
-    const clearLabel = menu.querySelector('[data-command="clearLabel"]');
+    const clearLabel = item("clearLabel");
     if (clearLabel && !clearLabel.hidden) {
       clearLabel.hidden = !this.#view.nodes[row?.id]?.appearance?.label;
     }
@@ -362,12 +333,10 @@ export class SvalPanelRowMenu {
     }
     if (row) {
       this.#syncMoves(menu, row);
-      menu
-        .querySelector('[data-command="unload"]')
-        ?.toggleAttribute(
-          "disabled",
-          !this.#view.tabsUnder(row).some(lazy.canUnload)
-        );
+      item("unload")?.toggleAttribute(
+        "disabled",
+        !this.#view.tabsUnder(row).some(lazy.canUnload)
+      );
       this.#syncKeepLoaded(menu, row);
       this.#syncMedia(menu, row);
       this.#syncFavorite(menu, row);
@@ -388,7 +357,7 @@ export class SvalPanelRowMenu {
    * @param {object} row
    */
   #syncStyle(menu, row) {
-    const item = menu.querySelector('[data-command="styleSite"]');
+    const item = itemOf(menu, "styleSite");
     if (!item || item.hidden) {
       return;
     }
@@ -404,7 +373,7 @@ export class SvalPanelRowMenu {
    * @param {object} row
    */
   #syncKeepLoaded(menu, row) {
-    const item = menu.querySelector('[data-command="keepLoaded"]');
+    const item = itemOf(menu, "keepLoaded");
     if (!item) {
       return;
     }
@@ -421,7 +390,7 @@ export class SvalPanelRowMenu {
    * @param {object} row
    */
   #syncMedia(menu, row) {
-    const item = menu.querySelector('[data-command="media"]');
+    const item = itemOf(menu, "media");
     if (!item || item.hidden) {
       return;
     }
@@ -439,7 +408,7 @@ export class SvalPanelRowMenu {
    * @param {object} row
    */
   #syncFavorite(menu, row) {
-    const item = menu.querySelector('[data-command="favorite"]');
+    const item = itemOf(menu, "favorite");
     if (!item || item.hidden) {
       return;
     }
@@ -472,27 +441,26 @@ export class SvalPanelRowMenu {
    * @param {object} row A tab's row, not a pane's.
    */
   #fillAddToSplit(menu, row) {
-    const parent = menu.querySelector('[data-command="addToSplit"]');
-    const popup = parent.querySelector("menupopup");
-    popup.textContent = "";
+    const parent = itemOf(menu, "addToSplit");
     const choices = addToSplitChoices(
       this.#view.nodes,
       row.id,
       this.#view.workspace.id
     );
     const byParent = childrenByParent(this.#view.nodes);
-    for (const split of choices) {
-      const titles = splitTabs(this.#view.nodes, split, byParent).map(
-        id => displayName(this.#view.nodes[id]) || this.#view.untitled(TAB)
-      );
-      const entry = this.#window.document.createXULElement("menuitem");
-      entry.setAttribute("data-join-split", split);
-      entry.setAttribute(
-        "label",
-        this.#view.nodes[split].content?.name || titles.join(", ")
-      );
-      popup.append(entry);
-    }
+    SvalMenu.fill(
+      parent.menupopup,
+      choices.map(split => {
+        const titles = splitTabs(this.#view.nodes, split, byParent).map(
+          id => displayName(this.#view.nodes[id]) || this.#view.untitled(TAB)
+        );
+        return {
+          id: `joinSplit:${split}`,
+          data: split,
+          label: this.#view.nodes[split].content?.name || titles.join(", "),
+        };
+      })
+    );
     parent.toggleAttribute("disabled", !choices.length);
   }
 
@@ -506,20 +474,23 @@ export class SvalPanelRowMenu {
    * @param {object} pane A pane's row.
    */
   #syncSplit(menu, pane) {
-    menu
-      .querySelector('[data-command="addTabToSplit"]')
-      .toggleAttribute("disabled", !splitHasRoom(this.#view.nodes, pane.split));
-    menu
-      .querySelector('[data-command="movePaneLeft"]')
-      .toggleAttribute("disabled", pane.posinset === 1);
-    menu
-      .querySelector('[data-command="movePaneRight"]')
-      .toggleAttribute("disabled", pane.posinset === pane.setsize);
+    itemOf(menu, "addTabToSplit").toggleAttribute(
+      "disabled",
+      !splitHasRoom(this.#view.nodes, pane.split)
+    );
+    itemOf(menu, "movePaneLeft").toggleAttribute(
+      "disabled",
+      pane.posinset === 1
+    );
+    itemOf(menu, "movePaneRight").toggleAttribute(
+      "disabled",
+      pane.posinset === pane.setsize
+    );
     // Close All closes the split's every tab, more than one run's when a
     // merge left it holding more than four.
     const tabs = splitTabs(this.#view.nodes, pane.split);
     // The Tab menu has no Close All.
-    const closeAll = menu.querySelector('[data-command="closeSplit"]');
+    const closeAll = itemOf(menu, "closeSplit");
     closeAll?.setAttribute(
       "label",
       tabs.length === 2 ? "Close Both" : "Close All"
@@ -542,9 +513,7 @@ export class SvalPanelRowMenu {
     const id = this.#view.movingId(row);
     for (const command of ["moveBefore", "moveAfter"]) {
       const possible = moveTarget(this.#view.nodes, id, command);
-      menu
-        .querySelector(`[data-command="${command}"]`)
-        .toggleAttribute("disabled", !possible);
+      itemOf(menu, command).toggleAttribute("disabled", !possible);
     }
     this.#fillMoveToGroup(menu, [id]);
     this.#fillMoveToWorkspace(menu, [row.id]);
@@ -560,23 +529,22 @@ export class SvalPanelRowMenu {
    */
   #syncSelection(menu, several) {
     const roots = this.#view.selection.roots(several);
-    for (const child of menu.children) {
+    for (const child of menu.querySelectorAll(`:scope > [${MENU_ID_ATTR}]`)) {
       if (
         child.localName !== "menuseparator" &&
-        !SELECTION_COMMANDS.has(child.dataset.command)
+        !SELECTION_COMMANDS.has(child.getAttribute(MENU_ID_ATTR))
       ) {
         child.setAttribute("disabled", "true");
       }
     }
-    menu
-      .querySelector('[data-command="close"]')
-      ?.toggleAttribute("disabled", !this.#view.closesSelection(several));
-    menu
-      .querySelector('[data-command="groupSelection"]')
-      ?.toggleAttribute(
-        "disabled",
-        !groupSelectionTarget(this.#view.nodes, roots)
-      );
+    itemOf(menu, "close")?.toggleAttribute(
+      "disabled",
+      !this.#view.closesSelection(several)
+    );
+    itemOf(menu, "groupSelection")?.toggleAttribute(
+      "disabled",
+      !groupSelectionTarget(this.#view.nodes, roots)
+    );
     this.#fillMoveToGroup(menu, roots);
     this.#fillMoveToWorkspace(menu, roots);
   }
@@ -594,9 +562,6 @@ export class SvalPanelRowMenu {
    * @param {string[]} ids The nodes a move moves.
    */
   #fillMoveToGroup(menu, ids) {
-    const parent = menu.querySelector('[data-command="moveToGroup"]');
-    const popup = parent.querySelector("menupopup");
-    popup.textContent = "";
     const choices = moveToGroupChoices(
       this.#view.nodes,
       ids,
@@ -605,40 +570,32 @@ export class SvalPanelRowMenu {
         transparent: this.#view.transparentIds(),
       }
     );
+    const items = [];
     for (const choice of choices) {
-      const entry = this.#window.document.createXULElement("menuitem");
-      entry.setAttribute("data-move-parent", choice.id);
+      const entry = { id: `moveParent:${choice.id}`, data: choice.id };
       if (choice.kind === WORKSPACE) {
-        entry.setAttribute("label", "No group");
+        entry.label = "No group";
       } else {
         const node = this.#view.nodes[choice.id];
         const name = node?.content?.name || this.#view.untitled(choice.kind);
         const emoji = node?.appearance?.emoji;
-        entry.setAttribute(
-          "label",
-          " ".repeat(choice.depth) + (emoji ? `${emoji} ${name}` : name)
-        );
+        entry.label =
+          " ".repeat(choice.depth) + (emoji ? `${emoji} ${name}` : name);
         // The indent shows nesting only to the eye.
         const outer = this.#view.nodes[node?.placement?.parent];
         if (choice.depth > 0 && outer) {
-          entry.setAttribute(
-            "aria-description",
-            `in ${outer.content?.name || this.#view.untitled(outer.kind)}`
-          );
+          entry.attributes = {
+            "aria-description": `in ${outer.content?.name || this.#view.untitled(outer.kind)}`,
+          };
         }
       }
-      popup.append(entry);
+      items.push(entry);
       if (choice.kind === WORKSPACE && choices.length > 1) {
-        popup.append(this.#window.document.createXULElement("menuseparator"));
+        items.push("separator");
       }
     }
-    if (choices.length) {
-      popup.append(this.#window.document.createXULElement("menuseparator"));
-    }
-    const fresh = this.#window.document.createXULElement("menuitem");
-    fresh.setAttribute("data-new-group", "true");
-    fresh.setAttribute("label", "New group…");
-    popup.append(fresh);
+    items.push("separator", { id: "newGroup", label: "New group…" });
+    SvalMenu.fill(itemOf(menu, "moveToGroup").menupopup, items);
   }
 
   /**
@@ -663,42 +620,38 @@ export class SvalPanelRowMenu {
    * @param {string[]|null} [several] The selection the menu acts on.
    */
   #run(event, row, several = null) {
-    if (!row) {
+    const id = event.target.getAttribute(MENU_ID_ATTR);
+    if (!row || !id) {
       return;
     }
+    const data = SvalMenu.dataOf(event.target);
     // A pane's moves move its split (split-view spec §6.3).
     const moving = several
       ? this.#view.selection.roots(several)
       : this.#view.movingId(row);
-    if (event.target.hasAttribute("data-move-parent")) {
-      const parent = event.target.getAttribute("data-move-parent");
+    if (id.startsWith("moveParent:")) {
       this.#view.guard("moveInto", () =>
-        this.#view.moveInto(moving, parent, row.id)
+        this.#view.moveInto(moving, data, row.id)
       );
       return;
     }
-    if (event.target.hasAttribute("data-new-group")) {
+    if (id === "newGroup") {
       this.#view.guard("newGroup", () =>
         this.#view.newGroupWith([moving].flat())
       );
       return;
     }
-    if (event.target.hasAttribute("data-join-split")) {
-      const split = event.target.getAttribute("data-join-split");
-      this.#view.guard("joinSplit", () => this.#view.joinSplit(split, row.id));
+    if (id.startsWith("joinSplit:")) {
+      this.#view.guard("joinSplit", () => this.#view.joinSplit(data, row.id));
       return;
     }
-    if (event.target.hasAttribute("data-move-workspace")) {
-      const workspace = event.target.getAttribute("data-move-workspace");
+    if (id.startsWith("moveWorkspace:")) {
       this.#view.guard("moveToWorkspace", () =>
-        this.#view.moveToWorkspace(moving, workspace)
+        this.#view.moveToWorkspace(moving, data)
       );
       return;
     }
-    const command = event.target.dataset.command;
-    if (command) {
-      this.#view.run(command, row);
-    }
+    this.#view.run(id, row);
   }
 
   /**
@@ -706,11 +659,11 @@ export class SvalPanelRowMenu {
    * act on one tab, labelled as the menu bar labels its items, for
    * `syncBar` to fit to the selected tab.
    *
-   * @returns {Element[]}
+   * @returns {Array<object>}
    */
   barItems() {
     const items = new Map(
-      this.#items(TAB_MENU_LABELS).map(el => [el.dataset.command, el])
+      this.#items(TAB_MENU_LABELS).map(item => [item.id, item])
     );
     return Object.keys(TAB_MENU_LABELS).map(command => items.get(command));
   }
@@ -726,7 +679,7 @@ export class SvalPanelRowMenu {
     const pin = this.#view.built ? this.#view.pins?.selectedPin : null;
     const row = pin ? null : this.#selectedTabRow();
     this.sync(menu, row);
-    const pinItem = menu.querySelector('[data-command="pin"]');
+    const pinItem = itemOf(menu, "pin");
     pinItem.setAttribute(
       "label",
       pin ? "Move Pin to Favorites" : TAB_MENU_LABELS.pin
@@ -734,11 +687,12 @@ export class SvalPanelRowMenu {
     pinItem.dataset.pinned = String(!!pin);
     if (pin) {
       pinItem.hidden = false;
-      menu.querySelector('[data-command="pinHere"]').hidden = true;
+      itemOf(menu, "pinHere").hidden = true;
     }
     // A tab's row offers Create Split and a pane's the split's entries
     // (`SvalPanelModel.contextMenuItems`), so a row always has a block here.
-    menu.querySelector('[data-command="splitSeparator"]').hidden = !row;
+    itemOf(menu, "splitSeparator").hidden = !row;
+    tidySeparators(menu);
   }
 
   /**
@@ -750,7 +704,7 @@ export class SvalPanelRowMenu {
     }
     const pin = this.#view.pins?.selectedPin;
     if (pin) {
-      if (event.target.dataset.command === "pin") {
+      if (event.target.getAttribute(MENU_ID_ATTR) === "pin") {
         this.#view.guard("moveToFavorites", () =>
           this.#view.pins.moveToFavoritesGuid(pin.guid)
         );
@@ -779,10 +733,18 @@ export class SvalPanelRowMenu {
    * @param {string[]} ids The rows the menu is for.
    */
   #fillMoveToWorkspace(menu, ids) {
-    const popup = menu.querySelector(
-      '[data-command="moveToWorkspace"] menupopup'
+    SvalMenu.fill(
+      itemOf(menu, "moveToWorkspace").menupopup,
+      this.#view.moveToWorkspaceItems(ids)
     );
-    popup.textContent = "";
-    this.#view.fillMoveToWorkspace(popup, ids);
   }
+}
+
+/**
+ * @param {Element} menu A menu built from the row menu's items.
+ * @param {string} command
+ * @returns {Element|null} the item that runs `command`.
+ */
+function itemOf(menu, command) {
+  return menu.querySelector(`:scope > [${MENU_ID_ATTR}="${command}"]`);
 }

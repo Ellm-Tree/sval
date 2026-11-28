@@ -199,6 +199,11 @@
     --sval-surface-ground: var(--sval-window-color);
     --panel-background-color: var(--sval-surface);
     --sval-popup-bg: var(--sval-surface);
+    /* The roles Sval's menus read (`sval-menu.css`), the window's popup
+       colours as each palette below sets them. */
+    --sval-menu-bg: var(--sval-popup-bg);
+    --sval-menu-ink: var(--panel-text-color);
+    --sval-menu-edge: var(--panel-border-color);
   }
 
   /* A tinted workspace: the panel and the window's popups wear the tint
@@ -206,32 +211,6 @@
    part of that workspace. */
   :root[data-sval-tint] {
     --sidebar-background-color: var(--sval-tint);
-  }
-
-  /* Every menu takes the window's popup colours. An arrow panel inherits the
-   root's; a menu sets the system's on itself (`popup.css`), so it is pointed
-   back at the root's, as Firefox's own `.toolbar-menupopup` does. Gecko draws
-   every menu, macOS's context and button menus included (`app-sval-prefs.js`),
-   and on macOS `popup.css` gives it the system menu's appearance and
-   background (`-moz-default-appearance: menupopup`, `Menu`), cleared here.
-   On Windows 11 `menu.css` gives it the system's Mica backdrop, which paints
-   the whole popup window, the room for Sval's drawn shadow
-   (`sval-panel.css`) included, so that is cleared too, with the square
-   corner it sets. */
-  menupopup {
-    --panel-background-color: inherit;
-    --panel-text-color: inherit;
-    --panel-border-color: inherit;
-
-    @media (-moz-platform: macos) {
-      appearance: none;
-      background-color: transparent;
-    }
-
-    @media (-moz-windows-mica-popups) {
-      appearance: none;
-      --panel-border-radius: inherit;
-    }
   }
 
   /* A tinted window's popups and find bar take the scheme of its text with
@@ -255,7 +234,7 @@
     --sval-cluster-border: rgba(255, 255, 255, 0.1);
   }
 
-  :root[data-sval-ink="light"] :is(menupopup, panel[type="arrow"], findbar) {
+  :root[data-sval-ink="light"] :is(panel[type="arrow"], panel[sval-popover], findbar) {
     color-scheme: dark;
   }
 
@@ -279,7 +258,7 @@
     --sval-accent: var(--sval-palette-blue);
   }
 
-  :root[data-sval-ink="dark"] :is(menupopup, panel[type="arrow"], findbar) {
+  :root[data-sval-ink="dark"] :is(panel[type="arrow"], panel[sval-popover], findbar) {
     color-scheme: light;
   }
 
@@ -584,6 +563,53 @@
   border-inline-end: 1px solid var(--sval-cluster-border);
   border-start-end-radius: 999px;
   border-end-end-radius: 999px;
+}
+
+/* The » button, which Firefox shows while the row's controls overflow
+   (`toolbarbuttons.css`), closes the last pill in the row: the records'
+   while one of them is in the row, else the extensions'. */
+#nav-bar > #nav-bar-overflow-button {
+  align-self: center;
+  background-color: var(--sval-cluster-bg);
+  border-block: 1px solid var(--sval-cluster-border);
+  border-inline-end: 1px solid var(--sval-cluster-border);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+  box-shadow: var(--sval-cluster-shadow);
+  padding: 3px;
+  margin: 0;
+}
+
+/* The » panel is as wide as its rows, as Sval's menus are (`sval-menu.css`),
+   where Firefox gives it the main menu's width (`panelUI-shared.css`), and
+   its rows are menu rows with no frame of their own. */
+#widget-overflow > panelmultiview panelview {
+  min-width: 0;
+  max-width: 42em;
+}
+
+#widget-overflow .widget-overflow-list > :is(toolbarbutton, toolbaritem) {
+  border: none;
+  box-shadow: none;
+
+  &:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+#nav-bar:is([overflowing], [nonemptyoverflow])
+  :is(
+    #sval-history-button,
+    #downloads-button:not(:has(~ #sval-history-button)),
+    #sval-notices-button:not(:has(~ :is(#downloads-button, #sval-history-button)))
+  ),
+#nav-bar:is([overflowing], [nonemptyoverflow]):not(
+    :has(#nav-bar-customization-target > :is(#downloads-button, #sval-history-button, #sval-notices-button:not([hidden])))
+  )
+  #unified-extensions-button {
+  border-inline-end: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
 /* The address pill's docked parts, each counted while it is in the row and
@@ -1961,20 +1987,6 @@
 
 panel[type="arrow"] {
   --panel-border-radius: 20px;
-}
-
-@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
-  /* The Workspace menu opens over the switcher, where no stem can join it
-     to its button, and wears a stem popover's edge and shadow as box
-     shadows. */
-  #sval-workspace-menu {
-    --panel-box-shadow:
-      1px 0 0 var(--sval-stem-edge), -1px 0 0 var(--sval-stem-edge), 0 1px 0 var(--sval-stem-edge), 0 -1px 0 var(--sval-stem-edge), var(--sval-stem-box-shadow);
-    --panel-border-color: transparent;
-    /* `--sval-stem-shadow-reach` (`sval-stem.css`), and the edge. */
-    --panel-box-shadow-margin: 16px;
-    -moz-window-shadow: none;
-  }
 }
 
 /* The notices popover (`SvalNoticesButton`, messages spec §5): each notice
@@ -3355,6 +3367,7 @@ screenshots-buttons {
       #downloads-button,
       #sval-history-button,
       #unified-extensions-button,
+      #nav-bar-overflow-button,
       #back-button,
       #forward-button,
       #stop-reload-button,

@@ -389,14 +389,20 @@ add_task(async function a_group_whose_tabs_move_out_shows_them_meanwhile() {
   Assert.ok(!SvalPanel._rowFor(group), "the group's row went");
   const menu = await openContextMenu(SvalPanel._rowElementFor(ids[2]));
   const offered = Array.from(
-    menu.querySelectorAll('[data-command="moveToGroup"] [data-move-parent]'),
-    entry => entry.getAttribute("data-move-parent")
+    menuItem({ popup: menu }, "moveToGroup").menupopup.children,
+    entry => entry.getAttribute("data-sval-menu-id")
   );
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
   menu.hidePopup();
   await within(hidden, 10_000, "the row menu closing");
-  Assert.ok(!offered.includes(group), "Move to group leaves it out");
-  Assert.ok(offered.includes(other), "and offers the group that stays");
+  Assert.ok(
+    !offered.includes(`moveParent:${group}`),
+    "Move to group leaves it out"
+  );
+  Assert.ok(
+    offered.includes(`moveParent:${other}`),
+    "and offers the group that stays"
+  );
   for (const [i, tab] of tabs.slice(0, 2).entries()) {
     Assert.ok(SvalPanel._rowFor(ids[i]), "its tab's row shows");
     Assert.ok(!tab.hidden, "and its tab");

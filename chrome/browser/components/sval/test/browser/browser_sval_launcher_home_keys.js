@@ -457,7 +457,7 @@ add_task(async function a_rows_menu_lists_and_acts_alike() {
   const items = [...menu.querySelectorAll("menuitem")].map(i => i.label);
   info(JSON.stringify(items));
   Assert.ok(items.length, "with the address bar's commands");
-  const remove = menu.querySelector("menuitem");
+  const remove = menuItem({ popup: menu }, "dismiss");
   Assert.equal(
     remove.getAttribute("key"),
     "sval-key-dismiss",
@@ -472,7 +472,7 @@ add_task(async function a_rows_menu_lists_and_acts_alike() {
         .textContent
   );
   const removed = PlacesTestUtils.waitForNotification("page-removed");
-  menu.activateItem(menu.querySelector("menuitem"));
+  menu.activateItem(remove);
   await within(removed, 10_000, "Remove from history removes the page");
   await TestUtils.waitForCondition(
     async () => !(await homeList(browser)).items.some(i => i.includes(title)),

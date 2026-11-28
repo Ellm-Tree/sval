@@ -37,6 +37,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   glyph: "moz-src:///browser/components/sval/SvalProtectionButton.sys.mjs",
   scopeForURI: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
+  SvalPopover: "moz-src:///browser/components/sval/SvalPopover.sys.mjs",
 });
 
 /** How far in from the page's top and end corner the dialog opens. */
@@ -186,8 +188,8 @@ class StylePanel {
     this.browser = null;
     /** The scope picked in the title, or null for the page's host. */
     this.picked = null;
-    /** Whether the panel moves the focus into itself once it shows. */
-    this.focusOnShow = false;
+    /** The dialog, as `SvalPopover.create` gave it. */
+    this.popover = null;
     /** The values the dialog shows and the page previews, unsaved. */
     this.draft = null;
     /** Where the dialog stands, as `openPopupAtScreen` places it. */
@@ -216,42 +218,35 @@ class StylePanel {
 
   mount() {
     const { doc } = this;
-    const panel = doc.createXULElement("panel");
-    panel.id = STYLE_PANEL_ID;
-    panel.setAttribute("orient", "vertical");
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-label", "Colorshift");
-    // A panel that hides itself closes on a press anywhere outside it, the
-    // page included (`nsXULPopupManager::Rollup`). The dialog stays while the
-    // person works between it, the page and the site menu, and closes from
-    // Save, Cancel, its Close button, Escape or a tab switch.
-    panel.setAttribute("noautohide", "true");
-    panel.addEventListener("popupshown", event => {
-      if (event.target !== panel) {
-        return;
-      }
-      this.drawPressed(true);
-      if (this.focusOnShow) {
-        this.focusOnShow = false;
-        doc.commandDispatcher.advanceFocusIntoSubtree(panel);
-      }
+    // A floating dialog placed on the screen, with no button to grow from.
+    this.popover = lazy.SvalPopover.create(doc, {
+      name: STYLE_PANEL_ID,
+      arrow: false,
+      label: "Colorshift",
+      attributes: {
+        orient: "vertical",
+        // A panel that hides itself closes on a press anywhere outside it,
+        // the page included (`nsXULPopupManager::Rollup`). The dialog stays
+        // while the person works between it, the page and the site menu,
+        // and closes from Save, Cancel, its Close button, Escape or a tab
+        // switch.
+        noautohide: "true",
+      },
+      onShown: () => this.drawPressed(true),
+      onHidden: () => {
+        this.observe(false);
+        this.drawPressed(false);
+        // The page goes back to its saved style, which Save has just
+        // written or Cancel leaves as the dialog found it.
+        if (this.browser) {
+          SvalSiteStyles.endPreview(this.browser);
+        }
+        this.browser = null;
+        this.picked = null;
+        this.draft = null;
+      },
     });
-    panel.addEventListener("popuphidden", event => {
-      if (event.target !== panel) {
-        return;
-      }
-      this.observe(false);
-      this.drawPressed(false);
-      // The page goes back to its saved style, which Save has just written
-      // or Cancel leaves as the dialog found it.
-      if (this.browser) {
-        SvalSiteStyles.endPreview(this.browser);
-      }
-      this.browser = null;
-      this.picked = null;
-      this.draft = null;
-      this.focusOnShow = false;
-    });
+    const panel = this.popover.popup;
     this.movable(panel);
     panel.addEventListener("keydown", event => {
       // The scope dropdown and the font menu take their own Escape first.
@@ -260,7 +255,6 @@ class StylePanel {
         this.cancel();
       }
     });
-    doc.getElementById("mainPopupSet").append(panel);
     this.panel = panel;
     this.win.gBrowser.tabContainer.addEventListener("TabSelect", () =>
       this.cancel()
@@ -355,7 +349,6 @@ class StylePanel {
       return;
     }
     this.picked = null;
-    this.focusOnShow = focus;
     this.browser = browser;
     this.draft = this.valuesAt(scope, this.scopeAt(scope));
     this.observe(true);
@@ -372,7 +365,7 @@ class StylePanel {
       x: Math.round(win.mozInnerScreenX + left),
       y: Math.round(win.mozInnerScreenY + page.top + OPEN_INSET),
     };
-    this.panel.openPopupAtScreen(this.at.x, this.at.y, false);
+    this.popover.openAt(this.at.x, this.at.y, { focus });
   }
 
   /** Saves the dialog's values at the scope in view, and closes it. */
@@ -949,29 +942,20 @@ class StylePanel {
    * @param {string} current
    * @param {Element} anchor
    */
-  pickFont(scope, values, current, anchor) {
-    const { doc } = this;
-    const popup = doc.createXULElement("menupopup");
-    popup.id = "sval-style-font-menu";
-    for (const { value, text } of FONT_CHOICES) {
-      const item = doc.createXULElement("menuitem");
-      item.setAttribute("type", "radio");
-      item.setAttribute("label", text);
-      item.dataset.font = value;
-      if (value === current) {
-        item.setAttribute("checked", "true");
-      }
-      item.addEventListener("command", () =>
-        this.change({ font: value || undefined }, true)
-      );
-      popup.append(item);
+  async pickFont(scope, values, current, anchor) {
+    const font = await lazy.SvalMenu.choose(
+      anchor,
+      FONT_CHOICES.map(({ value, text }) => ({
+        value,
+        id: value || "default",
+        label: text,
+      })),
+      current,
+      { name: "sval-style-font-menu" }
+    );
+    if (font !== null) {
+      this.change({ font: font || undefined }, true);
     }
-    popup.addEventListener("popuphidden", () => popup.remove(), {
-      once: true,
-    });
-    // Outside the panel, which a choice redraws.
-    doc.getElementById("mainPopupSet").append(popup);
-    popup.openPopup(anchor, "after_end");
   }
 
   /**
@@ -1112,6 +1096,15 @@ export const SvalSiteStylePanel = {
   isOpen(win) {
     const state = panels.get(win)?.panel.state;
     return !!state && state !== "closed";
+  },
+
+  /**
+   * @param {Window} win A browser window.
+   * @returns {object|undefined} its editor, as `SvalPopover.create` gave
+   *   it, once opened.
+   */
+  popoverOf(win) {
+    return panels.get(win)?.popover;
   },
 
   /**

@@ -97,15 +97,13 @@ async function contextOn(el) {
 }
 
 /**
- * Chooses `command` in the open context menu.
+ * Chooses the item `command` in the open context menu.
  *
  * @param {Element} menu
- * @param {string} command
+ * @param {string} command The item's id in the menu.
  */
-async function chooseMenuItem(menu, command) {
-  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.activateItem(menu.querySelector(`[data-command="${command}"]`));
-  await within(hidden, 10_000, `the context menu closing on ${command}`);
+async function chooseInContextMenu(menu, command) {
+  await pickMenuItem({ popup: menu }, command);
 }
 
 /**
@@ -116,7 +114,11 @@ async function chooseMenuItem(menu, command) {
 function shownCommands(menu) {
   return Array.from(menu.children)
     .filter(el => !el.hidden)
-    .map(el => (el.localName === "menuseparator" ? "-" : el.dataset.command));
+    .map(el =>
+      el.localName === "menuseparator"
+        ? "-"
+        : el.getAttribute("data-sval-menu-id")
+    );
 }
 
 /**

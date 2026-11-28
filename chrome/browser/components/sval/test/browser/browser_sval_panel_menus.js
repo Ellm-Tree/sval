@@ -170,7 +170,7 @@ add_task(async function both_menus_are_drawn_by_sval_before_they_open() {
   ]) {
     Assert.equal(popup.state, "closed");
     Assert.ok(popup.hasAttribute("nonnative"), "Gecko draws it");
-    Assert.ok(popup.classList.contains("toolbar-menupopup"), "as a panel menu");
+    Assert.equal(popup.getAttribute("sval-menu"), "panel", "as a panel menu");
   }
 });
 
@@ -211,8 +211,9 @@ add_task(async function the_workspace_menu_works_from_the_keyboard() {
   const second = await press(popup, "KEY_ArrowDown");
   Assert.equal(second.dataset.workspaceId, entries[1], "and then the second");
   const last = await press(popup, "KEY_End");
-  Assert.ok(
-    last.hasAttribute("data-sval-new-workspace"),
+  Assert.strictEqual(
+    last.getAttribute("data-sval-menu-id"),
+    "newWorkspace",
     "End lands on New workspace…"
   );
 
@@ -362,8 +363,9 @@ add_task(async function type_ahead_reaches_a_workspace_named_after_an_emoji() {
   Assert.equal(typed, entry, "N finds the emoji's workspace");
   Assert.equal(popup.state, "open", "and only moves there");
   const next = await press(popup, "n");
-  Assert.ok(
-    next.hasAttribute("data-sval-new-workspace"),
+  Assert.strictEqual(
+    next.getAttribute("data-sval-menu-id"),
+    "newWorkspace",
     "N again moves on to New workspace…"
   );
 

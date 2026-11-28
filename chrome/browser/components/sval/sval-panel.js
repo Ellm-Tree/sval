@@ -242,8 +242,7 @@ var SvalPanel = {
         untitled: kind => panel._untitled(kind),
         closesSelection: ids => panel._closesSelection(ids),
         transparentIds: () => panel.undo.transparentIds(),
-        fillMoveToWorkspace: (popup, ids) =>
-          panel.switcher.fillMoveToWorkspace(popup, ids),
+        moveToWorkspaceItems: ids => panel.switcher.moveToWorkspaceItems(ids),
         guard: (what, action) => panel._guard(what, action),
         run: (command, row) => panel.run(command, row),
         moveInto: (...args) => panel._moveInto(...args),
@@ -673,6 +672,7 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalFavoritesMenu.sys.mjs",
         SvalFavoritesView:
           "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
+        SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
         canUnload: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
         isKeptLoaded:
           "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
@@ -702,8 +702,6 @@ var SvalPanel = {
         SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
         slide: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
         SvalPanelRowMenu:
-          "moz-src:///browser/components/sval/SvalPanelRowMenu.sys.mjs",
-        openContextMenu:
           "moz-src:///browser/components/sval/SvalPanelRowMenu.sys.mjs",
         SvalPanelSwitcher:
           "moz-src:///browser/components/sval/SvalPanelSwitcher.sys.mjs",
@@ -745,8 +743,7 @@ var SvalPanel = {
         SvalSession: "moz-src:///browser/components/sval/SvalSession.sys.mjs",
         SvalSyncState:
           "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
-        tidySeparators:
-          "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
+        tidySeparators: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
         SvalLocalSettings:
           "moz-src:///browser/components/sval/SvalLocalSettings.sys.mjs",
         SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",

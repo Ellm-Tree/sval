@@ -221,7 +221,7 @@ add_task(async function a_menu_on_a_selection_offers_what_acts_on_it() {
   accelClick(ids.tab3);
   const menu = await openContextMenu(rowOf(ids.tab3));
   const enabled = command => {
-    const item = menu.querySelector(`[data-command="${command}"]`);
+    const item = menuItem({ popup: menu }, command);
     return !item.hidden && !item.hasAttribute("disabled");
   };
   for (const command of SvalPanelModel.SELECTION_COMMANDS) {
@@ -240,7 +240,7 @@ add_task(async function a_menu_on_a_selection_offers_what_acts_on_it() {
   accelClick(ids.groupB);
   const withGroup = await openContextMenu(rowOf(ids.tab3));
   Assert.ok(
-    withGroup.querySelector('[data-command="close"]').hasAttribute("disabled"),
+    menuItem({ popup: withGroup }, "close").hasAttribute("disabled"),
     "a selection with a group in it cannot be closed"
   );
   await closeMenu(withGroup);
@@ -252,11 +252,11 @@ add_task(async function a_menu_on_a_selection_offers_what_acts_on_it() {
     "a menu on another row clears the selection"
   );
   Assert.ok(
-    single.querySelector('[data-command="groupSelection"]').hidden,
+    menuItem({ popup: single }, "groupSelection").hidden,
     "and offers one row's entries"
   );
   Assert.ok(
-    !single.querySelector('[data-command="rename"]').hasAttribute("disabled"),
+    !menuItem({ popup: single }, "rename").hasAttribute("disabled"),
     "every one of them on"
   );
   await closeMenu(single);
@@ -281,11 +281,7 @@ add_task(async function move_to_group_takes_the_selection_in_its_order() {
   const { engine, ids } = await viewingTab1();
   accelClick(ids.loose, ids.tab3);
   const menu = await openContextMenu(rowOf(ids.loose));
-  await chooseMenuItem(
-    menu.querySelector(`[data-move-parent="${ids.groupB}"]`),
-    menu,
-    "the second group"
-  );
+  await pickMenuItem({ popup: menu }, `moveParent:${ids.groupB}`);
   await TestUtils.waitForCondition(
     async () => (await childrenOf(engine, ids.groupB)).length === 4,
     "the selection moved"
@@ -317,11 +313,7 @@ add_task(async function move_to_workspace_asks_once_for_the_selection() {
 
   accelClick(ids.groupA, ids.tab2, ids.tab4);
   const menu = await openContextMenu(rowOf(ids.tab4));
-  await chooseMenuItem(
-    menu.querySelector(`[data-move-workspace="${other}"]`),
-    menu,
-    "the other workspace"
-  );
+  await pickMenuItem({ popup: menu }, `moveWorkspace:${other}`);
   await answerDialog();
   await TestUtils.waitForCondition(
     async () => (await childrenOf(engine, other)).length === 2,

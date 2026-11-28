@@ -655,13 +655,13 @@ function contextMenuIn(win, id) {
 }
 
 /**
- * Chooses the item `selector` matches in the open row menu `menu`.
+ * Chooses the item `id` in the open row menu `menu`.
  *
  * @param {Element} menu
- * @param {string} selector
+ * @param {string} id The item's id in the menu.
  */
-function menuCommand(menu, selector) {
-  return chooseMenuItem(menu.querySelector(selector), menu, selector);
+function menuCommand(menu, id) {
+  return pickMenuItem({ popup: menu }, id);
 }
 
 /**

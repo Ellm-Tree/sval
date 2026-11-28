@@ -24,6 +24,7 @@
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
+import { SvalPopover } from "moz-src:///browser/components/sval/SvalPopover.sys.mjs";
 
 export const MODE_PREF = "browser.sval.batterySaver.mode";
 
@@ -161,7 +162,7 @@ function drawWindow(win) {
     button.hidden = !active;
   }
   if (!active) {
-    panels.get(win)?.hidePopup();
+    panels.get(win)?.close();
   }
   const item = doc.getElementById(MENU_ITEM_ID);
   if (item) {
@@ -178,18 +179,25 @@ function drawWindow(win) {
  * @returns {Element}
  */
 function panelFor(win) {
-  let panel = panels.get(win);
-  if (panel) {
-    return panel;
+  let handle = panels.get(win);
+  if (handle) {
+    return handle;
   }
   const doc = win.document;
-  panel = doc.createXULElement("panel");
-  panel.id = PANEL_ID;
-  panel.setAttribute("type", "arrow");
-  panel.setAttribute("flip", "slide");
-  panel.setAttribute("orient", "vertical");
-  panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-labelledby", `${PANEL_ID}-heading`);
+  handle = SvalPopover.create(doc, {
+    name: PANEL_ID,
+    labelledBy: `${PANEL_ID}-heading`,
+    attributes: { flip: "slide", orient: "vertical" },
+    // Grows from its button, reaching past it as the header's popovers do.
+    stem: { hang: true },
+    onShown: () => {
+      if (handle.focusOff) {
+        off.focus();
+      }
+      handle.focusOff = false;
+    },
+  });
+  const panel = handle.popup;
 
   const tile = htmlElement(doc, "span", {
     className: "sval-notice-tile sval-battery-saver-tile",
@@ -251,24 +259,8 @@ function panelFor(win) {
       )
     )
   );
-  panel.addEventListener("popupshown", event => {
-    if (event.target !== panel) {
-      return;
-    }
-    doc.getElementById(BUTTON_ID)?.setAttribute("open", "true");
-    if (panel._svalFocusOnShow) {
-      off.focus();
-    }
-    panel._svalFocusOnShow = false;
-  });
-  panel.addEventListener("popuphidden", event => {
-    if (event.target === panel) {
-      doc.getElementById(BUTTON_ID)?.removeAttribute("open");
-    }
-  });
-  doc.getElementById("mainPopupSet").append(panel);
-  panels.set(win, panel);
-  return panel;
+  panels.set(win, handle);
+  return handle;
 }
 
 /**
@@ -378,17 +370,21 @@ export const SvalBatterySaver = {
     if (!button || button.hidden) {
       return;
     }
-    const panel = panelFor(win);
-    if (panel.state === "open" || panel.state === "showing") {
-      panel.hidePopup();
+    const handle = panelFor(win);
+    if (handle.isOpen()) {
+      handle.close();
       return;
     }
-    panel._svalFocusOnShow = focus;
-    panel.openPopup(button, {
-      position: "bottomright topright",
-      y: 6,
-      triggerEvent: null,
-    });
+    handle.focusOff = focus;
+    handle.openFrom(button, "bottomright topright");
+  },
+
+  /**
+   * @param {Window} win A browser window.
+   * @returns {object} its popover, as `SvalPopover.create` gave it.
+   */
+  popoverOf(win) {
+    return panelFor(win);
   },
 
   /**

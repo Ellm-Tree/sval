@@ -576,13 +576,7 @@ async function moveIntoGroupIn(win, id, group) {
     win
   );
   await within(shown, 10_000, "the row menu opening");
-  await chooseMenuItem(
-    menu.querySelector(
-      `[data-command="moveToGroup"] [data-move-parent="${CSS.escape(group)}"]`
-    ),
-    menu,
-    "the group in Move to group"
-  );
+  await pickMenuItem({ popup: menu }, `moveParent:${group}`);
   await TestUtils.waitForCondition(
     async () => (await privateTree(win))[id]?.placement.parent === group,
     "the row moves into the group"

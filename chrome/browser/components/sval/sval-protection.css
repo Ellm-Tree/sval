@@ -553,27 +553,13 @@
 }
 
 /* Under its open panel's stem the button is the face the stem grows from,
-   in the panel's fill (`sval-stem.css`). The stem's edge runs over the
-   face's top corner, where the count and the breach dot stand, so they give
-   way while the panel that names them is open, and the shield is whole, in
-   the panel's text colour. The `:dir` outranks the count's and the dot's
-   cuts in either direction. */
+   in the panel's fill (`sval-stem.css`), and the shield takes the panel's
+   text colour. */
 @media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
   #sval-protection-button[sval-stem-anchor] {
     &,
     &:hover {
       color: var(--sval-text);
-    }
-
-    > :is(.sval-prot-count, .sval-prot-dot) {
-      display: none;
-    }
-
-    &:is(:dir(ltr), :dir(rtl)) > .sval-prot-shield {
-      mask-image: var(--sval-glyph);
-      mask-size: 18px;
-      mask-position: center;
-      mask-composite: add;
     }
   }
 }

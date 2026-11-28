@@ -17,11 +17,15 @@
  *   do; without it, it is at least as wide as its button and keeps the place
  *   Gecko gives it, as the Workspace panel's menus do;
  * - `sval-stem-off`: it opens with no stem this time.
- * A popover whose button stands inside an element carrying
- * `sval-stem-beside` opens beside the button, on the side facing the
- * window's middle, in place of its own. A pill marked `sval-stem-face` that
- * a button stands alone in is the face the stem grows from, as is a
- * button's own child marked `sval-stem-face`.
+ * A popup whose window shows the system's backdrop, as a see-through
+ * window's do, gives the backdrop the stem's shape, the face included
+ * ({@link shapeWindow}), and draws the face again over it
+ * ({@link showFace}).
+ * A popover whose button stands inside an element whose `sval-stem-beside`
+ * names a width, while that element is no wider, opens beside the button,
+ * on the side facing the window's middle, in place of its own. A pill
+ * marked `sval-stem-face` that a button stands alone in is the face the
+ * stem grows from, as is a button's own child marked `sval-stem-face`.
  * The button it grows from is the toolbarbutton around its anchor, as
  * `panel.js` marks `[open]`, or the anchor itself; the face is that
  * button's icon or badge stack, or the whole button. The button carries
@@ -82,6 +86,11 @@ const STEM_PROPERTIES = [
   "--sval-stem-tab-width",
   "--sval-stem-tab-height",
   "--sval-stem-tab-radius",
+  "--sval-stem-face-left",
+  "--sval-stem-face-top",
+  "--sval-stem-face-width",
+  "--sval-stem-face-height",
+  "--sval-stem-face-image",
 ];
 
 /**
@@ -313,8 +322,8 @@ function stemPath({ face, faceRadii, stem, body, radii, fillets }, grow, side) {
 }
 
 /**
- * The face's inside, which a popup's fill leaves out so the button's label
- * shows through the popover's window: the face inset by `inset`, its far
+ * The face's inside, which a solid popup's fill leaves out so the button's
+ * label shows through the popover's window: the face inset by `inset`, its far
  * corners rounded with it and its near side square, as the anchor is
  * (`sval-stem.css`). The fill over the rim it keeps lies on the button's own
  * fill, of the same colour, so where the two windows' pixels fall makes no
@@ -532,6 +541,18 @@ function outlineOf(popup) {
 }
 
 /**
+ * Gives `popup`'s window its whole backdrop back.
+ *
+ * @param {Element} popup
+ */
+function clearShape(popup) {
+  if (popup._svalStemShapeKey !== null) {
+    popup._svalStemShapeKey = null;
+    popup.setWindowShape();
+  }
+}
+
+/**
  * Draws `popup` as itself while it keeps its button and the stem's room.
  *
  * @param {Element} popup
@@ -545,9 +566,13 @@ function unplace(popup) {
   faceOf(popup._svalStemButton).removeAttribute("sval-stem-anchor");
   popup.setAttribute("sval-stem", "");
   popup.removeAttribute("sval-stem-pending");
+  clearShape(popup);
+  showFace(popup, null);
 }
 
 function detach(popup) {
+  popup._svalStemOffSide = 0;
+  showFace(popup, null);
   const button = popup._svalStemButton;
   popup._svalStemButton = null;
   popup._svalStemMargins = null;
@@ -568,6 +593,7 @@ function detach(popup) {
   }
   popup.removeAttribute("sval-stem");
   popup.removeAttribute("sval-stem-pending");
+  clearShape(popup);
   popup._svalStemSettling = false;
   for (const name of STEM_PROPERTIES) {
     popup.style.removeProperty(name);
@@ -603,18 +629,23 @@ function screenRoom(win, margin) {
   };
 }
 
-/** The least room between a popover's content and its window's edge. */
-const WINDOW_INSET = 8;
+/**
+ * @returns {number} The least room between a popup and its window's edge,
+ *   which Gecko holds every popup to (`nsMenuPopupFrame::GetConstraintRect`).
+ */
+function windowInset() {
+  return Services.prefs.getIntPref("ui.popup.window_inset", 0);
+}
 
 /**
  * @param {Element} popup
  * @param {Window} win
  * @returns {number} How far inside its window's edges `popup`'s content
  *   stands: past its shadow's reach, and never nearer than
- *   {@link WINDOW_INSET}.
+ *   {@link windowInset}.
  */
 function edgeInset(popup, win) {
-  return Math.max(WINDOW_INSET, shadowReach(popup, win));
+  return Math.max(windowInset(), shadowReach(popup, win));
 }
 
 /**
@@ -683,7 +714,28 @@ function keepInWindow(popup, win, content, face, vertical, around) {
   if (content[start] + by < low - slack) {
     by = Math.ceil((low - content[start]) * dpr) / dpr;
   }
-  if (!by) {
+  const margins = popup._svalStemMargins?.[margin];
+  // A shift that moved the content the other way, as the » panel's does on
+  // Linux, would only push it further on each pass and part it from its
+  // button: the popover goes back to where Gecko put it and stays there.
+  if (
+    margins?.lastBy &&
+    Math.sign(content[end] - margins.lastEnd) === -Math.sign(margins.lastBy)
+  ) {
+    margins.held = true;
+    margins.lastBy = 0;
+    if (margins.by) {
+      margins.by = 0;
+      popup.style[margin] = `${margins.start}px`;
+      popup.style[marginEnd] = `${margins.end}px`;
+      return true;
+    }
+    return false;
+  }
+  if (!by || margins?.held) {
+    if (margins) {
+      margins.lastBy = 0;
+    }
     return false;
   }
   popup._svalStemMargins ??= {};
@@ -695,10 +747,12 @@ function keepInWindow(popup, win, content, face, vertical, around) {
       by: 0,
     };
   }
-  const margins = popup._svalStemMargins[margin];
-  margins.by += by;
-  popup.style[margin] = `${margins.start + margins.by}px`;
-  popup.style[marginEnd] = `${margins.end - margins.by}px`;
+  const shift = popup._svalStemMargins[margin];
+  shift.by += by;
+  shift.lastBy = by;
+  shift.lastEnd = content[end];
+  popup.style[margin] = `${shift.start + shift.by}px`;
+  popup.style[marginEnd] = `${shift.end - shift.by}px`;
   return true;
 }
 
@@ -750,6 +804,228 @@ function keepInRoom(popup, win, content, margin = { above: 0, below: 0 }) {
   if (popup.style.getPropertyValue("--sval-stem-room") !== value) {
     popup.style.setProperty("--sval-stem-room", value);
   }
+}
+
+/** How far apart, in CSS pixels, a window shape's ring samples its outline. */
+const SHAPE_STEP = 2;
+
+/**
+ * Samples a closed path that {@link stemPath} traced, of straight lines and
+ * circular arcs alone, by its own geometry: each line by its ends, each arc
+ * every {@link SHAPE_STEP} along it. Arc endpoints follow the SVG
+ * implementation notes (SVG 1.1 §F.6.5), a radius too short for its chord
+ * grown to fit it as SVG grows it.
+ *
+ * @param {string} d
+ * @returns {number[]} Points along it, [x0, y0, x1, y1, ...].
+ */
+function ringOf(d) {
+  const ring = [];
+  let x = 0;
+  let y = 0;
+  for (const [, command, args] of d.matchAll(/([MLAZ])([^MLAZ]*)/g)) {
+    const n = args.trim()
+      ? args
+          .trim()
+          .split(/[\s,]+/)
+          .map(Number)
+      : [];
+    if (command === "M" || command === "L") {
+      [x, y] = n;
+      ring.push(x, y);
+      continue;
+    }
+    if (command !== "A") {
+      continue;
+    }
+    const [radius, , , large, sweep, x2, y2] = n;
+    const hx = (x - x2) / 2;
+    const hy = (y - y2) / 2;
+    const half = hx * hx + hy * hy;
+    if (!half) {
+      continue;
+    }
+    const r = Math.max(radius, Math.sqrt(half));
+    const reach =
+      (large === sweep ? -1 : 1) *
+      Math.sqrt(Math.max(0, (r * r - half) / half));
+    const cx = reach * hy + (x + x2) / 2;
+    const cy = -reach * hx + (y + y2) / 2;
+    const from = Math.atan2(y - cy, x - cx);
+    let turn = Math.atan2(y2 - cy, x2 - cx) - from;
+    if (sweep && turn < 0) {
+      turn += 2 * Math.PI;
+    } else if (!sweep && turn > 0) {
+      turn -= 2 * Math.PI;
+    }
+    const steps = Math.max(1, Math.ceil((Math.abs(turn) * r) / SHAPE_STEP));
+    for (let i = 1; i <= steps; i++) {
+      const angle = from + (turn * i) / steps;
+      ring.push(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    }
+    [x, y] = [x2, y2];
+  }
+  return ring;
+}
+
+/**
+ * Gives a popover whose window shows the system's backdrop
+ * (`sval-popover.css`, `sval-menu.css`) a backdrop in the stem's shape, so
+ * the backdrop fills the face and the stem as it fills the body
+ * (`XULPopupElement.setWindowShape`): the outline as a ring, and the face,
+ * the neck from the face to the body and the body as the parts a backdrop
+ * of rounded boxes joins. The face is in the shape because the backdrop
+ * draws its rim along every free edge of its parts, and the main window
+ * draws the face in a material of its own; with the face in, face, neck
+ * and body are one surface. A part has one radius for its four corners, so
+ * the face is two parts: the face at its far corners' radius, and its half
+ * on the stem's side square. A popover drawn solid has no shape.
+ *
+ * @param {Element} popup
+ * @param {boolean} glass Whether its window shows the system's backdrop.
+ * @param {object} traced From {@link trace}.
+ * @param {object} layout From {@link layOut}.
+ * @param {object} side One of {@link SIDES}.
+ * @param {{tl: number, tr: number, br: number, bl: number}} faceRadii
+ * @param {{tl: number, tr: number, br: number, bl: number}} contentRadii
+ */
+function shapeWindow(
+  popup,
+  glass,
+  traced,
+  layout,
+  side,
+  faceRadii,
+  contentRadii
+) {
+  if (!glass) {
+    clearShape(popup);
+    return;
+  }
+  const box = rect => ({
+    x: rect.left,
+    y: rect.top,
+    width: rect.right - rect.left,
+    height: rect.bottom - rect.top,
+  });
+  const { face } = layout;
+  const far = radiiToShape(faceRadii, side);
+  const radius = Math.min(
+    Math.max(far.tl, far.tr),
+    (face.right - face.left) / 2,
+    (face.bottom - face.top) / 2
+  );
+  const neck = turnRect(
+    {
+      left: layout.stem.left,
+      right: layout.stem.right,
+      top: face.bottom,
+      bottom: layout.body.top + STEM_FILLET,
+    },
+    side.map
+  );
+  const parts = [
+    { ...box(traced.body), radius: Math.max(...Object.values(contentRadii)) },
+    { ...box(neck), radius: 0 },
+    { ...box(turnRect(face, side.map)), radius },
+  ];
+  if (radius > 0) {
+    parts.push({
+      ...box(turnRect({ ...face, top: face.top + radius }, side.map)),
+      radius: 0,
+    });
+  }
+  // macOS lays the backdrop's views out once, for the window's size as the
+  // shape arrives (`SvalShapedBackdropView`), and a popup's window takes
+  // its frame's size only at a later paint
+  // (`nsMenuPopupFrame::SchedulePendingWidgetMoveResize`): until the two
+  // agree, the shape is given again on the next frame. The popover is placed
+  // again on every frame while it settles and on every resize, and each
+  // shape given rebuilds those views, so a shape is given once for each
+  // size of the window.
+  const windowRect = popup.getOuterScreenRect();
+  const frame = popup.getBoundingClientRect();
+  const key = `${windowRect.width}x${windowRect.height} ${traced.edge} ${JSON.stringify(parts)}`;
+  if (popup._svalStemShapeKey !== key) {
+    popup._svalStemShapeKey = key;
+    popup._svalStemShapeFrames = 0;
+    popup.setWindowShape({ rings: [ringOf(traced.edge)], parts });
+  }
+  const sized =
+    Math.abs(windowRect.width - frame.width) <= 1 &&
+    Math.abs(windowRect.height - frame.height) <= 1;
+  // A window that never took its frame's size would hold the wait open
+  // while the popover shows: it ends with the popover's own settling
+  // ({@link SETTLE_FRAMES}).
+  if (
+    !sized &&
+    !popup._svalStemShapeAgain &&
+    popup._svalStemShapeFrames++ < SETTLE_FRAMES
+  ) {
+    popup._svalStemShapeAgain = true;
+    popup.documentGlobal.requestAnimationFrame(() => {
+      popup._svalStemShapeAgain = false;
+      if (popup._svalStemButton) {
+        place(popup, true);
+      }
+    });
+  }
+}
+
+/** Ids `document.mozSetImageElement` names each popover's face by. */
+let faceKeys = 0;
+
+/**
+ * Draws the button's face again in `popup`'s window, at `rect`, over the
+ * backdrop {@link shapeWindow} lays across the face, so the button looks as
+ * it does while its popover is open. `-moz-element` paints the face
+ * element's own rendering, whatever draws its icon, badge or count, and
+ * repaints as it changes (`SVGObserverUtils::GetAndObserveBackgroundImage`).
+ * The face gives up its fill and edge meanwhile (`sval-stem.css`), so the
+ * copy carries the icon alone over the popover's fill.
+ *
+ * @param {Element} popup
+ * @param {?{face: Element, rect: object}} shown The face element, and its
+ *   rect in the popup's window; null takes the copy away.
+ */
+function showFace(popup, shown) {
+  const doc = popup.ownerDocument;
+  const key = popup._svalStemFaceKey;
+  const was = popup._svalStemGlassFace;
+  if (was && was !== shown?.face) {
+    was.removeAttribute("sval-stem-glass");
+    popup._svalStemGlassFace = null;
+  }
+  if (!shown) {
+    if (was) {
+      doc.mozSetImageElement(key, null);
+    }
+    popup.removeAttribute("sval-stem-glass");
+    return;
+  }
+  const shadow = popup.shadowRoot;
+  if (!shadow.querySelector('[part~="sval-stem-face"]')) {
+    const copy = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+    copy.setAttribute("part", "sval-stem-face");
+    copy.setAttribute("aria-hidden", "true");
+    shadow.append(copy);
+  }
+  if (!key) {
+    popup._svalStemFaceKey = `sval-stem-face-${++faceKeys}`;
+  }
+  if (popup._svalStemGlassFace !== shown.face) {
+    doc.mozSetImageElement(popup._svalStemFaceKey, shown.face);
+    popup._svalStemGlassFace = shown.face;
+    shown.face.setAttribute("sval-stem-glass", "");
+  }
+  const { rect } = shown;
+  const set = (name, value) => popup.style.setProperty(name, value);
+  set("--sval-stem-face-left", `${rect.left}px`);
+  set("--sval-stem-face-top", `${rect.top}px`);
+  set("--sval-stem-face-width", `${rect.right - rect.left}px`);
+  set("--sval-stem-face-height", `${rect.bottom - rect.top}px`);
+  set("--sval-stem-face-image", `-moz-element(#${popup._svalStemFaceKey})`);
+  popup.setAttribute("sval-stem-glass", "");
 }
 
 /**
@@ -867,11 +1143,31 @@ function place(popup, traceOnly = false) {
     bottom: rect.bottom - box.top,
   });
   const rects = { face: inWindow(face), content: inWindow(content) };
-  // Opened on another side, it has nothing to grow from and lets go.
+  // Opened on another side, it has nothing to grow from and lets go. A
+  // measure taken while the window or the popup still moves can put the
+  // content on the wrong side for a frame, so the popover measures again on
+  // the next frame, unseen while it opens and as itself once shown, and
+  // lets go only once it has stood off its side for as long as a popover
+  // settles ({@link SETTLE_FRAMES}).
   if (!onSide(rects, side)) {
+    popup._svalStemOffSide = (popup._svalStemOffSide ?? 0) + 1;
+    if (popup._svalStemOffSide <= SETTLE_FRAMES) {
+      if (!popup.hasAttribute("sval-stem-pending")) {
+        unplace(popup);
+      }
+      if (!popup._svalStemOffSideAgain && !popup._svalStemSettling) {
+        popup._svalStemOffSideAgain = true;
+        win.requestAnimationFrame(() => {
+          popup._svalStemOffSideAgain = false;
+          place(popup);
+        });
+      }
+      return false;
+    }
     detach(popup);
     return false;
   }
+  popup._svalStemOffSide = 0;
   const layout = layOut(rects, side, 1 / win.devicePixelRatio);
   // Not across from its button, which moved: it shows as itself until
   // Gecko moves it after the button (`popuppositioned`) and the stem
@@ -890,13 +1186,11 @@ function place(popup, traceOnly = false) {
   }
   // The content's near corners follow the corners just set.
   const contentRadii = cornerRadii(part, content);
-  const traced = trace(
-    layout,
-    side,
-    cornerRadii(faceEl, pill),
-    contentRadii,
-    true
-  );
+  const faceRadii = cornerRadii(faceEl, pill);
+  // Over the backdrop the face is part of the shape, which the fill covers
+  // whole ({@link shapeWindow}).
+  const glass = win.getComputedStyle(popup).appearance === "auto";
+  const traced = trace(layout, side, faceRadii, contentRadii, !glass);
   const [fillPath, edgePath] = outline.children;
   fillPath.setAttribute("d", traced.fill);
   edgePath.setAttribute("d", traced.edge);
@@ -913,6 +1207,8 @@ function place(popup, traceOnly = false) {
   set("--sval-stem-tab-height", px(tab.bottom - tab.top));
   set("--sval-stem-tab-radius", cornersValue(traced.tabRadii));
   popup._svalStemTab = tab;
+  shapeWindow(popup, glass, traced, layout, side, faceRadii, contentRadii);
+  showFace(popup, glass ? { face: faceEl, rect: rects.face } : null);
   button.setAttribute("sval-stem", sideName);
   faceEl.setAttribute("sval-stem-anchor", sideName);
   popup.setAttribute("sval-stem", "placed");
@@ -982,9 +1278,11 @@ function onPlaced(event) {
 }
 
 /**
- * Turns a popover to open beside its button, inside an ancestor carrying
- * `sval-stem-beside`, whatever side the popover names, as from a column of
- * buttons a popover above or below one would cover the next. It opens
+ * Turns a popover to open beside its button, inside an ancestor no wider
+ * than the width its `sval-stem-beside` names, whatever side the popover
+ * names, as from a column of buttons a popover above or below one would
+ * cover the next. The width is read as the popover opens, so it is the
+ * ancestor's width at that moment. It opens
  * toward the window's middle, wherever the column stands and whatever the
  * text's direction. Gecko takes a new anchoring while the popup is still
  * showing (`nsMenuPopupFrame::MoveToAnchor`).
@@ -993,7 +1291,12 @@ function onPlaced(event) {
  * @param {Window} win The popup's browser window.
  */
 function turnBeside(popup, win) {
-  if (!popup.anchorNode.closest("[sval-stem-beside]")) {
+  const column = popup.anchorNode.closest("[sval-stem-beside]");
+  if (
+    !column ||
+    column.getBoundingClientRect().width >
+      parseFloat(column.getAttribute("sval-stem-beside"))
+  ) {
     return;
   }
   const { left, right } = popup.anchorNode.getBoundingClientRect();

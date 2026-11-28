@@ -51,7 +51,7 @@ async function favoriteItemOn(id) {
     button: 2,
   });
   await within(showing, 10_000, "the tab's menu opens");
-  return menu.querySelector('[data-command="favorite"]');
+  return menuItem(SvalPanel.rowMenu.menu, "favorite");
 }
 
 async function closeMenu() {

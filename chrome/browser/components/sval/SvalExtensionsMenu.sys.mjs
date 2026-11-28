@@ -20,12 +20,17 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalExtensionWorkspaces:
     "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+  MENU_ID_ATTR: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
   scopeOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   ScopeDropdown: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
   keepsLine: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
   scopeChoices: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
   scopePhrase: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
 });
+
+/** The boxes of a "Show in" submenu (`fillShowIn`). */
+const SHOW_IN_BOXES = '[data-sval-menu-id^="showIn:"]';
 
 /**
  * @param {Window} win
@@ -279,39 +284,31 @@ function addPin(win, list, row) {
  * extension is available in, ticked where its button shows. The items leave
  * the menu open while the user ticks.
  *
+ * Each box is `showIn:` and its Workspace's id, the id its data.
+ *
  * @param {Element} popup The submenu's `menupopup`.
  * @param {string} id The extension's id.
  */
 function fillShowIn(popup, id) {
-  const doc = popup.ownerDocument;
   const scopes = lazy.SvalExtensionWorkspaces;
   const offered = scopes
     .offered()
     .filter(each => scopes.isAvailableIn(id, each.id));
   const scope = scopes.pinScope(id);
-  popup.replaceChildren();
-  const item = (label, command) => {
-    const el = doc.createXULElement("menuitem");
-    el.setAttribute("label", label);
-    el.setAttribute("closemenu", "none");
-    el.dataset.showIn = command;
-    return el;
-  };
-  popup.append(
-    item("Select all", "all"),
-    item("Deselect all", "none"),
-    doc.createXULElement("menuseparator")
-  );
-  for (const { id: ws, name, emoji } of offered) {
-    const box = item(emoji ? `${emoji} ${name}` : name, "workspace");
-    box.setAttribute("type", "checkbox");
-    box.setAttribute("autocheck", "false");
-    box.dataset.workspace = ws;
-    if (!scope || scope.includes(ws)) {
-      box.setAttribute("checked", "true");
-    }
-    popup.append(box);
-  }
+  lazy.SvalMenu.fill(popup, [
+    { id: "showInAll", label: "Select all", closemenu: "none" },
+    { id: "showInNone", label: "Deselect all", closemenu: "none" },
+    "separator",
+    ...offered.map(({ id: ws, name, emoji }) => ({
+      id: `showIn:${ws}`,
+      label: emoji ? `${emoji} ${name}` : name,
+      type: "checkbox",
+      autocheck: false,
+      closemenu: "none",
+      checked: !scope || scope.includes(ws),
+      data: ws,
+    })),
+  ]);
 }
 
 /**
@@ -323,10 +320,10 @@ function fillShowIn(popup, id) {
  * @param {string} id
  */
 function applyShowIn(popup, id) {
-  const boxes = [...popup.querySelectorAll("[data-workspace]")];
+  const boxes = [...popup.querySelectorAll(SHOW_IN_BOXES)];
   const ticked = boxes
     .filter(box => box.getAttribute("checked") === "true")
-    .map(box => box.dataset.workspace);
+    .map(box => lazy.SvalMenu.dataOf(box));
   if (!ticked.length) {
     return;
   }
@@ -382,17 +379,16 @@ export const SvalExtensionsMenu = {
       });
       popup.addEventListener("command", event => {
         const item = event.target;
-        const boxes = popup.querySelectorAll("[data-workspace]");
-        const command = item.dataset.showIn;
-        if (command === "workspace") {
+        const command = item.getAttribute(lazy.MENU_ID_ATTR) ?? "";
+        if (command.startsWith("showIn:")) {
           if (item.getAttribute("checked") === "true") {
             item.removeAttribute("checked");
           } else {
             item.setAttribute("checked", "true");
           }
-        } else if (command === "all" || command === "none") {
-          for (const box of boxes) {
-            if (command === "all") {
+        } else if (command === "showInAll" || command === "showInNone") {
+          for (const box of popup.querySelectorAll(SHOW_IN_BOXES)) {
+            if (command === "showInAll") {
               box.setAttribute("checked", "true");
             } else {
               box.removeAttribute("checked");

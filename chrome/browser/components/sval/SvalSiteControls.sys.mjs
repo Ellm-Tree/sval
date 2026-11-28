@@ -122,6 +122,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalPanelToolbar:
     "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
+  SvalPopover: "moz-src:///browser/components/sval/SvalPopover.sys.mjs",
   SvalSiteData: "moz-src:///browser/components/sval/SvalSiteData.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SitePermissions: "resource:///modules/SitePermissions.sys.mjs",
@@ -686,6 +688,8 @@ class SiteControls {
     this.win = win;
     this.doc = win.document;
     this.panel = null;
+    /** The menu, as `SvalPopover.create` gave it. */
+    this.popover = null;
     /** The permission an open prompt asks for, or null. */
     this.pending = null;
     /**
@@ -734,52 +738,45 @@ class SiteControls {
     this.restore = null;
   }
 
+  /**
+   * Once the menu has hidden: its state goes back to the main view, and
+   * what was asked to run once it closed runs.
+   */
+  #afterHiding() {
+    this.hiddenOpen = false;
+    this.confirmingClear = false;
+    this.picked = null;
+    this.counted.clear();
+    this.reloadChanged();
+    const mode = this.pendingMode;
+    this.pendingMode = null;
+    if (mode) {
+      this.begin(mode, null);
+    }
+    if (this.pendingStyle) {
+      this.pendingStyle = false;
+      SvalSiteStylePanel.open(this.win, { focus: true });
+    }
+    if (this.pendingCopy) {
+      this.pendingCopy = false;
+      copyCleanAddress(this.win);
+    }
+  }
+
   mount() {
     const { doc, win } = this;
-    const panel = doc.createXULElement("panel");
-    panel.id = SITE_MENU_ID;
-    panel.setAttribute("type", "arrow");
-    // An arrow panel's default flip narrows a popover that reaches past the
-    // screen (`nsMenuPopupFrame::FlipOrResize`), cutting off its side; a
-    // slide moves it whole (`nsMenuPopupFrame::SlideOrResize`).
-    panel.setAttribute("flip", "slide");
-    panel.setAttribute("orient", "vertical");
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-label", "Site settings");
-    panel.addEventListener("popupshown", () => {
-      this.menuButton()?.setAttribute("open", "true");
-      if (this.focusOnShow) {
-        this.focusOnShow = false;
-        doc.commandDispatcher.advanceFocusIntoSubtree(panel);
-      }
+    this.popover = lazy.SvalPopover.create(doc, {
+      name: SITE_MENU_ID,
+      label: "Site settings",
+      // An arrow panel's default flip narrows a popover that reaches past
+      // the screen (`nsMenuPopupFrame::FlipOrResize`), cutting off its side;
+      // a slide moves it whole (`nsMenuPopupFrame::SlideOrResize`).
+      attributes: { flip: "slide", orient: "vertical" },
+      // Grows from its button, reaching past it as the header's popovers do.
+      stem: { hang: true },
+      onHidden: () => this.#afterHiding(),
     });
-    panel.addEventListener("popuphidden", event => {
-      // A permission's value menu is a popup inside the panel, and its
-      // popuphidden bubbles here while the panel stays open.
-      if (event.target !== panel) {
-        return;
-      }
-      this.menuButton()?.removeAttribute("open");
-      this.focusOnShow = false;
-      this.hiddenOpen = false;
-      this.confirmingClear = false;
-      this.picked = null;
-      this.counted.clear();
-      this.reloadChanged();
-      const mode = this.pendingMode;
-      this.pendingMode = null;
-      if (mode) {
-        this.begin(mode, null);
-      }
-      if (this.pendingStyle) {
-        this.pendingStyle = false;
-        SvalSiteStylePanel.open(win, { focus: true });
-      }
-      if (this.pendingCopy) {
-        this.pendingCopy = false;
-        copyCleanAddress(win);
-      }
-    });
+    const panel = this.popover.popup;
     // Esc in the clear-data confirm puts its row back; a further Esc closes
     // the menu. The popup manager closes an open panel on Esc from its
     // listener on the document (`nsXULPopupManager::KeyDown`), so this
@@ -801,7 +798,6 @@ class SiteControls {
       },
       { capture: true }
     );
-    doc.getElementById("mainPopupSet").append(panel);
     this.panel = panel;
 
     const progress = {
@@ -1751,13 +1747,12 @@ class SiteControls {
       this.confirmingClear = true;
     }
     this.render(media);
-    if (this.panel.state === "closed") {
-      this.focusOnShow = focus;
+    if (this.popover.isOpen()) {
+      return;
     }
-    this.panel.openPopup(anchor, {
-      position: "bottomright topright",
-      y: 6,
-      triggerEvent: null,
+    this.popover.openFrom(anchor, "bottomright topright", {
+      focus,
+      button: this.menuButton(),
     });
   }
 
@@ -1861,8 +1856,12 @@ class SiteControls {
       this.footer(media)
     );
     const focused = this.panel.querySelector(":focus")?.id;
-    // Drawn again on each change, the menu keeps its place.
-    const scrolled = this.panel.querySelector(".sval-site-menu")?.scrollTop;
+    // Drawn again on each change while open, the menu keeps its place; it
+    // opens at its top.
+    const scrolled =
+      this.panel.state === "open"
+        ? this.panel.querySelector(".sval-site-menu")?.scrollTop
+        : 0;
     this.panel.replaceChildren(body);
     this.drawZoom();
     body.scrollTop = scrolled ?? 0;
@@ -2541,8 +2540,6 @@ class SiteControls {
    */
   askShowAgain(media, entry, at, anchor) {
     const { doc } = this;
-    const popup = doc.createXULElement("menupopup");
-    popup.id = "sval-site-show-again-menu";
     const chain = scopeChain(media.host);
     const everywhere = () => {
       const next = showAgainIn(SvalBlocking.myFilters, entry.line, entry.scope);
@@ -2569,26 +2566,26 @@ class SiteControls {
               ]),
           ],
     ];
-    for (const [where, label, next] of choices) {
-      const item = doc.createXULElement("menuitem");
-      item.setAttribute("label", label);
-      item.dataset.where = where;
-      item.addEventListener("command", event =>
+    // A menu of its own over `choose`: the write needs to know whether the
+    // keyboard made the choice, which the command's event tells.
+    const menu = lazy.SvalMenu.create(doc, {
+      name: "sval-site-show-again-menu",
+      transient: true,
+      items: choices.map(([where, label, next]) => ({
+        id: where,
+        label,
+        data: next,
+      })),
+      onCommand: (where, next, event) =>
         this.writeShowAgain(
           media,
           entry,
           at,
           next(),
           event.inputSource == MouseEvent.MOZ_SOURCE_KEYBOARD
-        )
-      );
-      popup.append(item);
-    }
-    popup.addEventListener("popuphidden", () => popup.remove(), {
-      once: true,
+        ),
     });
-    this.panel.append(popup);
-    popup.openPopup(anchor, "after_end");
+    menu.openFrom(anchor, "after_end");
   }
 
   /**
@@ -3129,36 +3126,30 @@ class SiteControls {
    * @param {number} current
    * @param {Element} anchor
    */
-  pickPermission(media, id, choices, current, anchor) {
-    const { doc } = this;
+  async pickPermission(media, id, choices, current, anchor) {
     const SP = lazy.SitePermissions;
     const words = permissionWords();
-    const popup = doc.createXULElement("menupopup");
-    popup.id = "sval-site-perm-menu";
-    for (const state of choices) {
-      const item = doc.createXULElement("menuitem");
-      item.setAttribute("type", "radio");
-      item.setAttribute("label", words.get(state));
-      if (words.get(state) === words.get(current)) {
-        item.setAttribute("checked", "true");
-      }
-      item.addEventListener("command", () => {
-        const { browser } = media;
-        this.notePermissions(browser);
-        if (state === SP.UNKNOWN || state === SP.PROMPT) {
-          SP.removeFromPrincipal(browser.contentPrincipal, id, browser);
-        } else {
-          SP.setForPrincipal(browser.contentPrincipal, id, state);
-        }
-        this.update();
-      });
-      popup.append(item);
+    // The state shown as chosen is the one that reads as the current one.
+    const shown = choices.find(
+      state => words.get(state) === words.get(current)
+    );
+    const state = await lazy.SvalMenu.choose(
+      anchor,
+      choices.map(choice => ({ value: choice, label: words.get(choice) })),
+      shown,
+      { name: "sval-site-perm-menu" }
+    );
+    if (state === null) {
+      return;
     }
-    popup.addEventListener("popuphidden", () => popup.remove(), {
-      once: true,
-    });
-    this.panel.append(popup);
-    popup.openPopup(anchor, "after_end");
+    const { browser } = media;
+    this.notePermissions(browser);
+    if (state === SP.UNKNOWN || state === SP.PROMPT) {
+      SP.removeFromPrincipal(browser.contentPrincipal, id, browser);
+    } else {
+      SP.setForPrincipal(browser.contentPrincipal, id, state);
+    }
+    this.update();
   }
 
   clearRow() {

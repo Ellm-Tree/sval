@@ -39,7 +39,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   keycap: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   LAUNCHER_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   MENU_KEYS: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
-  ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
   keyOf: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   COMMANDS_PROVIDER:
@@ -1359,52 +1359,30 @@ export class SvalHomeSearchParent extends JSWindowActorParent {
     }
     const doc = window.document;
     this.#menu?.remove();
-    const popup = doc.createXULElement("menupopup");
-    popup.id = "sval-home-result-menu";
-    this.#menu = popup;
     let picked = false;
-    const fill = (into, items) => {
-      for (const command of items) {
+    const itemsOf = entries =>
+      entries.map(command => {
         if (command.name == "separator") {
-          into.append(doc.createXULElement("menuseparator"));
-          continue;
+          return "separator";
         }
-        if (command.children) {
-          const menu = doc.createXULElement("menu");
-          doc.l10n.setAttributes(menu, command.l10n.id, command.l10n.args);
-          const sub = doc.createXULElement("menupopup");
-          fill(sub, command.children);
-          menu.append(sub);
-          into.append(menu);
-          continue;
-        }
-        const item = doc.createXULElement("menuitem");
-        doc.l10n.setAttributes(item, command.l10n.id, command.l10n.args);
-        // Shift+Delete on the row runs the same dismissal (`#dismiss`).
-        if (command.name == MENU.DISMISS) {
-          item.setAttribute("key", lazy.MENU_KEYS.dismiss.id);
-          item.setAttribute(
-            "aria-keyshortcuts",
-            lazy.ariaShortcut(lazy.MENU_KEYS.dismiss)
-          );
-        }
-        item.addEventListener("command", event => {
-          picked = this.#pickMenuCommand(result, command.name, event);
-        });
-        into.append(item);
-      }
-    };
-    fill(popup, commands);
-    doc.getElementById("mainPopupSet").append(popup);
-    await doc.l10n.translateFragment(popup);
-    popup.addEventListener(
-      "popuphidden",
-      event => {
-        if (event.target !== popup) {
-          return;
-        }
-        popup.remove();
-        if (this.#menu === popup) {
+        return {
+          id: command.name,
+          l10n: command.l10n,
+          data: command.name,
+          // Shift+Delete on the row runs the same dismissal (`#dismiss`).
+          key: command.name == MENU.DISMISS ? lazy.MENU_KEYS.dismiss : null,
+          items: command.children ? itemsOf(command.children) : null,
+        };
+      });
+    const handle = lazy.SvalMenu.create(doc, {
+      name: "sval-home-result-menu",
+      transient: true,
+      items: itemsOf(commands),
+      onCommand: (itemId, name, event) => {
+        picked = this.#pickMenuCommand(result, name, event);
+      },
+      onHidden: () => {
+        if (this.#menu === handle.popup) {
           this.#menu = null;
         }
         // Firefox fires the item's command before the popup hides.
@@ -1414,16 +1392,18 @@ export class SvalHomeSearchParent extends JSWindowActorParent {
           // The page went away with its menu.
         }
       },
-      { once: true }
-    );
+    });
+    const popup = handle.popup;
+    this.#menu = popup;
+    await doc.l10n.translateFragment(popup);
     const zoom = browser.fullZoom;
     const x = Number(anchor?.left) || 0;
     const y = Number(anchor?.bottom) || 0;
-    popup.openPopup(browser, {
-      position: "overlap",
-      x: x * zoom,
-      y: y * zoom,
-    });
+    const box = browser.getBoundingClientRect();
+    handle.openAtScreen(
+      window.mozInnerScreenX + box.left + x * zoom,
+      window.mozInnerScreenY + box.top + y * zoom
+    );
   }
 
   /**

@@ -1,0 +1,417 @@
+Sval: a popup window's system backdrop takes the shape it is given
+
+A see-through window's popover keeps its stem, and the system's backdrop
+behind its window fills the stem as it fills the body. Gecko lays that
+backdrop over the popup's whole window, which reaches past the shape on
+every side. XULPopupElement.setWindowShape hands the shape to the widget
+(nsIWidget::SetWindowShape) as rings filled even-odd and as rounded
+boxes, and each platform's widget shapes its backdrop with the form it
+can take: on macOS 26, glass for each box in a container that joins
+them (SvalPopupShape.mm); earlier, the menu material masked to the
+rings; on Windows, the window's region. The headless widget keeps
+whether it has one, which hasWindowShape reads.
+
+diff --git a/dom/chrome-webidl/XULPopupElement.webidl b/dom/chrome-webidl/XULPopupElement.webidl
+index 7d41e5ba1d..c17cb791fc 100644
+--- a/dom/chrome-webidl/XULPopupElement.webidl
++++ b/dom/chrome-webidl/XULPopupElement.webidl
+@@ -25,6 +25,23 @@ dictionary ActivateMenuItemOptions {
+   short button = 0;
+ };
+ 
++dictionary PopupWindowShapePart {
++  double x = 0;
++  double y = 0;
++  double width = 0;
++  double height = 0;
++  double radius = 0;
++};
++
++// The shape of a popup window's system backdrop, in CSS pixels from the
++// popup's top left: closed rings, each [x0, y0, x1, y1, ...], filled
++// even-odd, and the same shape as rounded rectangles. No rings gives the
++// backdrop the whole window.
++dictionary PopupWindowShape {
++  sequence<sequence<double>> rings = [];
++  sequence<PopupWindowShapePart> parts = [];
++};
++
+ typedef (DOMString or OpenPopupOptions) StringOrOpenPopupOptions;
+ 
+ [ChromeOnly,
+@@ -199,6 +216,18 @@ interface XULPopupElement : XULElement
+ 
+   undefined setConstraintRect(DOMRectReadOnly rect);
+ 
++  /**
++   * Shapes the system backdrop behind the popup's window, kept for every
++   * window the popup shows in until it is given another.
++   */
++  undefined setWindowShape(optional PopupWindowShape shape = {});
++
++  /**
++   * Whether the popup's window has a backdrop that takes the shape it was
++   * given.
++   */
++  readonly attribute boolean hasWindowShape;
++
+   readonly attribute boolean isWaylandDragSource;
+   readonly attribute boolean isWaylandPopup;
+ 
+diff --git a/dom/xul/XULPopupElement.cpp b/dom/xul/XULPopupElement.cpp
+index 3417f49994..c044e2b452 100644
+--- a/dom/xul/XULPopupElement.cpp
++++ b/dom/xul/XULPopupElement.cpp
+@@ -322,6 +322,36 @@ void XULPopupElement::SetConstraintRect(dom::DOMRectReadOnly& aRect) {
+   }
+ }
+ 
++void XULPopupElement::SetWindowShape(const PopupWindowShape& aShape) {
++  nsIWidget::WindowShape shape;
++  for (const auto& ring : aShape.mRings) {
++    if (ring.Length() < 6) {
++      continue;
++    }
++    auto points = shape.mRings.AppendElement();
++    for (size_t i = 0; i + 1 < ring.Length(); i += 2) {
++      points->AppendElement(
++          LayoutDevicePoint(float(ring[i]), float(ring[i + 1])));
++    }
++  }
++  for (const auto& part : aShape.mParts) {
++    shape.mParts.AppendElement(nsIWidget::WindowShape::Part{
++        LayoutDeviceRect(float(part.mX), float(part.mY), float(part.mWidth),
++                         float(part.mHeight)),
++        LayoutDeviceCoord(float(part.mRadius))});
++  }
++  mWindowShape = std::move(shape);
++  if (nsMenuPopupFrame* f = do_QueryFrame(GetPrimaryFrame())) {
++    f->PropagateWindowShape();
++  }
++}
++
++bool XULPopupElement::HasWindowShape() {
++  nsMenuPopupFrame* f = do_QueryFrame(GetPrimaryFrame());
++  nsIWidget* widget = f ? f->GetWidget() : nullptr;
++  return widget && widget->HasWindowShape();
++}
++
+ bool XULPopupElement::IsWaylandDragSource() const {
+ #ifdef MOZ_WAYLAND
+   nsMenuPopupFrame* f = do_QueryFrame(GetPrimaryFrame());
+diff --git a/dom/xul/XULPopupElement.h b/dom/xul/XULPopupElement.h
+index d69a28e7f1..8ea6a62722 100644
+--- a/dom/xul/XULPopupElement.h
++++ b/dom/xul/XULPopupElement.h
+@@ -9,6 +9,7 @@
+ #include "mozilla/Attributes.h"
+ #include "nsCycleCollectionParticipant.h"
+ #include "nsINode.h"
++#include "nsIWidget.h"
+ #include "nsString.h"
+ #include "nsWrapperCache.h"
+ #include "nsXULElement.h"
+@@ -26,6 +27,7 @@ class Element;
+ class Event;
+ class StringOrOpenPopupOptions;
+ struct ActivateMenuItemOptions;
++struct PopupWindowShape;
+ 
+ nsXULElement* NS_NewXULPopupElement(
+     already_AddRefed<mozilla::dom::NodeInfo> aNodeInfo);
+@@ -91,6 +93,11 @@ class XULPopupElement : public XULMenuParentElement {
+ 
+   void SetConstraintRect(DOMRectReadOnly& aRect);
+ 
++  void SetWindowShape(const PopupWindowShape& aShape);
++  bool HasWindowShape();
++  // The shape setWindowShape gave, in CSS pixels.
++  const nsIWidget::WindowShape& GetWindowShape() const { return mWindowShape; }
++
+   bool IsWaylandDragSource() const;
+   bool IsWaylandPopup() const;
+ 
+@@ -106,6 +113,8 @@ class XULPopupElement : public XULMenuParentElement {
+ 
+   JSObject* WrapNode(JSContext* aCx,
+                      JS::Handle<JSObject*> aGivenProto) override;
++
++  nsIWidget::WindowShape mWindowShape;
+ };
+ 
+ }  // namespace dom
+diff --git a/layout/xul/nsMenuPopupFrame.cpp b/layout/xul/nsMenuPopupFrame.cpp
+index 6efd0f9b83..55ee38da80 100644
+--- a/layout/xul/nsMenuPopupFrame.cpp
++++ b/layout/xul/nsMenuPopupFrame.cpp
+@@ -322,6 +322,32 @@ void nsMenuPopupFrame::CreateWidget() {
+   // (maybe in BaseCreate?) then remove this call.
+   mWidget->SetTransparencyMode(mode);
+   PropagateStyleToWidget();
++  PropagateWindowShape();
++}
++
++void nsMenuPopupFrame::PropagateWindowShape() const {
++  nsIWidget* widget = GetWidget();
++  if (!widget) {
++    return;
++  }
++  const nsIWidget::WindowShape& css = PopupElement().GetWindowShape();
++  const float scale = PresContext()->CSSToDevPixelScale().scale;
++  nsIWidget::WindowShape shape;
++  for (const auto& ring : css.mRings) {
++    auto points = shape.mRings.AppendElement();
++    for (const auto& point : ring) {
++      points->AppendElement(
++          LayoutDevicePoint(point.x * scale, point.y * scale));
++    }
++  }
++  for (const auto& part : css.mParts) {
++    const auto& r = part.mRect;
++    shape.mParts.AppendElement(nsIWidget::WindowShape::Part{
++        LayoutDeviceRect(r.x * scale, r.y * scale, r.width * scale,
++                         r.height * scale),
++        LayoutDeviceCoord(part.mRadius * scale)});
++  }
++  widget->SetWindowShape(shape);
+ }
+ 
+ TransparencyMode nsMenuPopupFrame::WidgetTransparencyMode() const {
+diff --git a/layout/xul/nsMenuPopupFrame.h b/layout/xul/nsMenuPopupFrame.h
+index a361dc6e69..cf04f1b4fc 100644
+--- a/layout/xul/nsMenuPopupFrame.h
++++ b/layout/xul/nsMenuPopupFrame.h
+@@ -189,6 +189,8 @@ class nsMenuPopupFrame final : public nsBlockFrame, public nsIWidgetListener {
+             WidgetStyle::Transform,   WidgetStyle::MicaBackdrop};
+   }
+   void PropagateStyleToWidget(WidgetStyleFlags = AllWidgetStyleFlags()) const;
++  // Sends the widget the shape XULPopupElement::SetWindowShape gave.
++  void PropagateWindowShape() const;
+ 
+   // Overridden methods
+   void Init(nsIContent* aContent, nsContainerFrame* aParent,
+diff --git a/widget/cocoa/moz.build b/widget/cocoa/moz.build
+index db519ec428..684f39a119 100644
+--- a/widget/cocoa/moz.build
++++ b/widget/cocoa/moz.build
+@@ -88,6 +88,7 @@ SOURCES += [
+     "nsDragService.mm",
+     "nsNativeThemeCocoa.mm",
+     "SvalMacWindowOrder.mm",  # Sval
++    "SvalPopupShape.mm",  # Sval
+ ]
+ 
+ if not CONFIG["RELEASE_OR_BETA"] or CONFIG["MOZ_DEBUG"]:
+diff --git a/widget/cocoa/nsCocoaWindow.h b/widget/cocoa/nsCocoaWindow.h
+index 45a3eff2d6..b850495322 100644
+--- a/widget/cocoa/nsCocoaWindow.h
++++ b/widget/cocoa/nsCocoaWindow.h
+@@ -104,6 +104,9 @@ class TextInputHandler;
+ 
+ - (void)setEffectViewWrapperForStyle:(mozilla::WindowShadow)aStyle;
+ @property(nonatomic) mozilla::WindowShadow shadowStyle;
++// The shape a menu's backdrop takes (nsIWidget::SetWindowShape), owned by
++// the nsCocoaWindow, or null.
++@property(nonatomic) const nsIWidget::WindowShape* windowShape;
+ 
+ - (void)updateTitlebarTransparency;
+ - (void)setTitlebarSeparatorStyle:(NSTitlebarSeparatorStyle)aStyle
+@@ -448,6 +451,8 @@ class nsCocoaWindow final : public nsIWidget {
+   TransparencyMode GetTransparencyMode() override;
+   void SetTransparencyMode(TransparencyMode aMode) override;
+   void SetWindowShadowStyle(mozilla::WindowShadow aStyle) override;
++  void SetWindowShape(const WindowShape& aShape) override;
++  bool HasWindowShape() const override;
+   void SetWindowOpacity(float aOpacity) override;
+   void SetWindowTransform(const mozilla::gfx::Matrix& aTransform) override;
+   void SetInputRegion(const InputRegion&) override;
+@@ -597,6 +602,7 @@ class nsCocoaWindow final : public nsIWidget {
+   // transition, it is the animation object.
+   NSAnimation* mFullscreenTransitionAnimation;
+   mozilla::WindowShadow mShadowStyle;
++  WindowShape mWindowShape;
+   CGFloat mAspectRatio;
+ 
+   WindowAnimationType mAnimationType;
+diff --git a/widget/cocoa/nsCocoaWindow.mm b/widget/cocoa/nsCocoaWindow.mm
+index 614829deb7..a5658eca7b 100644
+--- a/widget/cocoa/nsCocoaWindow.mm
++++ b/widget/cocoa/nsCocoaWindow.mm
+@@ -91,6 +91,7 @@
+ #include "mozilla/WritingModes.h"
+ #include "mozilla/layers/CompositorBridgeChild.h"
+ #include "mozilla/widget/Screen.h"
++#include "SvalPopupShape.h"  // Sval
+ #include <algorithm>
+ 
+ #ifdef ACCESSIBILITY
+@@ -7319,12 +7320,38 @@ void nsCocoaWindow::SetWindowShadowStyle(WindowShadow aStyle) {
+   }
+ 
+   mWindow.shadowStyle = mShadowStyle;
++  mWindow.windowShape = &mWindowShape;
+   [mWindow setEffectViewWrapperForStyle:mShadowStyle];
+   [mWindow setHasShadow:aStyle != WindowShadow::None];
+ 
+   NS_OBJC_END_TRY_IGNORE_BLOCK;
+ }
+ 
++void nsCocoaWindow::SetWindowShape(const WindowShape& aShape) {
++  NS_OBJC_BEGIN_TRY_IGNORE_BLOCK;
++
++  mWindowShape.mRings.Clear();
++  for (const auto& ring : aShape.mRings) {
++    mWindowShape.mRings.AppendElement(ring.Clone());
++  }
++  mWindowShape.mParts = aShape.mParts.Clone();
++
++  if (!mWindow || mWindowType != WindowType::Popup) {
++    return;
++  }
++
++  mWindow.windowShape = &mWindowShape;
++  [mWindow setEffectViewWrapperForStyle:mShadowStyle];
++  [mWindow invalidateShadow];
++
++  NS_OBJC_END_TRY_IGNORE_BLOCK;
++}
++
++bool nsCocoaWindow::HasWindowShape() const {
++  return mWindow && mWindowType == WindowType::Popup &&
++         mShadowStyle == WindowShadow::Menu && !mWindowShape.IsEmpty();
++}
++
+ void nsCocoaWindow::SetWindowOpacity(float aOpacity) {
+   NS_OBJC_BEGIN_TRY_IGNORE_BLOCK;
+ 
+@@ -8331,6 +8358,14 @@ static NSImage* GetMenuMaskImage() {
+ // vibrancy effect and window border.
+ - (void)setEffectViewWrapperForStyle:(WindowShadow)aStyle {
+   NSView* wrapper = [&]() -> NSView* {
++    if (aStyle == WindowShadow::Menu && self.windowShape &&
++        !self.windowShape->IsEmpty()) {
++      if (NSView* shaped =
++              SvalShapedBackdropView(self.contentView.frame, *self.windowShape,
++                                     self.backingScaleFactor)) {
++        return shaped;
++      }
++    }
+     if (@available(macOS 26.0, *)) {
+       if (aStyle == WindowShadow::Menu) {
+         // Menus on macOS 26 use glass instead of vibrancy.
+diff --git a/widget/headless/HeadlessWidget.h b/widget/headless/HeadlessWidget.h
+index 9daa3334e7..5d214cdd19 100644
+--- a/widget/headless/HeadlessWidget.h
++++ b/widget/headless/HeadlessWidget.h
+@@ -67,6 +67,12 @@ class HeadlessWidget final : public nsIWidget {
+   nsresult MakeFullScreen(bool aFullScreen) override;
+   void Enable(bool aState) override;
+   bool IsEnabled() const override;
++  // Keeps whether a shape was given, which tests read through
++  // XULPopupElement.hasWindowShape.
++  void SetWindowShape(const WindowShape& aShape) override {
++    mHasWindowShape = !aShape.IsEmpty();
++  }
++  bool HasWindowShape() const override { return mHasWindowShape; }
+   void SetFocus(Raise, mozilla::dom::CallerType aCallerType) override;
+   LayoutDeviceIntRect GetBounds() override { return mBounds; }
+   void Invalidate(const LayoutDeviceIntRect& aRect) override {
+@@ -129,6 +135,7 @@ class HeadlessWidget final : public nsIWidget {
+ 
+  private:
+   ~HeadlessWidget();
++  bool mHasWindowShape = false;
+   bool mEnabled;
+   bool mVisible;
+   bool mDestroyed;
+diff --git a/widget/nsIWidget.h b/widget/nsIWidget.h
+index fe9411e78c..b0e0c36ab0 100644
+--- a/widget/nsIWidget.h
++++ b/widget/nsIWidget.h
+@@ -1087,6 +1087,25 @@ class nsIWidget : public nsSupportsWeakReference {
+   };
+   virtual void SetInputRegion(const InputRegion&) {}
+ 
++  /**
++   * The shape a popup window's system backdrop takes, in device pixels from
++   * the window's top left: closed rings filled even-odd, and the same shape
++   * as rounded rectangles for a backdrop that takes only those. An empty
++   * shape gives the backdrop the whole window.
++   */
++  struct WindowShape {
++    struct Part {
++      mozilla::LayoutDeviceRect mRect;
++      mozilla::LayoutDeviceCoord mRadius = 0;
++    };
++    nsTArray<nsTArray<mozilla::LayoutDevicePoint>> mRings;
++    nsTArray<Part> mParts;
++    bool IsEmpty() const { return mRings.IsEmpty(); }
++  };
++  virtual void SetWindowShape(const WindowShape&) {}
++  /** Whether the window's backdrop takes a shape it was given. */
++  virtual bool HasWindowShape() const { return false; }
++
+   /*
+    * On macOS, this method shows or hides the pill button in the titlebar
+    * that's used to collapse the toolbar.
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+index 5b2d5b424c..36c09b5872 100644
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -2683,6 +2683,35 @@ void nsWindow::SetMicaBackdrop(bool aEnabled) {
+   UpdateMicaBackdrop();
+ }
+ 
++// A popup's window, and with it the backdrop DWM draws behind it, is cut to
++// the shape's rings: the region a window shows (SetWindowRgn), in the
++// window's own pixels, which the system owns once it is set.
++void nsWindow::SetWindowShape(const WindowShape& aShape) {
++  if (!mWnd || !IsPopup()) {
++    return;
++  }
++  if (aShape.IsEmpty()) {
++    ::SetWindowRgn(mWnd, nullptr, TRUE);
++    mHasWindowShape = false;
++    return;
++  }
++  nsTArray<POINT> points;
++  nsTArray<INT> counts;
++  for (const auto& ring : aShape.mRings) {
++    for (const auto& point : ring) {
++      points.AppendElement(POINT{LONG(floorf(point.x.value + 0.5f)),
++                                 LONG(floorf(point.y.value + 0.5f))});
++    }
++    counts.AppendElement(INT(ring.Length()));
++  }
++  HRGN region = ::CreatePolyPolygonRgn(points.Elements(), counts.Elements(),
++                                       INT(counts.Length()), ALTERNATE);
++  mHasWindowShape = region && ::SetWindowRgn(mWnd, region, TRUE);
++  if (region && !mHasWindowShape) {
++    ::DeleteObject(region);
++  }
++}
++
+ void nsWindow::UpdateMicaBackdrop(bool aForce) {
+   const bool micaEnabled =
+       IsPopup() ? WinUtils::MicaPopupsEnabled() : WinUtils::MicaEnabled();
+diff --git a/widget/windows/nsWindow.h b/widget/windows/nsWindow.h
+index eb540a4e6d..ee89139bae 100644
+--- a/widget/windows/nsWindow.h
++++ b/widget/windows/nsWindow.h
+@@ -650,6 +650,8 @@ class nsWindow final : public nsIWidget {
+ 
+   void SetColorScheme(const mozilla::Maybe<mozilla::ColorScheme>&) override;
+   void SetMicaBackdrop(bool) override;
++  void SetWindowShape(const WindowShape&) override;
++  bool HasWindowShape() const override { return mHasWindowShape; }
+ 
+   bool DispatchTouchEventFromWMPointer(UINT msg, LPARAM aLParam,
+                                        const WinPointerInfo& aPointerInfo,
+@@ -879,6 +881,7 @@ class nsWindow final : public nsIWidget {
+ 
+   // Whether we are asked to render a mica backdrop.
+   bool mMicaBackdrop : 1;
++  bool mHasWindowShape = false;
+ 
+   int32_t mCachedHitTestResult = 0;
+ 

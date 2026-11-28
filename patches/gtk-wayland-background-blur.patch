@@ -1,16 +1,19 @@
-Sval: a toplevel window on Wayland asks the compositor to blur what is behind it
+Sval: a toplevel or popup window on Wayland asks the compositor to blur what is behind it
 
 A see-through window shows what is behind it through a backdrop the system
 draws: the HUD material on macOS, Acrylic on Windows, asked for by the
 root's windowsmica attribute through nsIWidget::SetMicaBackdrop. On Linux
 the compositor offers blur through ext-background-effect-v1, which KDE
 Plasma 6.7 and GNOME 51 carry. The GTK widget binds it, a toplevel window
-asks for blur on its surface while windowsmica is set, and
+asks for blur on its surface while windowsmica is set, a popup while its
+appearance is a menu's (nsMenuPopupFrame::PropagateStyleToWidget), and
 -moz-windows-mica reports whether the compositor blurs, so the chrome
-offers see-through only where it shows blurred.
+offers see-through only where it shows blurred. A popup given a shape
+(nsIWidget::SetWindowShape, popup-window-shape.patch) is blurred only
+inside it, as rows of rectangles, which is all a blur region can hold.
 
 diff --git a/widget/gtk/WaylandSurface.cpp b/widget/gtk/WaylandSurface.cpp
-index 67baf3e26c..b4cf82df7a 100644
+index 67baf3e26c..7702261bac 100644
 --- a/widget/gtk/WaylandSurface.cpp
 +++ b/widget/gtk/WaylandSurface.cpp
 @@ -116,6 +116,7 @@ WaylandSurface::~WaylandSurface() {
@@ -21,12 +24,13 @@ index 67baf3e26c..b4cf82df7a 100644
    wl_egl_window* tmp = nullptr;
    mEGLWindow.exchange(tmp);
    MozClearPointer(tmp, wl_egl_window_destroy);
-@@ -660,6 +661,33 @@ bool WaylandSurface::DisableUserInputLocked(
+@@ -660,6 +661,39 @@ bool WaylandSurface::DisableUserInputLocked(
    return true;
  }
  
 +void WaylandSurface::SetBackgroundBlurLocked(
-+    const WaylandSurfaceLock& aProofOfLock, bool aBlur) {
++    const WaylandSurfaceLock& aProofOfLock, bool aBlur,
++    const nsTArray<gfx::IntRect>* aRects) {
 +  MOZ_DIAGNOSTIC_ASSERT(&aProofOfLock == mSurfaceLock);
 +  auto* manager = WaylandDisplayGet()->GetBackgroundEffectManager();
 +  if (!manager || (!aBlur && !mBackgroundEffect)) {
@@ -34,16 +38,21 @@ index 67baf3e26c..b4cf82df7a 100644
 +  }
 +  LOGWAYLAND("WaylandSurface::SetBackgroundBlurLocked() %d", aBlur);
 +  if (!mBackgroundEffect) {
-+    mBackgroundEffect =
-+        ext_background_effect_manager_v1_get_background_effect(manager,
-+                                                               mSurface);
++    mBackgroundEffect = ext_background_effect_manager_v1_get_background_effect(
++        manager, mSurface);
 +  }
 +  wl_region* region = nullptr;
 +  if (aBlur) {
-+    // The compositor clips the region to the surface, so one region covers
-+    // the surface at every size.
 +    region = wl_compositor_create_region(WaylandDisplayGet()->GetCompositor());
-+    wl_region_add(region, 0, 0, INT32_MAX, INT32_MAX);
++    if (aRects && !aRects->IsEmpty()) {
++      for (const auto& rect : *aRects) {
++        wl_region_add(region, rect.x, rect.y, rect.width, rect.height);
++      }
++    } else {
++      // The compositor clips the region to the surface, so one region covers
++      // the surface at every size.
++      wl_region_add(region, 0, 0, INT32_MAX, INT32_MAX);
++    }
 +  }
 +  ext_background_effect_surface_v1_set_blur_region(mBackgroundEffect, region);
 +  if (region) {
@@ -56,22 +65,24 @@ index 67baf3e26c..b4cf82df7a 100644
      const WaylandSurfaceLock& aProofOfLock) {
    MOZ_DIAGNOSTIC_ASSERT(&aProofOfLock == mSurfaceLock);
 diff --git a/widget/gtk/WaylandSurface.h b/widget/gtk/WaylandSurface.h
-index 05b6924785..bc15122057 100644
+index 05b6924785..f9a12e0c00 100644
 --- a/widget/gtk/WaylandSurface.h
 +++ b/widget/gtk/WaylandSurface.h
-@@ -339,6 +339,11 @@ class WaylandSurface final {
+@@ -339,6 +339,13 @@ class WaylandSurface final {
    void SetParentLocked(const WaylandSurfaceLock& aProofOfLock,
                         RefPtr<WaylandSurface> aParent);
  
-+  // Asks the compositor to blur what is behind the whole surface, or to stop.
-+  // The request lasts as long as the wl_surface, across unmap and map.
-+  void SetBackgroundBlurLocked(const WaylandSurfaceLock& aProofOfLock,
-+                               bool aBlur);
++  // Asks the compositor to blur what is behind the whole surface, or only
++  // what is behind aRects, in the surface's coordinates, or to stop. The
++  // request lasts as long as the wl_surface, across unmap and map.
++  void SetBackgroundBlurLocked(
++      const WaylandSurfaceLock& aProofOfLock, bool aBlur,
++      const nsTArray<mozilla::gfx::IntRect>* aRects = nullptr);
 +
    bool EnableColorManagementLocked(const WaylandSurfaceLock& aProofOfLock,
                                     mozilla::gfx::YUVColorSpace aColorSpace,
                                     gfx::TransferFunction aTransferFunction);
-@@ -550,6 +555,8 @@ class WaylandSurface final {
+@@ -550,6 +557,8 @@ class WaylandSurface final {
    std::function<void(DMABufFormats*)> mDMABufFormatRefreshCallback;
    RefPtr<DMABufFormats> mFormats;
  
@@ -204,22 +215,79 @@ index 714f247ac6..fa57a7edf4 100644
    xdg_wm_base* mWmBase = nullptr;
    xx_session_manager_v1* mSessionManager = nullptr;
 diff --git a/widget/gtk/nsWindow.cpp b/widget/gtk/nsWindow.cpp
-index dc188c39d5..6230e46d0d 100644
+index acb3ba19b5..0d680c0e7c 100644
 --- a/widget/gtk/nsWindow.cpp
 +++ b/widget/gtk/nsWindow.cpp
-@@ -4969,6 +4969,18 @@ gint nsWindow::GetInputRegionMarginInGdkCoords() {
+@@ -4969,6 +4969,75 @@ gint nsWindow::GetInputRegionMarginInGdkCoords() {
    return DevicePixelsToGdkCoordRoundDown(mInputRegion.mMargin);
  }
  
-+// A toplevel window's backdrop is the compositor's blur of what is behind
-+// it, which shows through the parts the window paints translucent.
++// A toplevel or popup window's backdrop is the compositor's blur of what is
++// behind it, which shows through the parts the window paints translucent.
 +void nsWindow::SetMicaBackdrop(bool aEnabled) {
 +#ifdef MOZ_WAYLAND
-+  if (mWindowType != WindowType::TopLevel || !mSurface) {
++  if (!(mWindowType == WindowType::TopLevel || IsPopup()) || !mSurface) {
++    return;
++  }
++  mBlurBackdrop = aEnabled;
++  WaylandSurfaceLock lock(mSurface);
++  mSurface->SetBackgroundBlurLocked(lock, aEnabled, &mBlurRects);
++#endif
++}
++
++// A popup's blur takes the shape it is given, which a region of rectangles
++// can only approximate: rows of kBlurRow device pixels, each covering the
++// spans the shape's rings fill even-odd across the row's middle.
++void nsWindow::SetWindowShape(const WindowShape& aShape) {
++#ifdef MOZ_WAYLAND
++  static const int kBlurRow = 2;
++  mBlurRects.Clear();
++  if (!aShape.IsEmpty()) {
++    const double scale = FractionalScaleFactor();
++    float bottom = 0;
++    for (const auto& ring : aShape.mRings) {
++      for (const auto& point : ring) {
++        bottom = std::max(bottom, point.y.value);
++      }
++    }
++    for (int y = 0; y < int(bottom); y += kBlurRow) {
++      const float mid = y + kBlurRow / 2.0f;
++      nsTArray<float> crossings;
++      for (const auto& ring : aShape.mRings) {
++        for (size_t i = 0; i < ring.Length(); i++) {
++          const auto& a = ring[i];
++          const auto& b = ring[(i + 1) % ring.Length()];
++          if ((a.y.value <= mid) != (b.y.value <= mid)) {
++            crossings.AppendElement(a.x.value + (mid - a.y.value) *
++                                                    (b.x.value - a.x.value) /
++                                                    (b.y.value - a.y.value));
++          }
++        }
++      }
++      crossings.Sort();
++      for (size_t i = 0; i + 1 < crossings.Length(); i += 2) {
++        const int left = int(floor(crossings[i] / scale));
++        const int right = int(ceil(crossings[i + 1] / scale));
++        const int top = int(floor(y / scale));
++        const int rowBottom = int(ceil((y + kBlurRow) / scale));
++        mBlurRects.AppendElement(
++            gfx::IntRect(left, top, right - left, rowBottom - top));
++      }
++    }
++  }
++  if (!mSurface || !(mWindowType == WindowType::TopLevel || IsPopup())) {
 +    return;
 +  }
 +  WaylandSurfaceLock lock(mSurface);
-+  mSurface->SetBackgroundBlurLocked(lock, aEnabled);
++  mSurface->SetBackgroundBlurLocked(lock, mBlurBackdrop, &mBlurRects);
++#endif
++}
++
++bool nsWindow::HasWindowShape() const {
++#ifdef MOZ_WAYLAND
++  return mBlurBackdrop && !mBlurRects.IsEmpty();
++#else
++  return false;
 +#endif
 +}
 +
@@ -227,17 +295,31 @@ index dc188c39d5..6230e46d0d 100644
    mInputRegion = aInputRegion;
  
 diff --git a/widget/gtk/nsWindow.h b/widget/gtk/nsWindow.h
-index 18df35031e..acfee0b208 100644
+index 18df35031e..b89c19dceb 100644
 --- a/widget/gtk/nsWindow.h
 +++ b/widget/gtk/nsWindow.h
-@@ -400,6 +400,7 @@ class nsWindow : public nsIWidget {
+@@ -400,6 +400,9 @@ class nsWindow : public nsIWidget {
    void SetTransparencyMode(TransparencyMode aMode) override;
    TransparencyMode GetTransparencyMode() override;
    void SetInputRegion(const InputRegion&) override;
 +  void SetMicaBackdrop(bool aEnabled) override;
++  void SetWindowShape(const WindowShape& aShape) override;
++  bool HasWindowShape() const override;
  
    nsresult SynthesizeNativeMouseEvent(
        LayoutDeviceIntPoint aPoint, NativeMouseMessage aNativeMessage,
+@@ -770,6 +773,11 @@ class nsWindow : public nsIWidget {
+   float mLastMotionPressure = 0.0f;
+ 
+   InputRegion mInputRegion;
++  // Whether the compositor blurs what is behind the window
++  // (SetMicaBackdrop), and where: the surface's rectangles SetWindowShape
++  // gave, or all of it while they are empty.
++  bool mBlurBackdrop = false;
++  nsTArray<mozilla::gfx::IntRect> mBlurRects;
+ 
+   bool DragInProgress(void);
+ 
 diff --git a/widget/gtk/wayland/moz.build b/widget/gtk/wayland/moz.build
 index fd6fa5822d..43575986c0 100644
 --- a/widget/gtk/wayland/moz.build

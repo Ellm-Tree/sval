@@ -280,7 +280,7 @@ add_task(async function an_open_workspace_is_not_offered_a_second_window() {
     "the workspace this window shows is not offered a window of its own"
   );
   Assert.ok(
-    menu.querySelector("[data-sval-new-workspace]"),
+    menuItem({ popup: menu }, "newWorkspace"),
     "and the switcher is where a new workspace is made"
   );
   await closeSwitcher(menu);
@@ -307,7 +307,7 @@ add_task(async function an_open_workspace_is_not_offered_a_second_window() {
     );
     Assert.ok(listed, "while the open workspace is still listed, to go to");
     Assert.ok(
-      listed.querySelector('[data-command="edit"]') &&
+      menuItem({ popup: listed.menupopup }, "edit") &&
         !listed.querySelector("[data-open-workspace-id]"),
       "its submenu keeps its own commands, with no new window"
     );
@@ -920,10 +920,8 @@ add_task(async function an_agent_workspaces_menu_stops_and_resumes_it() {
   await SvalPanel.refresh();
   const choose = async (label, what) => {
     const menu = await openSwitcher();
-    const row = menu.querySelector(
-      `menu[data-workspace-id="${CSS.escape(agent)}"]`
-    );
-    const item = row.querySelector('menuitem[data-command="stopAgent"]');
+    const row = menuItem({ popup: menu }, `workspace:${agent}`);
+    const item = menuItem({ popup: row.menupopup }, "stopAgent");
     Assert.equal(item.getAttribute("label"), label, `${what} is labelled`);
     await chooseMenuItem(item, menu, what);
   };
@@ -955,9 +953,10 @@ add_task(
     atTaskEnd(() => SvalAgents.unpair(agentId));
     await SvalPanel.refresh();
     const menu = await openSwitcher();
-    const item = menu
-      .querySelector(`menu[data-workspace-id="${CSS.escape(agent)}"]`)
-      .querySelector('menuitem[data-command="agentPermissions"]');
+    const item = menuItem(
+      { popup: menuItem({ popup: menu }, `workspace:${agent}`).menupopup },
+      "agentPermissions"
+    );
     Assert.ok(!item.hidden, "an agent's workspace offers its permissions");
     const opened = BrowserTestUtils.waitForNewTab(
       gBrowser,

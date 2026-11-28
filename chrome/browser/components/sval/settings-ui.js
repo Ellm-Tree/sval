@@ -340,36 +340,24 @@
       }
     }
 
-    #open() {
-      const popup = document.createXULElement("menupopup");
-      popup.className = "sval-choice-menu";
-      for (const [value, word, disabled] of this.#choices) {
-        const item = document.createXULElement("menuitem");
-        item.setAttribute("type", "radio");
-        item.setAttribute("label", word);
-        item.disabled = !!disabled;
-        if (value === this.#value) {
-          item.setAttribute("checked", "true");
-        }
-        item.addEventListener("command", () => {
-          if (value === this.#value) {
-            return;
-          }
-          this.value = value;
-          this.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-        popup.append(item);
+    async #open() {
+      const { SvalMenu } = ChromeUtils.importESModule(
+        "moz-src:///browser/components/sval/SvalMenu.sys.mjs"
+      );
+      const value = await SvalMenu.choose(
+        this.#button,
+        this.#choices.map(([choice, label, disabled]) => ({
+          value: choice,
+          label,
+          disabled: !!disabled,
+        })),
+        this.#value
+      );
+      if (value === null || value === this.#value) {
+        return;
       }
-      popup.addEventListener("popuphidden", () => popup.remove(), {
-        once: true,
-      });
-      let set = document.querySelector("popupset");
-      if (!set) {
-        set = document.createXULElement("popupset");
-        document.body.append(set);
-      }
-      set.append(popup);
-      popup.openPopup(this.#button, "after_end");
+      this.value = value;
+      this.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
   customElements.define("sval-choice-pill", SvalChoicePill);

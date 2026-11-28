@@ -91,6 +91,20 @@ async function toolbarInPanel(inPanel = true) {
     () => arranged(inPanel),
     "the header's widgets taking their places"
   );
+  // The widgets take their places before the panel lays them out: the
+  // toolbar draws its layout in a task of its own
+  // (`SvalPanelToolbar`'s `fit`), and a panel sliding back in stands over
+  // the page until its slide ends. A button clicked before then is not yet
+  // where it stays.
+  if (inPanel) {
+    await TestUtils.waitForCondition(
+      () =>
+        SvalPanelToolbar.drawnLayout(window)?.width ===
+          container().getBoundingClientRect().width &&
+        !container().hasAttribute("sval-overlay"),
+      "the toolbar drawn for the panel's width"
+    );
+  }
 }
 
 /**
@@ -423,7 +437,10 @@ add_task(async function a_peek_keeps_its_address_and_its_own_parts() {
 
 add_task(async function a_click_on_the_address_floats_the_launcher() {
   await toolbarInPanel(true);
-  atTaskEnd(() => SvalLauncher.close(window));
+  // The Launcher opens its view as its first results come, and a docked
+  // field keeps an open view over the panel's buttons below it: the task
+  // waits for the results and closes the view with the Launcher.
+  atTaskEnd(() => SvalLauncher.close(window, { focusPage: true }));
   // A moved field breaks out of its row again a frame later
   // (`UrlbarInput.#updateLayoutBreakoutDimensions`), and only then floats.
   await TestUtils.waitForCondition(
@@ -673,11 +690,13 @@ add_task(async function the_page_keeps_its_gap_below_the_windows_top() {
 add_task(async function the_extensions_button_opens_its_menu_from_the_panel() {
   await toolbarInPanel(true);
   const panel = gUnifiedExtensions.panel;
-  const shown = BrowserTestUtils.waitForPopupEvent(panel, "shown");
-  EventUtils.synthesizeMouseAtCenter(
-    document.getElementById("unified-extensions-button"),
-    {}
+  const button = document.getElementById("unified-extensions-button");
+  await TestUtils.waitForCondition(
+    () => button.checkVisibility(),
+    "the extensions button showing"
   );
+  const shown = BrowserTestUtils.waitForPopupEvent(panel, "shown");
+  EventUtils.synthesizeMouseAtCenter(button, {});
   await within(shown, 10_000, "the extensions menu");
   atTaskEnd(async () => {
     const hidden = BrowserTestUtils.waitForPopupEvent(panel, "hidden");

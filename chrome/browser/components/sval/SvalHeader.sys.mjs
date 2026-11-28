@@ -42,7 +42,10 @@ import { SvalSearchFlip } from "moz-src:///browser/components/sval/SvalSearchFli
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { SvalStem } from "moz-src:///browser/components/sval/SvalStem.sys.mjs";
-import { tidySeparators } from "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs";
+import {
+  SvalMenu,
+  tidySeparators,
+} from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
 import {
   MODE_NAMES,
   describeKey,
@@ -94,6 +97,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   launcherKeyText: "moz-src:///browser/components/sval/SvalLauncher.sys.mjs",
   copyCleanAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
+  SvalPopover: "moz-src:///browser/components/sval/SvalPopover.sys.mjs",
 });
 
 const HEADER_CSS = "chrome://browser/content/sval/sval-header.css";
@@ -610,7 +614,8 @@ function doorhangerGrowsFrom(root) {
  * `popupshowing`, captured so `SvalStem` sees the mark as the event
  * bubbles: marks the header's popovers as stem hosts, and Firefox's
  * doorhanger while it opens from a button it grows from. Firefox makes some
- * of these popups only as they first open, so each is marked as it opens.
+ * of these popups only as they first open, so each is marked as it opens,
+ * and Firefox's are drawn as Sval's popovers (`SvalPopover.adopt`).
  *
  * @param {Event} event
  */
@@ -620,6 +625,7 @@ function markStemHost(event) {
   if (!doorhanger && !STEM_HOSTS.has(popup.id)) {
     return;
   }
+  lazy.SvalPopover.adopt(popup);
   popup.setAttribute("sval-stem-host", "");
   popup.setAttribute("sval-stem-hang", "");
   const anchor = popup.anchorNode;
@@ -1535,6 +1541,9 @@ export const SvalHeader = {
       HEADER_CSS,
       win.windowUtils.AUTHOR_SHEET
     );
+    // After the header's sheet, whose palettes it reads and whose rules it
+    // states again for menus.
+    SvalMenu.loadSheet(win);
     this.init();
     SvalThemes.mount(win);
     const doc = win.document;

@@ -69,31 +69,39 @@ function dragPin(source, target, x) {
 
 /**
  * @param {Element} tile
- * @returns {Promise<Element>} the pin's menu, open on it.
+ * @returns {Promise<object>} the pin's menu, open on it, as
+ *   `SvalMenu.create` gave it.
  */
 async function pinMenuOn(tile) {
-  EventUtils.synthesizeMouseAtCenter(tile, { type: "contextmenu", button: 2 });
-  await TestUtils.waitForCondition(
-    () => document.getElementById("sval-pin-context-menu")?.state === "open",
-    "the pin's menu opens"
+  const handle = SvalPanel.pins.pinMenu;
+  await openMenu(handle, () =>
+    EventUtils.synthesizeMouseAtCenter(tile, { type: "contextmenu", button: 2 })
   );
-  return document.getElementById("sval-pin-context-menu");
+  return handle;
 }
 
 /**
- * @param {Element} menu
- * @returns {string[]} the commands it shows, "-" for a separator.
+ * @param {object} handle A menu, as `SvalMenu.create` gave it.
+ * @returns {string[]} the items it shows, by id, "-" for a separator.
  */
-function shown(menu) {
-  return Array.from(menu.children)
+function shown(handle) {
+  return Array.from(handle.popup.children)
     .filter(el => !el.hidden)
-    .map(el => (el.localName === "menuseparator" ? "-" : el.dataset.command));
+    .map(el =>
+      el.localName === "menuseparator"
+        ? "-"
+        : el.getAttribute("data-sval-menu-id")
+    );
 }
 
-async function choose(menu, command) {
-  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.activateItem(menu.querySelector(`[data-command="${command}"]`));
-  await within(hidden, 10_000, `the menu closing on ${command}`);
+/**
+ * @param {object} handle
+ * @returns {Promise<void>} once the menu has closed.
+ */
+async function closeMenu(handle) {
+  const hidden = BrowserTestUtils.waitForPopupEvent(handle.popup, "hidden");
+  handle.close();
+  await within(hidden, 10_000, "the menu closing");
 }
 
 /**
@@ -243,7 +251,7 @@ add_task(async function a_pin_dropped_on_a_pin_makes_a_folder() {
     "and leaves the folder"
   );
 
-  await choose(await pinMenuOn(tileOf(folder)), "moveContents");
+  await pickMenuItem(await pinMenuOn(tileOf(folder)), "moveContents");
   await TestUtils.waitForCondition(
     () => rowGuids().join() === [c, b, a, d].join(),
     "Move Contents to Row puts A where the folder stood"
@@ -273,15 +281,12 @@ add_task(async function a_folders_menu_and_move_to_folder() {
 
   let menu = await pinMenuOn(tileOf(b));
   Assert.ok(shown(menu).includes("moveToPinFolder"), "a pin's menu offers it");
-  const moveTo = menu.querySelector('[data-command="moveToPinFolder"]');
+  const moveTo = menuItem(menu, "moveToPinFolder");
   const opened = BrowserTestUtils.waitForPopupEvent(moveTo.menupopup, "shown");
   moveTo.openMenu(true);
   await within(opened, 10_000, "Move to Pin Folder opens");
-  const item = moveTo.menupopup.querySelector(`[data-folder="${folder}"]`);
-  Assert.ok(item, "listing the row's folder");
-  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  moveTo.menupopup.activateItem(item);
-  await within(hidden, 10_000, "the menu closing");
+  Assert.ok(menuItem(menu, `folder:${folder}`), "listing the row's folder");
+  await pickMenuItem(menu, `folder:${folder}`);
   await TestUtils.waitForCondition(
     () =>
       store
@@ -301,7 +306,7 @@ add_task(async function a_folders_menu_and_move_to_folder() {
     "moveToFavorites",
     "delete",
   ]);
-  await choose(menu, "moveToFavorites");
+  await pickMenuItem(menu, "moveToFavorites");
   await TestUtils.waitForCondition(
     () => store.get(folder)?.parentGuid === TOOLBAR,
     "Move to Favorites moves the folder whole to Favorites"
@@ -338,25 +343,23 @@ add_task(async function move_to_folder_leaves_out_another_workspaces() {
     !shown(menu).includes("moveToPinFolder"),
     "with no folder in this row, the menu leaves it out"
   );
-  let hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.hidePopup();
-  await within(hidden, 10_000, "the menu closing");
+  await closeMenu(menu);
 
   const here = await pinsFolder("Home");
   await untilPinShows(here);
   menu = await pinMenuOn(tileOf(pin));
-  const moveTo = menu.querySelector('[data-command="moveToPinFolder"]');
+  const moveTo = menuItem(menu, "moveToPinFolder");
   const opened = BrowserTestUtils.waitForPopupEvent(moveTo.menupopup, "shown");
   moveTo.openMenu(true);
   await within(opened, 10_000, "Move to Pin Folder opens");
   Assert.deepEqual(
-    [...moveTo.menupopup.children].map(el => el.dataset.folder),
-    [here],
+    [...moveTo.menupopup.children].map(el =>
+      el.getAttribute("data-sval-menu-id")
+    ),
+    [`folder:${here}`],
     "listing this row's folder alone"
   );
-  hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.hidePopup();
-  await within(hidden, 10_000, "the menu closing");
+  await closeMenu(menu);
 });
 
 /** The row's own menu makes an empty pin folder at the end of the row. */
@@ -369,21 +372,18 @@ add_task(async function the_rows_menu_makes_a_folder() {
   const block = SvalPanel._els.pins;
   const lines = block.querySelector(".sval-pins-lines");
   const rect = lines.getBoundingClientRect();
-  EventUtils.synthesizeMouse(
-    lines,
-    rect.width - 2,
-    rect.height / 2,
-    { type: "contextmenu", button: 2 },
-    window
+  const menu = SvalPanel.pins.rowMenu;
+  await openMenu(menu, () =>
+    EventUtils.synthesizeMouse(
+      lines,
+      rect.width - 2,
+      rect.height / 2,
+      { type: "contextmenu", button: 2 },
+      window
+    )
   );
-  const menu = await TestUtils.waitForCondition(() => {
-    const m = document.getElementById("sval-pins-row-context-menu");
-    return m?.state === "open" ? m : null;
-  }, "the row's menu opens");
   const asked = answerDialog("Reading");
-  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.activateItem(menu.querySelector('[data-command="newPinFolder"]'));
-  await within(hidden, 10_000, "the menu closing");
+  await pickMenuItem(menu, "newPinFolder");
   Assert.equal(
     await within(asked, 10_000, "the pin folder's name is asked"),
     "Create Pin Folder"

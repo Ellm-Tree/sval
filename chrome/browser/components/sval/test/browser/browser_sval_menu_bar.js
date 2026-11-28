@@ -41,18 +41,24 @@ function showing(id) {
 
 /**
  * @param {Element} popup
- * @returns {string[]} the entries it shows: a command's `data-command`, else
- *   an entry's id, else its label, which names a page or a workspace, and
+ * @returns {string[]} the entries it shows: an entry's id, else a command's
+ *   id in the menu, else its label, which names a page or a workspace, and
  *   "-" for a separator.
  */
 function entries(popup) {
   return Array.from(popup.children)
     .filter(el => !el.hidden)
-    .map(el =>
-      el.localName === "menuseparator"
-        ? "-"
-        : (el.dataset.command ?? (el.id || el.label))
-    );
+    .map(el => {
+      if (el.localName === "menuseparator") {
+        return "-";
+      }
+      // A workspace's, a page's and a favorite's entries are named by what
+      // they hold.
+      const command = el.dataset.guid
+        ? null
+        : el.getAttribute("data-sval-menu-id");
+      return el.id || (command && !command.includes(":") ? command : el.label);
+    });
 }
 
 /** @returns {Promise<object>} a tab of the workspace, selected. */
@@ -156,7 +162,7 @@ add_task(async function workspaces_lists_and_switches() {
     container.hasAttribute("sval-collapsed") ? "hidden" : "shown",
     "named for what it will do"
   );
-  const entry = id => popup.querySelector(`[data-workspace-id="${id}"]`);
+  const entry = id => menuItem({ popup }, `workspace:${id}`);
   const nameOf = id => SvalPanel.nodes[id].content.name;
   Assert.equal(entry(home)?.label, nameOf(home), "each workspace by name");
   Assert.equal(entry(work)?.label, nameOf(work));
@@ -224,15 +230,16 @@ add_task(async function workspaces_groups_agents_by_app() {
     "under the caption"
   );
   const inApp = (app, id) =>
-    app.querySelector(`:scope > menupopup > [data-workspace-id="${id}"]`);
+    menuItem({ popup: app.menupopup }, `workspace:${id}`);
   Assert.ok(inApp(apps[0], first) && inApp(apps[0], second), "the app's own");
   Assert.ok(inApp(apps[1], other), "and the other app's in its menu");
   Assert.ok(
     inApp(apps[0], second).label.startsWith("Compare laptop prices"),
     "each named for its task"
   );
-  Assert.ok(
-    !popup.querySelector(`:scope > [data-workspace-id="${first}"]`),
+  Assert.notStrictEqual(
+    menuItem({ popup }, `workspace:${first}`)?.parentNode,
+    popup,
     "none listed outside its app"
   );
 });
@@ -291,11 +298,11 @@ add_task(async function tab_acts_on_the_selected_tab() {
   }
 
   Assert.equal(
-    popup.querySelector('[data-command="pin"]').dataset.pinned,
+    menuItem({ popup }, "pin").dataset.pinned,
     "false",
     "a tab is offered Pin Tab"
   );
-  popup.querySelector('[data-command="pin"]').doCommand();
+  menuItem({ popup }, "pin").doCommand();
   await TestUtils.waitForCondition(
     () => rowGuids().length === 1 && selectedPinGuid() === rowGuids()[0],
     "Pin Tab pins it, selected"
@@ -317,11 +324,11 @@ add_task(async function tab_acts_on_the_selected_tab() {
     "a selected pin is offered Copy Address and Unpin Tab"
   );
   Assert.equal(
-    popup.querySelector('[data-command="pin"]').dataset.pinned,
+    menuItem({ popup }, "pin").dataset.pinned,
     "true",
     "which unpins it"
   );
-  popup.querySelector('[data-command="pin"]').doCommand();
+  menuItem({ popup }, "pin").doCommand();
   await TestUtils.waitForCondition(
     () => !rowGuids().length,
     "Unpin Tab unpins it"

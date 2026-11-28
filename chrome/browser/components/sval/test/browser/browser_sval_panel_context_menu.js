@@ -40,7 +40,7 @@ function silentMenuItems(kind) {
 function visibleMenuCommands(menu) {
   return Array.from(menu.children)
     .filter(item => !item.hidden)
-    .map(item => item.dataset.command);
+    .map(item => item.getAttribute("data-sval-menu-id"));
 }
 
 /**
@@ -88,7 +88,7 @@ add_task(async function the_context_menu_offers_the_right_items_per_kind() {
   await SvalPanel.refresh();
   const blankMenu = await openContextMenu(SvalPanel._rowElementFor(blank));
   Assert.ok(
-    blankMenu.querySelector('[data-command="pin"]').hidden,
+    menuItem({ popup: blankMenu }, "pin").hidden,
     "a blank tab offers no pin"
   );
   assertTidySeparators(blankMenu, "an unpinnable tab's menu");
@@ -130,7 +130,7 @@ add_task(async function rename_from_the_menu_names_and_remove_name_unnames() {
 
   menu = await openContextMenu(SvalPanel._rowElementFor(ids.tab1));
   Assert.ok(
-    !menu.querySelector('[data-command="clearLabel"]').hidden,
+    !menuItem({ popup: menu }, "clearLabel").hidden,
     "a renamed tab offers its page's title back"
   );
   await activateMenuItem(menu, "clearLabel");
@@ -504,9 +504,7 @@ add_task(async function delete_workspace_from_its_menu() {
     );
     const menu = await openWorkspaceMenu();
     Assert.ok(
-      menu
-        .querySelector('[data-command="deleteWorkspace"]')
-        .hasAttribute("disabled"),
+      menuItem({ popup: menu }, "deleteWorkspace").hasAttribute("disabled"),
       "the last workspace offers no delete"
     );
     await closeContextMenu(menu);
@@ -536,7 +534,7 @@ add_task(async function each_switcher_entry_has_its_workspace_commands() {
     const opened = BrowserTestUtils.waitForPopupEvent(switcher, "shown");
     EventUtils.synthesizeMouseAtCenter(SvalPanel._els.switcher, {});
     await within(opened, 10_000, "the switcher showing");
-    return switcher.querySelector(`menu[data-workspace-id="${other}"]`);
+    return menuItem({ popup: switcher }, `workspace:${other}`);
   };
 
   try {
@@ -549,12 +547,12 @@ add_task(async function each_switcher_entry_has_its_workspace_commands() {
     Assert.deepEqual(
       Array.from(submenu.children)
         .filter(item => !item.hidden && item.localName === "menuitem")
-        .map(item => item.dataset.command ?? "open"),
-      ["open", "edit", "isolateWorkspace", "deleteWorkspace"],
+        .map(item => item.getAttribute("data-sval-menu-id")),
+      ["openWorkspace", "edit", "isolateWorkspace", "deleteWorkspace"],
       "it opens the workspace in a window, and edits, isolates and deletes it"
     );
     await chooseMenuItem(
-      submenu.querySelector('[data-command="deleteWorkspace"]'),
+      menuItem({ popup: submenu }, "deleteWorkspace"),
       switcher,
       "Delete workspace"
     );
@@ -623,11 +621,7 @@ add_task(async function new_group_and_new_workspace_refuse_an_empty_name() {
     const shown = BrowserTestUtils.waitForPopupEvent(switcher, "shown");
     SvalPanel._els.switcher.click();
     await within(shown, 10_000, "the switcher showing");
-    await chooseMenuItem(
-      switcher.querySelector("[data-sval-new-workspace]"),
-      switcher,
-      "New workspace"
-    );
+    await pickMenuItem({ popup: switcher }, "newWorkspace");
     Assert.equal(
       await answerContainerDialog(null),
       "new-workspace",
@@ -685,7 +679,7 @@ add_task(async function the_context_menus_open_from_the_keyboard() {
   EventUtils.synthesizeKey("KEY_F10", { shiftKey: true });
   await within(shown, 10_000, "Shift+F10 showing the workspace menu");
   Assert.ok(
-    !workspaceMenu.querySelector('[data-command="edit"]').hidden,
+    !menuItem({ popup: workspaceMenu }, "edit").hidden,
     "the switcher's menu offers the workspace's commands"
   );
   await closeContextMenu(workspaceMenu);
@@ -699,7 +693,7 @@ add_task(async function the_context_menu_moves_a_node() {
   const { engine, ids } = await withFreshPanel();
 
   let menu = await openContextMenu(SvalPanel._rowElementFor(ids.tab1));
-  const item = command => menu.querySelector(`[data-command="${command}"]`);
+  const item = command => menuItem({ popup: menu }, command);
   Assert.ok(
     item("moveBefore").hasAttribute("disabled"),
     "the first tab in its group cannot move up, so that entry is disabled"
@@ -716,24 +710,22 @@ add_task(async function the_context_menu_moves_a_node() {
 
   menu = await openContextMenu(SvalPanel._rowElementFor(ids.loose));
   const entries = Array.from(
-    item("moveToGroup").querySelectorAll("menuitem[data-move-parent]")
+    item("moveToGroup").querySelectorAll(
+      'menuitem[data-sval-menu-id^="moveParent:"]'
+    )
   ).map(entry => [
-    entry.getAttribute("data-move-parent"),
+    entry.getAttribute("data-sval-menu-id"),
     entry.getAttribute("label"),
   ]);
   Assert.deepEqual(
     entries,
     [
-      [ids.groupA, "Reading"],
-      [ids.groupB, "Shipping"],
+      [`moveParent:${ids.groupA}`, "Reading"],
+      [`moveParent:${ids.groupB}`, "Shipping"],
     ],
     "a loose tab is offered both groups, and no 'No group' — it is in none"
   );
-  await chooseMenuItem(
-    item("moveToGroup").querySelector(`[data-move-parent="${ids.groupB}"]`),
-    menu,
-    "the second group"
-  );
+  await pickMenuItem({ popup: menu }, `moveParent:${ids.groupB}`);
   await TestUtils.waitForCondition(async () => {
     const children = await childrenOf(engine, ids.groupB);
     return children.join() === [ids.tab4, ids.loose].join();
@@ -747,8 +739,8 @@ add_task(async function the_context_menu_moves_a_node() {
   Assert.equal(
     item("moveToGroup")
       .querySelector("menuitem")
-      ?.getAttribute("data-move-parent"),
-    ids.workspace,
+      ?.getAttribute("data-sval-menu-id"),
+    `moveParent:${ids.workspace}`,
     "once in a group, the first destination is out of every group"
   );
   await closeContextMenu(menu);
@@ -760,10 +752,7 @@ add_task(async function the_context_menu_moves_a_node() {
  */
 add_task(async function move_to_group_makes_a_new_group_for_the_tab() {
   const { engine, ids } = await withFreshPanel();
-  const newGroupEntry = menu =>
-    menu
-      .querySelector('[data-command="moveToGroup"]')
-      .querySelector("[data-new-group]");
+  const newGroupEntry = menu => menuItem({ popup: menu }, "newGroup");
 
   let menu = await openContextMenu(SvalPanel._rowElementFor(ids.loose));
   const before = Object.keys((await engine.tree()).nodes).length;
@@ -820,23 +809,27 @@ add_task(async function move_to_workspace_takes_a_group_with_its_tabs() {
   await SvalPanel.refresh();
 
   const menu = await openContextMenu(SvalPanel._rowElementFor(ids.groupA));
-  const parent = menu.querySelector('[data-command="moveToWorkspace"]');
+  const parent = menuItem({ popup: menu }, "moveToWorkspace");
   Assert.ok(parent && !parent.hidden, "a group offers Move to workspace");
-  const entries = Array.from(parent.querySelectorAll("menuitem")).map(el => [
-    el.getAttribute("data-move-workspace"),
-    el.getAttribute("data-move-workspace") ? el.getAttribute("label") : null,
-  ]);
+  const entries = Array.from(parent.querySelectorAll("menuitem")).map(el => {
+    const id = el.getAttribute("data-sval-menu-id");
+    return [id, id === "moveWorkspace:" ? null : el.getAttribute("label")];
+  });
   Assert.deepEqual(
-    entries.filter(([id]) => id === other || id === ids.workspace),
-    [[other, "Elsewhere"]],
+    entries.filter(
+      ([id]) =>
+        id === `moveWorkspace:${other}` ||
+        id === `moveWorkspace:${ids.workspace}`
+    ),
+    [[`moveWorkspace:${other}`, "Elsewhere"]],
     "another workspace is offered, and never the window's own"
   );
-  Assert.deepEqual(entries.at(-1), ["", null], "then a new one, last");
-  await chooseMenuItem(
-    parent.querySelector(`[data-move-workspace="${other}"]`),
-    menu,
-    "the other workspace"
+  Assert.deepEqual(
+    entries.at(-1),
+    ["moveWorkspace:", null],
+    "then a new one, last"
   );
+  await pickMenuItem({ popup: menu }, `moveWorkspace:${other}`);
 
   await TestUtils.waitForCondition(async () => {
     const children = await childrenOf(engine, other);
@@ -880,7 +873,7 @@ add_task(async function the_menu_names_the_keys_that_do_the_same() {
     close: "Del",
   };
   for (const [command, text] of Object.entries(expected)) {
-    const item = menu.querySelector(`[data-command="${command}"]`);
+    const item = menuItem({ popup: menu }, command);
     Assert.equal(
       item.getAttribute("acceltext"),
       text,
@@ -894,7 +887,7 @@ add_task(async function the_menu_names_the_keys_that_do_the_same() {
     );
   }
   // A key of Firefox's, which the item names by its id.
-  const newTab = menu.querySelector('[data-command="addTab"]');
+  const newTab = menuItem({ popup: menu }, "addTab");
   Assert.equal(newTab.getAttribute("key"), "key_newNavigatorTab");
   Assert.equal(
     newTab.getAttribute("acceltext"),

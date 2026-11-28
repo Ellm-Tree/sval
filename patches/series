@@ -213,6 +213,8 @@ home-settings-in-preferences.patch
 settings-home-use-favorite.patch
 popups-anchor-in-sval-header.patch
 stem-popup-positioned.patch
+popup-shadow-follows-appearance.patch
+popups-stay-in-window.patch
 tab-strip-stays-hidden.patch
 addon-refusal-notification-id.patch
 header-popovers-slide.patch
@@ -481,3 +483,4 @@ prompt-sval-dialog.patch
 remove-site-data-list.patch
 remove-site-data-list.delete
 widevine-host-verification.patch
+popup-window-shape.patch

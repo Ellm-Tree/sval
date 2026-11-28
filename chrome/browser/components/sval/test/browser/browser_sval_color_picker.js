@@ -382,6 +382,10 @@ add_task(async function no_colour_can_be_see_through() {
     root.hasAttribute("data-sval-see-through"),
     "the window shows through with no colour"
   );
+  Assert.ok(
+    root.hasAttribute("data-sval-translucent"),
+    "and its menus show through with it"
+  );
   Assert.less(
     InspectorUtils.colorToRGBA(getComputedStyle(root).backgroundColor).a,
     1,

@@ -20,7 +20,9 @@
  * window's transparent face: the path's fill leaves out the face's inside
  * and overlaps its rim, so the button's label shows and no gap opens between
  * the two fills. The content's own fill and edge give way to the path, so
- * the content's edge is not drawn twice.
+ * the content's edge is not drawn twice. Over the system's backdrop, in a
+ * see-through window, the path's fill covers the face too, and the popover
+ * draws the face again over it (`SvalStem`).
  *
  * A popover marked `sval-stem-hang` reaches 32px past the button on each
  * side, which keeps the fillets clear of its 20px corners. Any other keeps
@@ -62,6 +64,28 @@
 
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
+/* While a popover grows from its button, the button shows its icon alone:
+   every adornment on it gives way, a dot, a count, a badge or a progress
+   ring, with the gap each cuts in the icon, as the popover says what it
+   marked. An icon drawn as a mask keeps its glyph (`--sval-glyph`) and
+   loses only the cut. `:not(#sval-stem-weight)` gives the rule an id's
+   weight, over the adornments' own rules, which name their buttons by id.
+   A menu button holds its popup, whose own parts stay as they are. */
+:is([sval-stem="top"], [sval-stem="right"], [sval-stem="bottom"], [sval-stem="left"], [sval-stem-anchor]):not(#sval-stem-weight) {
+  &::after,
+  & :not(panel, menupopup, :is(panel, menupopup) *)::after {
+    content: none !important;
+  }
+
+  & :is(.toolbarbutton-badge, #downloads-indicator-progress-outer, .sval-prot-count, .sval-prot-dot):not(:is(panel, menupopup) *) {
+    display: none !important;
+  }
+
+  & :is(.toolbarbutton-icon, .toolbarbutton-badge-stack, .sval-header-glyph, .sval-prot-glyph):not(:is(panel, menupopup) *) {
+    mask-image: var(--sval-glyph, none) !important;
+  }
+}
+
 :root {
   /* Each drop shadow shadows what the one before it drew, so the near one
      also shadows the far one. */
@@ -91,6 +115,12 @@
     content: "";
     position: absolute;
     pointer-events: none;
+  }
+
+  &::part(sval-stem-face) {
+    position: absolute;
+    pointer-events: none;
+    visibility: hidden;
   }
 
   &::part(sval-stem-outline) {
@@ -166,6 +196,16 @@
     background-color: var(--panel-background-color) !important;
   }
 
+  /* A face its popover draws again over the system's backdrop gives up its
+     fill and edge, which the popover's fill takes over, so the copy carries
+     its icon alone, from the copy's first paint. */
+  [sval-stem-anchor][sval-stem-glass] {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
   [sval-stem-anchor="bottom"] {
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
@@ -198,7 +238,11 @@
        (`--sval-stem-shadow-room`), deeper than `--sval-stem-box-shadow`
        reaches at three deviations of its largest layer. */
     --panel-box-shadow-margin: 24px;
-    --sval-stem-shadow-room: calc(var(--panel-box-shadow-margin) + var(--sval-stem-face-h, 0px) + var(--sval-fillet));
+    /* An opener may place a popover a few pixels further from its button
+       (`openPopup`'s offset), which moves the window that much away from
+       the face; the room beyond the face keeps the face inside the window
+       where no shadow needs room, as over the system's backdrop. */
+    --sval-stem-shadow-room: calc(max(var(--panel-box-shadow-margin), var(--sval-fillet)) + var(--sval-stem-face-h, 0px) + var(--sval-fillet));
     /* The margin on the button's side. */
     --sval-stem-near: calc(var(--sval-stem-drop, 0px) + var(--sval-fillet) - var(--sval-stem-shadow-room));
     --sval-stem-corner-start: min(var(--panel-border-radius), var(--sval-corner-left, var(--panel-border-radius)));
@@ -316,6 +360,17 @@
 
     &::part(sval-stem-outline) {
       visibility: visible;
+    }
+
+    /* The face, drawn again over the system's backdrop (`SvalStem`'s
+       `showFace`). */
+    &[sval-stem-glass]::part(sval-stem-face) {
+      visibility: visible;
+      left: var(--sval-stem-face-left);
+      top: var(--sval-stem-face-top);
+      width: var(--sval-stem-face-width);
+      height: var(--sval-stem-face-height);
+      background: var(--sval-stem-face-image) 0 0 / 100% 100% no-repeat;
     }
 
     &::part(sval-stem-fill) {

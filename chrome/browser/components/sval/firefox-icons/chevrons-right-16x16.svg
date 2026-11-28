@@ -13,6 +13,6 @@
     :root { stroke: context-fill #060a2e; }
     @media (prefers-color-scheme: dark) { :root { stroke: context-fill #ffffff; } }
   </style>
-  <path d="m12 14 4-4" />
-  <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+  <path d="m4 20 8-8-8-8" />
+  <path d="m12 20 8-8-8-8" />
 </svg>

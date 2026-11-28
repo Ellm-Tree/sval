@@ -267,11 +267,7 @@ function paneMenu(id) {
  * @returns {Promise<void>}
  */
 function choose(menu, command) {
-  return chooseMenuItem(
-    menu.querySelector(`[data-command="${command}"]`),
-    menu,
-    `"${command}"`
-  );
+  return pickMenuItem({ popup: menu }, command);
 }
 
 /** @returns {Element[]} the content area's panels on screen, left to right. */
@@ -357,24 +353,19 @@ add_task(async function separate_from_a_panes_menu() {
     "closeSplit",
   ]) {
     Assert.ok(
-      !menu.querySelector(`[data-command="${command}"]`).hidden,
+      !menuItem({ popup: menu }, command).hidden,
       `the pane's menu offers ${command}`
     );
   }
   for (const command of ["createSplit", "addToSplit"]) {
-    Assert.ok(
-      menu.querySelector(`[data-command="${command}"]`).hidden,
-      `but not ${command}`
-    );
+    Assert.ok(menuItem({ popup: menu }, command).hidden, `but not ${command}`);
   }
   Assert.ok(
-    menu.querySelector('[data-command="closeSplit"]').hasAttribute("data-both"),
+    menuItem({ popup: menu }, "closeSplit").hasAttribute("data-both"),
     "Close All reads Close Both for two"
   );
   Assert.ok(
-    menu
-      .querySelector('[data-command="movePaneRight"]')
-      .hasAttribute("disabled"),
+    menuItem({ popup: menu }, "movePaneRight").hasAttribute("disabled"),
     "the last pane cannot move right"
   );
   await choose(menu, "separate");
@@ -400,9 +391,7 @@ add_task(async function move_pane_left_and_right() {
   const { tabs, ids } = await shownSplit(3);
   let menu = await paneMenu(ids[0]);
   Assert.ok(
-    menu
-      .querySelector('[data-command="movePaneLeft"]')
-      .hasAttribute("disabled"),
+    menuItem({ popup: menu }, "movePaneLeft").hasAttribute("disabled"),
     "the first pane cannot move left"
   );
   for (const [command, keycode] of [
@@ -410,7 +399,7 @@ add_task(async function move_pane_left_and_right() {
     ["movePaneRight", "VK_RIGHT"],
     ["addTabToSplit", null],
   ]) {
-    const item = menu.querySelector(`[data-command="${command}"]`);
+    const item = menuItem({ popup: menu }, command);
     const key = document.getElementById(item.getAttribute("key"));
     Assert.equal(
       item.getAttribute("acceltext"),
@@ -425,9 +414,7 @@ add_task(async function move_pane_left_and_right() {
     }
   }
   Assert.ok(
-    !menu
-      .querySelector('[data-command="closeSplit"]')
-      .hasAttribute("data-both"),
+    !menuItem({ popup: menu }, "closeSplit").hasAttribute("data-both"),
     "Close All for more than two"
   );
   await choose(menu, "movePaneRight");
@@ -513,7 +500,7 @@ add_task(async function create_split_on_a_tab_opens_the_picker_beside_it() {
     SvalPanel._rowElementFor(ids[0]),
     SvalPanel._els.contextMenu
   );
-  const item = menu.querySelector('[data-command="createSplit"]');
+  const item = menuItem({ popup: menu }, "createSplit");
   Assert.equal(
     item.getAttribute("acceltext"),
     ShortcutUtils.prettifyShortcut(
@@ -664,9 +651,7 @@ add_task(async function add_tab_to_split_is_disabled_on_a_full_split() {
   const { ids } = await shownSplit(4);
   const menu = await paneMenu(ids[0]);
   Assert.ok(
-    menu
-      .querySelector('[data-command="addTabToSplit"]')
-      .hasAttribute("disabled"),
+    menuItem({ popup: menu }, "addTabToSplit").hasAttribute("disabled"),
     "a split of four takes no more"
   );
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
@@ -701,7 +686,7 @@ add_task(async function add_to_split_moves_a_tab_into_the_chosen_split() {
   });
   await SvalPanel.refresh();
   const menu = await tabMenu(loose[0]);
-  const parent = menu.querySelector('[data-command="addToSplit"]');
+  const parent = menuItem({ popup: menu }, "addToSplit");
   Assert.ok(!parent.hidden && !parent.disabled, "Add to Split is offered");
   const entries = Array.from(parent.querySelectorAll("menuitem"));
   Assert.deepEqual(

@@ -28,7 +28,7 @@ const { makeTempDir, tempPath } = ChromeUtils.importESModule(
             asPage, videoProbe, canvasProbe, nodes, taggedId, randomBytes,
             failOnConsoleErrors, drawnBehind, paintedOver, switchDone,
             selectTab, accessibleOf, translated, fluentText, committed,
-            pageReady, loadState, openPage, moveWindowOnScreen, nativeMouse,
+            pageReady, loadState, openPage, moveWindowOnScreen, windowStill, nativeMouse,
             DOWNLOAD_SJS, agentDownloads, clearPrefBranches, download,
             downloadsSetup, drawnRows, fileTab, filedAt, listedAs, pageRuns,
             restoreFixtureFavorites, rgbaOf, runCommandLine, useUpdateChannel,
@@ -1379,44 +1379,52 @@ async function solidWindows() {
   );
 }
 
-let systemSeeThrough = null;
+/** Each window's own `SvalPanel.seeThrough`, while a test stands in for it. */
+const systemSeeThrough = new Map();
 
 /**
- * Draws this window as a system that can show what is behind it draws it
+ * Draws `win` as a system that can show what is behind it draws it
  * (`see` true, with the material macOS gives), or as one that cannot,
  * whichever system the test runs on, and waits for the window to wear that
  * look. Sval's default window is see-through where the system allows it
  * (`SvalColor.DEFAULT_TRANSPARENCY`), so a check of what a window draws on
- * runs on both. The file's end gives the window the system's answer back.
+ * runs on both. The file's end gives each window the system's answer back.
  *
  * @param {boolean} see
+ * @param {Window} [win]
  */
-async function windowSeeThrough(see) {
-  if (!systemSeeThrough) {
-    systemSeeThrough = {
-      own: Object.getOwnPropertyDescriptor(SvalPanel, "seeThrough"),
-    };
+async function windowSeeThrough(see, win = window) {
+  const panel = win.SvalPanel;
+  if (!systemSeeThrough.has(win)) {
+    systemSeeThrough.set(
+      win,
+      Object.getOwnPropertyDescriptor(panel, "seeThrough")
+    );
     registerCleanupFunction(() => {
-      const { own } = systemSeeThrough;
-      systemSeeThrough = null;
-      if (own) {
-        Object.defineProperty(SvalPanel, "seeThrough", own);
-      } else {
-        delete SvalPanel.seeThrough;
+      const own = systemSeeThrough.get(win);
+      systemSeeThrough.delete(win);
+      if (win.closed) {
+        return null;
       }
-      return within(SvalPanel.refresh(), 10_000, "the panel redrawing");
+      if (own) {
+        Object.defineProperty(panel, "seeThrough", own);
+      } else {
+        delete panel.seeThrough;
+      }
+      return within(panel.refresh(), 10_000, "the panel redrawing");
     });
   }
   const { seeThroughMaterial } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalColor.sys.mjs"
   );
-  SvalPanel.seeThrough = see
-    ? () => seeThroughMaterial("macosx", query => matchMedia(query).matches)
+  panel.seeThrough = see
+    ? () => seeThroughMaterial("macosx", query => win.matchMedia(query).matches)
     : () => null;
-  await within(SvalPanel.refresh(), 10_000, "the panel redrawing");
+  await within(panel.refresh(), 10_000, "the panel redrawing");
   await TestUtils.waitForCondition(
     () =>
-      document.documentElement.hasAttribute("data-sval-see-through") === see,
+      win.document.documentElement.hasAttribute("data-sval-see-through") ===
+      see,
     see ? "the window is see-through" : "the window is solid"
   );
 }
@@ -1609,6 +1617,408 @@ async function chooseMenuItem(item, root, what) {
 }
 
 /**
+ * Opens a menu `SvalMenu` built and waits for it to show.
+ *
+ * @param {{popup: Element}} handle What `SvalMenu.create` gave.
+ * @param {() => void} opener What a person does that opens it.
+ * @returns {Promise<Element>} the open `menupopup`.
+ */
+async function openMenu(handle, opener) {
+  const shown = BrowserTestUtils.waitForPopupEvent(handle.popup, "shown");
+  await opener();
+  await within(shown, 10_000, `${handle.popup.id || "the menu"} showing`);
+  return handle.popup;
+}
+
+/**
+ * Asserts `popup`, shown in a see-through window, wears the window's colour
+ * `accent` over the system's backdrop. A popover
+ * that grows from its button keeps its stem, drawn in that colour with no
+ * edge, and gives its window's backdrop the stem's shape
+ * (`XULPopupElement.setWindowShape`); one with no stem leaves the backdrop
+ * the whole window.
+ *
+ * @param {Element} popup
+ * @param {string} accent The window's `--sval-tint-accent`, computed.
+ * @param {string} what
+ */
+async function checkSeeThroughLook(popup, accent, what) {
+  const win = popup.documentGlobal;
+  const style = win.getComputedStyle(popup);
+  const content = popup.shadowRoot.querySelector('[part~="content"]');
+  const rgba = color => {
+    const { r, g, b, a } = InspectorUtils.colorToRGBA(color);
+    return [r, g, b].map(Math.round).concat(+a.toFixed(2));
+  };
+  if (
+    !win.matchMedia(
+      "(not (forced-colors)) and ((-moz-platform: macos) or (-moz-platform: linux) or (-moz-windows-mica-popups))"
+    ).matches
+  ) {
+    Assert.equal(style.appearance, "none", `${what} stays solid`);
+    return;
+  }
+  Assert.equal(style.appearance, "auto", `${what} asks for the backdrop`);
+  // On Linux only a Wayland compositor that blurs what is behind a window
+  // gives a popup a backdrop (`-moz-windows-mica`,
+  // `gtk-wayland-background-blur.patch`): elsewhere there is none to wear
+  // the window's colour over or to take the stem's shape.
+  if (
+    win.matchMedia("(-moz-platform: linux) and (not (-moz-windows-mica))")
+      .matches
+  ) {
+    return;
+  }
+  const stemmed =
+    popup.hasAttribute("sval-stem-host") &&
+    !popup.hasAttribute("sval-stem-off") &&
+    !win.matchMedia(
+      "(-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available))"
+    ).matches;
+  if (!stemmed) {
+    Assert.deepEqual(
+      rgba(win.getComputedStyle(content).backgroundColor),
+      rgba(accent),
+      `${what} wears the window's colour at its share`
+    );
+    Assert.equal(
+      win.getComputedStyle(content).boxShadow,
+      "none",
+      `${what} leaves its shadow to the system`
+    );
+    Assert.ok(!popup.hasWindowShape, `${what}'s backdrop fills its window`);
+    return;
+  }
+  await TestUtils.waitForCondition(
+    () => popup.getAttribute("sval-stem") === "placed",
+    `${what} grows its stem`
+  );
+  const part = name =>
+    win.getComputedStyle(popup.shadowRoot.querySelector(`[part~="${name}"]`));
+  Assert.deepEqual(
+    rgba(part("sval-stem-fill").fill),
+    rgba(accent),
+    `${what}'s stem and body wear the window's colour at its share`
+  );
+  Assert.equal(
+    rgba(part("sval-stem-edge").stroke).at(-1),
+    0,
+    `${what}'s shape draws no edge over the backdrop`
+  );
+  await TestUtils.waitForCondition(
+    () => popup.hasWindowShape,
+    `${what}'s backdrop takes the stem's shape`
+  );
+  await checkFaceInBackdrop(popup, what);
+}
+
+/**
+ * The shape each watched popup last gave its window's backdrop, and the
+ * size its window had then.
+ */
+const lastWindowShape = new WeakMap();
+
+/**
+ * Keeps the shape each popup in `win` gives its window's backdrop
+ * (`XULPopupElement.setWindowShape`) until the task ends, for
+ * {@link checkFaceInBackdrop}, which no API reads back.
+ *
+ * @param {Window} win
+ */
+function watchWindowShapes(win) {
+  const watch = event => {
+    const popup = event.target;
+    if (
+      typeof popup.setWindowShape !== "function" ||
+      Object.hasOwn(popup, "setWindowShape")
+    ) {
+      return;
+    }
+    const give = popup.setWindowShape;
+    popup.setWindowShape = (shape = {}) => {
+      const { width, height } = popup.getOuterScreenRect();
+      lastWindowShape.set(popup, { shape, width, height });
+      return give.call(popup, shape);
+    };
+    atTaskEnd(() => delete popup.setWindowShape);
+  };
+  win.addEventListener("popupshowing", watch, true);
+  atTaskEnd(() => win.removeEventListener("popupshowing", watch, true));
+}
+
+/**
+ * @param {{x: number, y: number, width: number, height: number,
+ *   radius: number}} part
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean} whether the point lies in the rounded box.
+ */
+function inPart(part, x, y) {
+  const r = Math.min(part.radius, part.width / 2, part.height / 2);
+  const right = part.x + part.width;
+  const bottom = part.y + part.height;
+  if (x < part.x || x > right || y < part.y || y > bottom) {
+    return false;
+  }
+  const cx = Math.min(Math.max(x, part.x + r), right - r);
+  const cy = Math.min(Math.max(y, part.y + r), bottom - r);
+  return (x - cx) ** 2 + (y - cy) ** 2 <= r * r + 0.01;
+}
+
+/**
+ * Asserts the stemmed `popup`, open over the system's backdrop, gives the
+ * backdrop a shape that covers its button's face, the face's far corners
+ * rounded as the face is and its stem side square, and draws the face again
+ * over it where the face stands on the screen (`SvalStem`'s `showFace`).
+ * The window's shapes must be watched ({@link watchWindowShapes}) from
+ * before it opened.
+ *
+ * @param {Element} popup
+ * @param {string} what
+ */
+async function checkFaceInBackdrop(popup, what) {
+  const win = popup.documentGlobal;
+  const faces = win.document.querySelectorAll("[sval-stem-anchor]");
+  Assert.equal(faces.length, 1, `${what} grows from one face`);
+  const face = faces[0];
+  await TestUtils.waitForCondition(
+    () => face.hasAttribute("sval-stem-glass"),
+    `${what} draws its face over the backdrop`
+  );
+  await TestUtils.waitForCondition(
+    () => !popup.hasAttribute("sval-stem-pending"),
+    `${what} shows`
+  );
+  const given = lastWindowShape.get(popup);
+  const shape = given?.shape;
+  Assert.ok(shape?.parts?.length, `${what}'s backdrop shape was seen`);
+  const box = popup.getOuterScreenRect();
+  // macOS lays the backdrop out once for the window's size when the shape
+  // arrives (`SvalShapedBackdropView`), and a popup's window takes its
+  // frame's size only at a later paint
+  // (`nsMenuPopupFrame::SchedulePendingWidgetMoveResize`).
+  Assert.ok(
+    Math.abs(given.width - box.width) <= 1 &&
+      Math.abs(given.height - box.height) <= 1,
+    `${what}'s backdrop was shaped for its window as it shows (${given.width}x${given.height}, ${box.width}x${box.height})`
+  );
+  const pill = face.getBoundingClientRect();
+  const onScreen = {
+    left: win.mozInnerScreenX + pill.left,
+    top: win.mozInnerScreenY + pill.top,
+  };
+  // The face in the popup's window, where the shape is given.
+  const at = {
+    left: onScreen.left - box.left,
+    top: onScreen.top - box.top,
+    width: pill.width,
+    height: pill.height,
+  };
+  const style = win.getComputedStyle(face);
+  // The face is square on the stem's side while the stem is drawn
+  // (`sval-stem.css`), so its largest radius is its far corners'.
+  const radius = Math.min(
+    Math.max(
+      ...[
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ].map(value => parseFloat(value) || 0)
+    ),
+    pill.width / 2,
+    pill.height / 2
+  );
+  const side = popup.getAttribute("sval-stem-side") || "bottom";
+  // The face as the shape should hold it: rounded at its own radius, with
+  // the half on the stem's side square.
+  const isFace = (x, y) => {
+    const near = {
+      bottom: y >= at.top + at.height / 2,
+      top: y <= at.top + at.height / 2,
+      right: x >= at.left + at.width / 2,
+      left: x <= at.left + at.width / 2,
+    }[side];
+    return near || inPart({ ...at, x: at.left, y: at.top, radius }, x, y);
+  };
+  const missed = [];
+  const steps = 8;
+  // A device pixel in from the face's edge, where the window's place is
+  // rounded (`nsMenuPopupFrame::GetRects`).
+  const inset = 1;
+  for (let i = 0; i <= steps; i++) {
+    for (let j = 0; j <= steps; j++) {
+      const x = at.left + inset + ((at.width - 2 * inset) * i) / steps;
+      const y = at.top + inset + ((at.height - 2 * inset) * j) / steps;
+      if (isFace(x, y) && !shape.parts.some(part => inPart(part, x, y))) {
+        missed.push([Math.round(x), Math.round(y)]);
+      }
+    }
+  }
+  Assert.deepEqual(missed, [], `${what}'s backdrop covers its face`);
+  Assert.ok(
+    at.left >= -0.5 &&
+      at.top >= -0.5 &&
+      at.left + at.width <= box.width + 0.5 &&
+      at.top + at.height <= box.height + 0.5,
+    `${what}'s window holds its whole face`
+  );
+  Assert.ok(
+    shape.parts.some(
+      part =>
+        Math.abs(part.x - at.left) <= 1 &&
+        Math.abs(part.y - at.top) <= 1 &&
+        Math.abs(part.width - at.width) <= 1 &&
+        Math.abs(part.height - at.height) <= 1 &&
+        Math.abs(part.radius - radius) <= 0.5
+    ),
+    `${what}'s backdrop rounds its face at the face's radius (${radius}px)`
+  );
+  Assert.equal(
+    shape.rings?.length,
+    1,
+    `${what}'s backdrop outline leaves no hole for the face`
+  );
+
+  // The tint over the backdrop covers every part of it, and reaches past
+  // the parts only by the stem's fillets.
+  const fill = popup.shadowRoot.querySelector('[part~="sval-stem-fill"]');
+  const tinted = (x, y) => fill.isPointInFill(new DOMPoint(x, y));
+  const bare = [];
+  for (const part of shape.parts) {
+    for (let x = part.x + 0.5; x < part.x + part.width; x += 3) {
+      for (let y = part.y + 0.5; y < part.y + part.height; y += 3) {
+        if (inPart(part, x, y) && !tinted(x, y)) {
+          bare.push([Math.round(x), Math.round(y)]);
+        }
+      }
+    }
+  }
+  Assert.deepEqual(bare, [], `${what}'s tint covers its whole backdrop`);
+  const fillet = 12;
+  const beyond = [];
+  for (let x = 0.5; x < box.width; x += 3) {
+    for (let y = 0.5; y < box.height; y += 3) {
+      if (
+        tinted(x, y) &&
+        !shape.parts.some(part =>
+          inPart(
+            {
+              x: part.x - fillet,
+              y: part.y - fillet,
+              width: part.width + 2 * fillet,
+              height: part.height + 2 * fillet,
+              radius: part.radius + fillet,
+            },
+            x,
+            y
+          )
+        )
+      ) {
+        beyond.push([Math.round(x), Math.round(y)]);
+      }
+    }
+  }
+  Assert.deepEqual(
+    beyond,
+    [],
+    `${what}'s tint reaches past its backdrop by no more than a fillet`
+  );
+
+  const copy = popup.shadowRoot.querySelector('[part~="sval-stem-face"]');
+  Assert.ok(copy?.checkVisibility(), `${what} shows its face's copy`);
+  Assert.ok(
+    win.getComputedStyle(copy).backgroundImage.startsWith("-moz-element(#"),
+    `${what}'s copy paints the face element`
+  );
+  const frame = popup.getBoundingClientRect();
+  const drawn = copy.getBoundingClientRect();
+  const near = (a, b) => Math.abs(a - b) <= 1;
+  Assert.ok(
+    near(box.left + drawn.left - frame.left, onScreen.left) &&
+      near(box.top + drawn.top - frame.top, onScreen.top) &&
+      near(drawn.width, pill.width) &&
+      near(drawn.height, pill.height),
+    `${what}'s copy stands where its face does on the screen`
+  );
+  const seen = color => InspectorUtils.colorToRGBA(color).a > 0;
+  Assert.ok(
+    !seen(style.backgroundColor) && style.backgroundImage === "none",
+    `${what}'s face leaves its fill to the popover`
+  );
+  Assert.ok(
+    ["Top", "Right", "Bottom", "Left"].every(
+      edge =>
+        !parseFloat(style[`border${edge}Width`]) ||
+        !seen(style[`border${edge}Color`])
+    ) && style.boxShadow === "none",
+    `${what}'s face draws no edge under its copy`
+  );
+}
+
+/**
+ * Shows `win` in a gray Workspace's colour with some of what is behind it
+ * showing, as the Edit dialog tries a choice on (`previewColor`), so the
+ * panel's own redraws keep it, until the task ends.
+ *
+ * @param {Window} win
+ * @returns {boolean} whether the window is see-through, which needs the
+ *   system's transparency.
+ */
+function seeThroughWindow(win) {
+  watchWindowShapes(win);
+  const panel = win.SvalPanel;
+  panel.previewColor({ color: "gray", transparency: 0.4 });
+  atTaskEnd(() => panel.previewColor(null));
+  return win.document.documentElement.hasAttribute("data-sval-translucent");
+}
+
+/**
+ * Runs `opener`, which opens the popover `handle` gave, and waits for it to
+ * show.
+ *
+ * @param {{popup: Element}} handle What `SvalPopover.create` gave.
+ * @param {() => any} opener
+ * @returns {Promise<Element>} the popover.
+ */
+async function openPopover(handle, opener) {
+  return openMenu(handle, opener);
+}
+
+/**
+ * Closes the popover `handle` gave, and waits for it to hide.
+ *
+ * @param {{popup: Element, close: Function}} handle
+ * @returns {Promise<void>}
+ */
+async function closePopover(handle) {
+  const hidden = BrowserTestUtils.waitForPopupEvent(handle.popup, "hidden");
+  handle.close();
+  await within(hidden, 10_000, `${handle.popup.id || "the popover"} hiding`);
+}
+
+/**
+ * @param {{popup: Element}} handle What `SvalMenu.create` gave.
+ * @param {string} id An item's id in the menu's data.
+ * @returns {Element|null} the item, at any depth.
+ */
+function menuItem(handle, id) {
+  return handle.popup.querySelector(`[data-sval-menu-id="${CSS.escape(id)}"]`);
+}
+
+/**
+ * Chooses the item `id` in the open menu `handle` gave, as a click on it
+ * does, opening the submenus it is in first ({@link chooseMenuItem}).
+ *
+ * @param {{popup: Element}} handle
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+async function pickMenuItem(handle, id) {
+  await chooseMenuItem(menuItem(handle, id), handle.popup, id);
+}
+
+/**
  * Chooses the switcher's "New Workspace…", as a person does, leaving its
  * dialog open.
  *
@@ -1619,11 +2029,7 @@ async function chooseNewWorkspace() {
   const shown = BrowserTestUtils.waitForPopupEvent(switcher, "shown");
   SvalPanel._els.switcher.click();
   await within(shown, 10_000, "the switcher showing");
-  await chooseMenuItem(
-    switcher.querySelector("[data-sval-new-workspace]"),
-    switcher,
-    "New Workspace"
-  );
+  await pickMenuItem({ popup: switcher }, "newWorkspace");
 }
 
 /**
@@ -2986,6 +3392,27 @@ async function openPage(url, win = window) {
   );
   await pageReady(tab.linkedBrowser, url);
   return tab;
+}
+
+/**
+ * Waits until `win` stands still: its size and its place on the screen the
+ * same at two looks in a row. A window just opened or resized can still be
+ * taking its size or place from the system after the first `resize` comes,
+ * and a popup placed by its button then measures against a window that
+ * moves.
+ *
+ * @param {Window} [win]
+ */
+async function windowStill(win = window) {
+  const now = () =>
+    [win.screenX, win.screenY, win.outerWidth, win.outerHeight].join();
+  let last = null;
+  await TestUtils.waitForCondition(() => {
+    const seen = now();
+    const still = seen === last;
+    last = seen;
+    return still;
+  }, "the window standing still");
 }
 
 /**

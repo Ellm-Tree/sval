@@ -254,6 +254,11 @@ class Placement {
     this.started = false;
     this.lifetime = SvalScope.forWindow(win);
     this.layout = new win.ResizeObserver(() => this.fit());
+    // At the panel's narrowest, where its buttons stand in a column
+    // wherever the toolbar is (`sval-panel.css`'s 48px layout), a popover
+    // from them opens beside them, toward the page (`SvalStem`): below one
+    // it would cover the next.
+    this.container?.setAttribute("sval-stem-beside", COLUMN_MAX_W);
     /** Whether a fit is due in a task of its own. */
     this.fitting = false;
     /**
@@ -909,9 +914,6 @@ class Placement {
     // On the panel too, for the footer's records, which stand outside the
     // toolbar's box.
     this.container?.toggleAttribute("sval-column", !!drawn?.column);
-    // In the column, a popover from the panel's buttons opens beside them,
-    // toward the page (`SvalStem`): below one it would cover the next.
-    this.container?.toggleAttribute("sval-stem-beside", !!drawn?.column);
     this.placeShield(!!drawn?.column);
     toolbar.toggleAttribute("sval-joined", !!drawn?.joined);
     toolbar.toggleAttribute("sval-window-wrapped", !!drawn?.windowWrapped);

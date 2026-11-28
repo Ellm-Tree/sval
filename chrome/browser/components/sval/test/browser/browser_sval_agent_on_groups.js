@@ -61,7 +61,7 @@ async function newGroup(name) {
  */
 async function moveToGroup(id, group) {
   const menu = await contextMenuIn(window, id);
-  await menuCommand(menu, `[data-move-parent="${CSS.escape(group)}"]`);
+  await menuCommand(menu, `moveParent:${group}`);
   await TestUtils.waitForCondition(
     () =>
       SvalPanel.nodes[id]?.placement.parent === group &&
@@ -104,7 +104,7 @@ add_task(async function groups_keep_their_tabs_through_every_move() {
 
   const before = drawnChildren(beta);
   const menu = await contextMenuIn(window, before[1]);
-  await menuCommand(menu, '[data-command="moveBefore"]');
+  await menuCommand(menu, "moveBefore");
   await TestUtils.waitForCondition(
     () =>
       JSON.stringify(drawnChildren(beta)) ===
@@ -144,7 +144,7 @@ add_task(async function a_renamed_group_keeps_its_name_in_a_new_window() {
   await moveToGroup(id, group);
 
   const menu = await contextMenuIn(window, group);
-  await menuCommand(menu, '[data-command="edit"]');
+  await menuCommand(menu, "edit");
   const doc = await dialogIn(window, ".sval-nw-name");
   Assert.equal(doc.querySelector(".sval-nw-name").value, "Before");
   typeIn(doc.querySelector(".sval-nw-name"), "After");

@@ -1,0 +1,629 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's menus (`SvalMenu`). A browser window loads this sheet after
+ * `sval-header.css`, and any other document loads it with its first menu.
+ *
+ * The first part is every menu's in a browser window, Firefox's own
+ * included: the window's popup colours, its text's scheme and the drawn
+ * shadow. The rest is the look of a menu SvalMenu builds or fills
+ * (`[sval-menu]`): it states each property Firefox's `popup.css` and
+ * `menu.css` set on a menu, its items, separators, arrows, checks, icons and
+ * accelerator text, so those sheets decide nothing on it. The values are the
+ * ones each platform's menus take, so a Sval menu sits among the system's.
+ *
+ * The colours are the window's popup roles (`--sval-menu-bg`,
+ * `--sval-menu-ink`, `--sval-menu-edge`, which `sval-header.css` sets), and
+ * in a document without them Sval's card roles (`sval-roles.css`).
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* The palettes are Sval's. Under forced colours the system's menu colours
+   stand, as `popup.css` gives them. `(forced-colors)` for the reason
+   `sval-header.css`'s palettes give. */
+@media not (forced-colors) {
+  /* A menu sets the system's colours on itself (`popup.css`), so it is
+   pointed back at the root's, as Firefox's own `.toolbar-menupopup` does.
+   Gecko draws every menu, macOS's context and button menus included
+   (`app-sval-prefs.js`), and on macOS `popup.css` gives it the system
+   menu's appearance and background (`-moz-default-appearance: menupopup`,
+   `Menu`), cleared here. On Windows 11 `menu.css` gives it the system's Mica
+   backdrop, which paints the whole popup window, the room for the drawn
+   shadow included, so that is cleared too, with the square corner it sets. */
+  menupopup {
+    --panel-background-color: inherit;
+    --panel-text-color: inherit;
+    --panel-border-color: inherit;
+
+    @media (-moz-platform: macos) {
+      appearance: none;
+      background-color: transparent;
+    }
+
+    @media (-moz-windows-mica-popups) {
+      appearance: none;
+      --panel-border-radius: inherit;
+    }
+  }
+
+  /* A tinted window's menus take the scheme of its text, as the window
+     does (`sval-panel.css`). */
+  :root[data-sval-ink="light"] menupopup {
+    color-scheme: dark;
+  }
+
+  :root[data-sval-ink="dark"] menupopup {
+    color-scheme: light;
+  }
+}
+
+/* Every menu has a drawn shadow, on macOS too, where `popup.css` leaves menus
+ * the window server's faint one. The margin is the popup window's room for
+ * `--sval-menu-shadow`: three deviations of its far layer and its drop. A menu attached to
+ * its button by the stem (`[sval-stem]`) takes the stem's margin, edge and
+ * shadow instead (`sval-stem.css`, spec §9.4). A document without the
+ * window's shadows (`sval-header.css`) gives its menus the light surface's,
+ * which fits the same room. */
+menupopup:not([sval-stem]) {
+  --panel-box-shadow: var(
+    --sval-menu-shadow,
+    0 0 0 1px rgb(var(--sval-palette-wash-light) / 0.12),
+    0 2px 8px rgb(var(--sval-palette-wash-light) / 0.25),
+    0 1px 2px rgb(var(--sval-palette-wash-light) / 0.15)
+  );
+  --panel-box-shadow-margin: 14px;
+  -moz-window-shadow: none;
+}
+
+/* A see-through window's menus are see-through too (decision 0057): each
+ * lays the colour the window's root wears (`--sval-tint-accent`) over the
+ * system's backdrop for a menu, which Gecko puts behind a popup whose
+ * appearance is a menu's. On macOS that is the menu material, or glass on
+ * macOS 26 (`setEffectViewWrapperForStyle`), clipped to the system's
+ * corner with the system's shadow (`nsMenuPopupFrame::GetShadowStyle`). On
+ * Windows 11 it is the transient Acrylic backdrop with the system's corners
+ * and edge (`nsWindow::UpdateMicaBackdrop`), and on Wayland the
+ * compositor's blur (`nsWindow::SetMicaBackdrop`), which fills the popup's
+ * whole surface in a rectangle. Each backdrop covers the popup window's
+ * whole area, so the room for a drawn shadow goes with the shadow. The
+ * text keeps the colours the window solves for itself. A menulist's popup
+ * belongs to its field and stays solid, and so does every menu on a
+ * Windows without the popups' backdrop (`WinUtils::MicaPopupsEnabled`). A
+ * menu that grows from its button keeps its stem, and the backdrop takes
+ * the stem's shape in place of the window's (`SvalStem`,
+ * `nsIWidget::SetWindowShape`), with no edge or shadow drawn round it. */
+@media (not (forced-colors)) and ((-moz-platform: macos) or (-moz-platform: linux) or (-moz-windows-mica-popups)) {
+  /* With an id's weight, over a menu's own shadow (the Workspace menu's). */
+  :root[data-sval-translucent] menupopup:not(menulist > menupopup, #sval-menu-weight) {
+    --panel-background-color: var(--sval-tint-accent);
+    --sval-menu-bg: var(--sval-tint-accent);
+    --sval-stem-edge: transparent;
+    --sval-stem-box-shadow: none;
+    --panel-box-shadow: none;
+    --panel-box-shadow-margin: 0px;
+    --panel-border-color: transparent;
+    --sval-menu-edge: transparent;
+    -moz-window-shadow: auto;
+    appearance: auto;
+    -moz-default-appearance: menupopup;
+    background-color: transparent;
+
+    @media not (-moz-platform: macos) {
+      --panel-border-radius: 0px;
+      --sval-menu-radius: 0px;
+    }
+  }
+}
+
+/* ------------------------------------------------------------ Sval's menus */
+
+menupopup[sval-menu] {
+  --sval-menu-surface: var(--sval-menu-bg, var(--sval-raised));
+  --sval-menu-text: var(--sval-menu-ink, var(--sval-ink-body));
+  --sval-menu-border: var(--sval-menu-edge, var(--sval-border));
+  --sval-menu-separator: color-mix(in srgb, currentColor 25%, transparent);
+  --sval-menu-disabled: color-mix(in srgb, currentColor 40%, transparent);
+  --sval-menu-hover: -moz-menuhover;
+  --sval-menu-hover-text: -moz-menuhovertext;
+  --sval-menu-hover-disabled: -moz-menuhoverdisabled;
+  --sval-menu-radius: 6px;
+  --sval-menu-padding: 4px;
+  --sval-menu-item-radius: 4px;
+  --sval-menu-item-padding: 0.5em 1em;
+  --sval-menu-arrow-size: 1em;
+  --sval-menu-arrow-opacity: 1;
+
+  @media (-moz-platform: linux) {
+    --sval-menu-item-padding: 0.25em 0.5em;
+  }
+
+  @media (-moz-platform: macos) {
+    --sval-menu-item-padding: 3px 9px;
+
+    @media (-moz-mac-tahoe-theme) {
+      --sval-menu-radius: 12px;
+      --sval-menu-item-padding: 4px 11px;
+      --sval-menu-item-radius: 8px;
+    }
+  }
+
+  @media (-moz-platform: windows) {
+    --sval-menu-arrow-size: max(1em, var(--size-item-small));
+
+    @media (prefers-color-scheme: light) {
+      --sval-menu-arrow-opacity: 0.4;
+    }
+  }
+
+  @media (prefers-contrast) {
+    --sval-menu-separator: currentColor;
+  }
+
+  @media (forced-colors) {
+    --sval-menu-surface: Menu;
+    --sval-menu-text: MenuText;
+    --sval-menu-border: ThreeDShadow;
+    --sval-menu-disabled: GrayText;
+
+    @media (-moz-platform: macos) {
+      --sval-menu-border: transparent;
+    }
+  }
+
+  @media (-moz-platform: linux) and (prefers-contrast) and (not (forced-colors)) {
+    --sval-menu-border: color-mix(in srgb, currentColor 60%, transparent);
+  }
+
+  font: menu;
+  color-scheme: light dark;
+  min-width: 1px;
+  -moz-window-input-region-margin: var(--panel-box-shadow-margin);
+  margin: calc(-1 * var(--panel-box-shadow-margin));
+
+  @media (-moz-platform: macos) {
+    /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
+    font: -moz-pull-down-menu;
+  }
+
+  /* Firefox's menus keep the system's backdrop under forced colours on
+     macOS and on Windows 11 (`popup.css`, `menu.css`). */
+  @media (forced-colors) {
+    @media (-moz-platform: macos) {
+      appearance: auto;
+      -moz-default-appearance: menupopup;
+      background-color: Menu;
+      --sval-menu-surface: none;
+    }
+
+    @media (-moz-windows-mica-popups) {
+      appearance: auto;
+      -moz-default-appearance: menupopup;
+      --sval-menu-border: transparent;
+      --panel-box-shadow-margin: 0px;
+      --sval-menu-radius: 0px;
+    }
+  }
+
+  @media (-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)) {
+    --sval-menu-radius: 0px;
+  }
+
+  &::part(content) {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: var(--sval-menu-padding);
+    color: var(--sval-menu-text);
+    background: var(--sval-menu-surface);
+    border-radius: var(--sval-menu-radius);
+    border: 1px solid var(--sval-menu-border);
+    width: auto;
+    box-shadow: var(--panel-box-shadow);
+    margin: var(--panel-box-shadow-margin);
+    min-width: 0;
+    min-height: 0;
+    max-height: round(up, 100% - 2 * var(--panel-box-shadow-margin), 1px);
+    max-width: round(up, 100% - 2 * var(--panel-box-shadow-margin), 1px);
+    overflow: clip;
+  }
+
+  /* A submenu lines up its first item with the item that opened it: its
+     shadow's room, its padding and its edge above it. */
+  > menu > menupopup {
+    margin-top: calc(-1 * (var(--panel-box-shadow-margin) + var(--sval-menu-padding) + 1px));
+  }
+
+  > :is(menu, menuitem, menucaption) {
+    border-radius: var(--sval-menu-item-radius);
+    padding: var(--sval-menu-item-padding);
+    margin: 0;
+    align-items: center;
+    flex-shrink: 0;
+    list-style-image: none;
+    max-width: 42em;
+    font-weight: inherit;
+    background-color: transparent;
+    color: inherit;
+    --menuitem-icon: normal;
+  }
+
+  > :is(menu, menuitem) {
+    -moz-context-properties: fill;
+    fill: currentColor;
+
+    &[disabled] {
+      color: var(--sval-menu-disabled);
+      text-shadow: none;
+    }
+
+    &[_moz-menuactive]:not([disabled]) {
+      color: var(--sval-menu-hover-text);
+      background-color: var(--sval-menu-hover);
+    }
+
+    &[_moz-menuactive][disabled] {
+      background-color: var(--sval-menu-hover-disabled);
+    }
+  }
+
+  > :is(menuitem[default="true"], menucaption) {
+    font-weight: var(--font-weight-bold);
+  }
+
+  > menuseparator {
+    padding-block: var(--space-xsmall);
+    padding-inline: 0;
+    margin-inline: 0;
+
+    @media (-moz-platform: macos) {
+      margin-inline: var(--space-small);
+    }
+
+    @media (-moz-platform: windows) {
+      padding-inline: 1em;
+    }
+
+    &::before {
+      border-top: 1px solid var(--sval-menu-separator);
+      content: "";
+      display: block;
+      flex: 1;
+    }
+  }
+
+  /* A submenu's arrow. */
+  > menu::after {
+    content: "";
+    display: block;
+    width: var(--sval-menu-arrow-size);
+    height: var(--sval-menu-arrow-size);
+    background-image: url("chrome://global/skin/icons/arrow-right.svg");
+    background-size: var(--sval-menu-arrow-size);
+    -moz-context-properties: fill, fill-opacity;
+    fill: currentColor;
+    fill-opacity: var(--sval-menu-arrow-opacity);
+    margin-inline: 1em 0;
+
+    @media (-moz-platform: linux) {
+      margin-inline: 0.5em 0;
+    }
+
+    @media (-moz-platform: macos) {
+      margin-inline: var(--space-xlarge) calc(-1 * var(--space-xxsmall));
+    }
+  }
+
+  > menu:-moz-locale-dir(rtl)::after {
+    background-image: url("chrome://global/skin/icons/arrow-left.svg");
+  }
+
+  > :is(menu, menuitem) > :is(.menu-text, .menu-accel) {
+    margin: 0;
+    padding: 0;
+
+    @media (-moz-platform: windows) {
+      padding: 1px 0;
+    }
+
+    @media (-moz-platform: linux) {
+      margin-inline: 0 2px;
+    }
+  }
+
+  > :is(menu, menuitem) > .menu-accel {
+    margin-inline: 0.74em 0.35em;
+    color: inherit;
+
+    @media (-moz-platform: macos) {
+      margin-inline: 25px 0;
+    }
+
+    @media (-moz-platform: linux) {
+      margin-inline: var(--space-small) 0;
+    }
+  }
+
+  @media not (prefers-contrast) {
+    > menuitem:not([disabled]) > .menu-accel {
+      color: var(--sval-menu-disabled);
+    }
+  }
+
+  > :is(menu, menuitem):not([acceltext]) > .menu-accel {
+    display: none;
+  }
+
+  > :is(menu, menuitem) > .menu-icon {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    box-sizing: border-box;
+    display: none;
+    visibility: hidden;
+    margin: 0;
+    appearance: none;
+
+    @media (-moz-platform: linux) {
+      margin-inline-end: 0.5em;
+    }
+
+    @media (-moz-platform: windows) {
+      margin-top: var(--space-xxsmall);
+      margin-inline-end: var(--space-small);
+    }
+
+    @media (-moz-platform: macos) {
+      margin-block: calc(-1 * var(--space-xxsmall));
+      margin-inline-end: var(--space-small);
+    }
+  }
+
+  > :is(menuitem:is(.menuitem-iconic, [image]), menu.menu-iconic) > .menu-icon {
+    &:not([srcset]) {
+      content: var(--menuitem-icon);
+    }
+    display: revert;
+    visibility: inherit;
+  }
+
+  /* A check or radio: Linux draws the system's checkbox and radio, Windows
+     a check for either, and macOS a check in a gutter every row keeps. */
+  @media (-moz-platform: linux) {
+    > menuitem:is([type="checkbox"], [checked]) > .menu-icon {
+      visibility: inherit;
+      appearance: auto;
+      -moz-default-appearance: checkbox;
+    }
+
+    > menuitem[type="radio"] > .menu-icon {
+      visibility: inherit;
+      appearance: auto;
+      -moz-default-appearance: radio;
+    }
+  }
+
+  @media (-moz-platform: windows) {
+    > menuitem[checked] > .menu-icon {
+      visibility: inherit;
+      -moz-context-properties: fill, fill-opacity;
+      fill: currentColor;
+      fill-opacity: var(--sval-menu-arrow-opacity);
+      content: url("chrome://global/skin/icons/menu-check.svg");
+    }
+  }
+
+  &[needsgutter] {
+    @media (-moz-platform: linux) or (-moz-platform: windows) {
+      > :is(menu, menuitem) > .menu-icon {
+        display: revert;
+      }
+    }
+
+    @media (-moz-platform: macos) {
+      > :is(menu, menuitem, menucaption) {
+        padding-inline-start: 0;
+
+        &::before {
+          content: "\2713";
+          display: inline-block;
+          vertical-align: middle;
+          line-height: 0;
+          visibility: hidden;
+          padding-inline: var(--space-xsmall);
+          font-weight: var(--font-weight-bold);
+        }
+      }
+
+      > menuitem:is([checked], [selected])::before {
+        visibility: inherit;
+      }
+    }
+  }
+}
+
+/* A panel's look (`look: "panel"`), as the Workspace and Favorites menus
+   and the strip's agent apps wear it: a menu that opens from the panel and
+   reads as one of its popovers, its items spaced and lit as the panel's
+   buttons are (the design system's panel and ghost button tokens). */
+menupopup[sval-menu="panel"] {
+  /* The window's panels' colours and corner, which `popup.css` sets afresh
+     on a menu. */
+  --panel-background-color: inherit;
+  --panel-border-color: inherit;
+  --panel-text-color: inherit;
+  --panel-border-radius: inherit;
+  --sval-menu-surface: var(--panel-background-color);
+  --sval-menu-border: var(--panel-border-color);
+  --sval-menu-text: var(--panel-text-color);
+  --sval-menu-padding: var(--panel-subview-body-padding);
+  --sval-menu-radius: var(--panel-border-radius);
+  --sval-menu-item-radius: var(--panel-menuitem-border-radius);
+  --sval-menu-item-padding: var(--panel-menuitem-padding);
+  appearance: none;
+  border: none;
+  font: menu;
+  background-color: transparent;
+
+  > menu > menupopup {
+    margin-top: calc(-1 * (var(--panel-subview-body-padding-block) + var(--panel-box-shadow-margin) + 1px));
+  }
+
+  > :is(menu, menuitem, menucaption) {
+    margin: var(--panel-menuitem-margin);
+  }
+
+  > :is(menu, menuitem) {
+    &[disabled],
+    &[disabled][_moz-menuactive] {
+      color: var(--button-text-color-ghost-disabled);
+      background-color: var(--button-background-color-ghost-disabled);
+      opacity: var(--button-opacity-disabled);
+    }
+
+    &:not([disabled])[_moz-menuactive] {
+      color: var(--button-text-color-ghost-hover);
+      background-color: var(--button-background-color-ghost-hover);
+
+      &:active {
+        color: var(--button-text-color-ghost-active);
+        background-color: var(--button-background-color-ghost-active);
+      }
+    }
+
+    > :is(.menu-text, .menu-icon, .menu-accel) {
+      margin: 0;
+      padding: 0;
+    }
+
+    > .menu-icon {
+      margin-inline-end: 8px;
+    }
+
+    > .menu-accel {
+      margin-inline-start: 16px;
+    }
+  }
+
+  > menu::after {
+    margin: 0;
+    padding: 0;
+    margin-inline-start: 16px;
+    fill-opacity: 0.6;
+  }
+
+  > menuseparator {
+    padding: var(--panel-separator-padding);
+  }
+}
+
+/* ------------------------------------------- the Workspace and Favorites menus */
+
+@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
+  /* The Workspace menu opens over the switcher, where no stem can join it
+     to its button, and wears a stem popover's edge and shadow as box
+     shadows. */
+  #sval-workspace-menu {
+    --panel-box-shadow:
+      1px 0 0 var(--sval-stem-edge), -1px 0 0 var(--sval-stem-edge), 0 1px 0 var(--sval-stem-edge), 0 -1px 0 var(--sval-stem-edge), var(--sval-stem-box-shadow);
+    --panel-border-color: transparent;
+    /* `--sval-stem-shadow-reach` (`sval-stem.css`), and the edge. */
+    --panel-box-shadow-margin: 16px;
+    -moz-window-shadow: none;
+  }
+}
+
+/* The active item is where the arrow keys are, so it wears the panel's focus
+ * ring (`.sval-row:focus-visible`) over the hover wash. A `menu` whose submenu
+ * is open stays active, so the ring moves into the submenu with the keys.
+ * The pointer makes an item active too, so the Workspace menu rings it only
+ * once a key is pressed in the menu (`sval-keys`, which the pointer's next
+ * move clears). */
+:is(#sval-workspace-menu[sval-keys], #sval-favorites-menu) :is(menu, menuitem)[_moz-menuactive]:not([open]) {
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: calc(-1 * var(--focus-outline-width));
+}
+
+/* The window's own workspace, in its place in the switcher's list or an
+   agent app's list under the strip. */
+:is(#sval-workspace-menu menu, .sval-agent-app-popup > menuitem)[aria-current="true"] {
+  font-weight: var(--font-weight-semibold);
+  /* The selected tab's marks: an accent bar at the start edge and a tinted
+     fill, so the row reads as "you are here" at a glance. */
+  box-shadow: inset 4px 0 0 var(--color-accent-primary);
+  background-color: var(--sval-current-fill);
+
+  &:-moz-locale-dir(rtl) {
+    box-shadow: inset -4px 0 0 var(--color-accent-primary);
+  }
+}
+
+/* The Workspace menu opens over the switcher (`SvalPanelSwitcher.open`), at
+ * least as wide as it, and shows at most twelve rows
+ * (`SvalPanel._scrollSwitcherMenu`). */
+#sval-workspace-menu {
+  &::part(content) {
+    min-width: var(--sval-switcher-width, 0);
+  }
+
+  &::part(arrowscrollbox-scrollbox) {
+    max-height: var(--sval-menu-rows-max, none);
+  }
+}
+
+/* Where a drag will drop in the Favorites menu or the switcher: a line before
+ * or after the item, as Firefox's bookmarks menus draw one between items
+ * (`places-popup`'s drop indicator). `SvalFavoritesView` and
+ * `SvalPanel._showWorkspaceDrop` set `data-drop`. */
+#sval-favorites-menu :is(menu, menuitem, menuseparator),
+#sval-workspace-menu > menu {
+  /* Painted, so the item keeps its size while the line moves. */
+  &:is([data-drop="before"], [data-drop="after"]) {
+    background-image: linear-gradient(var(--focus-outline-color), var(--focus-outline-color));
+    background-repeat: no-repeat;
+    background-size: 100% var(--space-xxsmall);
+  }
+
+  &[data-drop="before"] {
+    background-position: top;
+  }
+
+  &[data-drop="after"] {
+    background-position: bottom;
+  }
+}
+
+/* High contrast. The window's popup colours are Sval's own (`sval-header.css`),
+ * so these menus restate the system's: an edge that shows under increased
+ * contrast, and under forced colours the system's menu colours, with the
+ * active item in the selection's pair and a disabled one in GrayText. */
+@media (prefers-contrast) {
+  :is(#sval-workspace-menu, #sval-favorites-menu) {
+    &,
+    menupopup {
+      --panel-border-color: currentColor;
+    }
+  }
+}
+
+@media (forced-colors) {
+  :is(#sval-workspace-menu, #sval-favorites-menu) {
+    &,
+    menupopup {
+      --panel-background-color: Menu;
+      --panel-text-color: MenuText;
+      --panel-border-color: MenuText;
+      --panel-box-shadow: none;
+      --button-background-color-ghost-hover: SelectedItem;
+      --button-background-color-ghost-active: SelectedItem;
+      --button-text-color-ghost-hover: SelectedItemText;
+      --button-text-color-ghost-active: SelectedItemText;
+      --button-text-color-ghost-disabled: GrayText;
+      --focus-outline-color: SelectedItemText;
+    }
+
+    /* A disabled item is not filled when active, so its ring is on Menu. */
+    :is(menu, menuitem)[disabled] {
+      --focus-outline-color: MenuText;
+    }
+  }
+}

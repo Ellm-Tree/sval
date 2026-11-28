@@ -44,10 +44,11 @@ do.
   matches your computer's light or dark appearance, the color switches when
   your appearance does.
 - **See-through Workspaces.** Set a Workspace's Transparency to let your
-  desktop show through the window. Transparency works on a Mac, Windows 11,
-  and Linux on Wayland with GNOME 51 or KDE Plasma 6.7 and later. Every new
-  Workspace starts with No color at 30% Transparency. Sval turns Transparency
-  off while your system's reduce-transparency or high contrast setting is on.
+  desktop show through the window and through the menus and popovers Sval
+  opens in the window. Transparency works on a Mac, Windows 11, and Linux on
+  Wayland with GNOME 51 or KDE Plasma 6.7 and later. Every new Workspace
+  starts with No color at 30% Transparency. Sval turns Transparency off while
+  your system's reduce-transparency or high contrast setting is on.
 - **One Workspace per window.** Work and home can sit side by side in two
   windows without mixing. Use the switcher above your tabs to change a
   window's Workspace, or Shift-click a Workspace to open it in a new window.

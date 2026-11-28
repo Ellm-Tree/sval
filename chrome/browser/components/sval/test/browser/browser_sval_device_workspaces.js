@@ -267,10 +267,8 @@ add_task(async function every_list_draws_a_devices_mark() {
     /^chrome:\/\/browser\/content\/sval\/device-(phone|tablet)\.svg$/;
 
   const popup = document.createXULElement("menupopup");
-  SvalPanel.switcher.fillMenuBar(popup);
-  const entry = popup.querySelector(
-    `[data-workspace-id="${CSS.escape(device)}"]`
-  );
+  SvalPanel.switcher.fillMenuBar(popup, []);
+  const entry = menuItem({ popup }, `workspace:${device}`);
   Assert.stringMatches(
     entry.getAttribute("image"),
     MARK,
@@ -278,8 +276,9 @@ add_task(async function every_list_draws_a_devices_mark() {
   );
   // `nsMenuItemX::SetupIcon` draws no image on a checkbox item.
   Assert.ok(!entry.hasAttribute("type"), "as a plain item");
-  const own = popup.querySelector(
-    `[data-workspace-id="${CSS.escape(SvalWindowWorkspace.of(window).id)}"]`
+  const own = menuItem(
+    { popup },
+    `workspace:${SvalWindowWorkspace.of(window).id}`
   );
   Assert.equal(own.getAttribute("checked"), "true", "this window's is checked");
 

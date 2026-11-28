@@ -735,9 +735,7 @@ add_task(async function the_menu_bar_opens_a_workspace_beside_the_agents() {
   // As the menu bar fills it before it shows (`SvalMenuBar`); macOS draws it
   // natively, where a test cannot open it.
   popup.dispatchEvent(new win.Event("popupshowing"));
-  const entry = popup.querySelector(
-    `menuitem[data-workspace-id="${CSS.escape(own)}"]`
-  );
+  const entry = menuItem({ popup }, `workspace:${own}`);
   const opening = BrowserTestUtils.domWindowOpenedAndLoaded();
   entry.doCommand();
   const opened = await within(opening, 20_000, "the new window's opening");

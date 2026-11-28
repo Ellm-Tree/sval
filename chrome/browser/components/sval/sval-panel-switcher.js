@@ -193,11 +193,9 @@ Object.assign(SvalPanel, {
    * `SvalFavoritesView` draws it from the document, and draws it again as
    * Favorites change (favorites-native spec §5.3).
    *
-   * It is drawn as Firefox's bookmarks menus are: by Gecko (`nonnative`),
+   * It is drawn by Gecko (`nonnative`, which `SvalMenu`'s panel look sets),
    * which is what lets its items carry a context menu (favorites-native
-   * spec §15.2), and as a `toolbar-menupopup`, which takes the window's popup
-   * colours (`sval-header.css`) on every platform. The switcher is drawn the
-   * same way; `sval-panel.css` (menus) holds what both add.
+   * spec §15.2), in a panel's look (`sval-menu.css`), as the switcher is.
    *
    * @param {Element} bar The favorites bar.
    * @returns {Element} the `menupopup`.
@@ -208,11 +206,11 @@ Object.assign(SvalPanel, {
     host.className = "sval-favorites-host";
     const popup = document.createXULElement("menupopup");
     popup.id = "sval-favorites-menu";
-    popup.setAttribute("nonnative", "");
     // Grows up from its button in the panel's footer (`SvalStem`).
     popup.setAttribute("sval-stem-host", "");
     popup.setAttribute("sval-stem-side", "top");
-    popup.classList.add("toolbar-menupopup");
+    // A panel's look; `SvalFavoritesView` draws its items.
+    this._modules.SvalMenu.fill(popup, [], { look: "panel" });
     popup.addEventListener("popupshowing", event => {
       if (event.target === popup) {
         this._els.favorites.setAttribute("aria-expanded", "true");

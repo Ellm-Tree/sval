@@ -91,7 +91,7 @@ async function unloaded(tab, id) {
 function unloadDisabled(row) {
   const menu = SvalPanel._els.contextMenu;
   SvalPanel.rowMenu.sync(menu, row);
-  return menu.querySelector('[data-command="unload"]').hasAttribute("disabled");
+  return menuItem(SvalPanel.rowMenu.menu, "unload").hasAttribute("disabled");
 }
 
 add_task(async function copy_markdown_link_copies_the_tabs_link() {
@@ -211,11 +211,7 @@ add_task(async function keep_awake_wakes_the_tab_and_holds_it_awake() {
   const menu = SvalPanel._els.contextMenu;
   const choose = async command => {
     await rightClickOpens(SvalPanel._rowElementFor(a.id), menu);
-    await chooseMenuItem(
-      menu.querySelector(`[data-command="${command}"]`),
-      menu,
-      command
-    );
+    await pickMenuItem(SvalPanel.rowMenu.menu, command);
   };
 
   await choose("keepLoaded");

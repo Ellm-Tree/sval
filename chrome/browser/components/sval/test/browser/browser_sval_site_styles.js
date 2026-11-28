@@ -204,7 +204,7 @@ add_task(async function a_tabs_row_menu_opens_the_editor_on_that_tab() {
   const menuShown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
   EventUtils.synthesizeKey("KEY_ContextMenu");
   await within(menuShown, 10_000, "the row's menu showing");
-  const item = menu.querySelector('[data-command="styleSite"]');
+  const item = menuItem(SvalPanel.rowMenu.menu, "styleSite");
   Assert.ok(!item.hidden, "the row's menu offers the editor");
   const shown = editorShown();
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");

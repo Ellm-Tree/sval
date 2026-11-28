@@ -11,6 +11,11 @@
  * menu to the item, and a press finds the nearest `context` from its target.
  */
 
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
+});
+
 export const RELOAD_MENU_ID = "sval-reload-menu";
 
 /**
@@ -28,19 +33,22 @@ const SITE_CACHES =
 /** Reload and Hard reload run `browser-sets.inc.xhtml`'s commands and show their keys. */
 const ITEMS = [
   {
-    id: "sval-reload-normal",
+    id: "reload",
     label: "Reload",
-    command: "Browser:Reload",
-    key: "key_reload",
+    key: { id: "key_reload" },
+    attributes: { command: "Browser:Reload" },
   },
   {
-    id: "sval-reload-skip-cache",
+    id: "skipCache",
     label: "Hard reload",
-    command: "Browser:ReloadSkipCache",
-    key: "key_reload_skip_cache",
+    key: { id: "key_reload_skip_cache" },
+    attributes: { command: "Browser:ReloadSkipCache" },
   },
-  { id: "sval-reload-clear-cache", label: "Clear site cache and reload" },
+  { id: "clearCache", label: "Clear site cache and reload" },
 ];
+
+/** @type {WeakMap<Window, object>} Each window's menu, as SvalMenu gave it. */
+const menus = new WeakMap();
 
 /**
  * Clears the caches of the selected page's site in its tab's jar, then
@@ -70,12 +78,13 @@ function clearSiteCacheAndReload(win) {
  * page alone has.
  *
  * @param {Event} event
+ * @param {object} handle The menu.
  */
-function onShowing(event) {
+function onShowing(event, handle) {
   const { gBrowser } = event.target.documentGlobal;
   const uri = gBrowser.selectedBrowser.currentURI;
-  event.target
-    .querySelector("#sval-reload-clear-cache")
+  handle
+    .item("clearCache")
     .toggleAttribute(
       "disabled",
       !uri.schemeIs("http") && !uri.schemeIs("https")
@@ -94,22 +103,25 @@ export const SvalReloadMenu = {
     if (!button) {
       return;
     }
-    const popup = doc.createXULElement("menupopup");
-    popup.id = RELOAD_MENU_ID;
-    for (const { id, label, command, key } of ITEMS) {
-      const item = doc.createXULElement("menuitem");
-      item.id = id;
-      item.setAttribute("label", label);
-      if (command) {
-        item.setAttribute("command", command);
-        item.setAttribute("key", key);
-      } else {
-        item.addEventListener("command", () => clearSiteCacheAndReload(win));
-      }
-      popup.append(item);
-    }
-    popup.addEventListener("popupshowing", onShowing);
-    doc.getElementById("mainPopupSet").append(popup);
+    const handle = lazy.SvalMenu.create(doc, {
+      name: RELOAD_MENU_ID,
+      items: ITEMS,
+      onShowing,
+      onCommand: id => {
+        if (id === "clearCache") {
+          clearSiteCacheAndReload(win);
+        }
+      },
+    });
+    menus.set(win, handle);
     button.setAttribute("context", RELOAD_MENU_ID);
+  },
+
+  /**
+   * @param {Window} win A browser window.
+   * @returns {object|undefined} its menu, as `SvalMenu.create` gave it.
+   */
+  menuOf(win) {
+    return menus.get(win);
   },
 };

@@ -632,6 +632,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_media_prompt.js"]
 
+["browser_sval_menu.js"]
+
 ["browser_sval_menu_bar.js"]
 
 ["browser_sval_my_filters.js"]
@@ -749,6 +751,12 @@ run-if = ["os == 'win'", "os == 'mac'"]
 ["browser_sval_pip_on_tab_switch.js"]
 
 ["browser_sval_pip_toggle_size.js"]
+
+["browser_sval_popover.js"]
+
+["browser_sval_popover_firefox_panels.js"]
+
+["browser_sval_popups_stay_in_window.js"]
 
 ["browser_sval_preferences_home_page.js"]
 

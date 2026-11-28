@@ -157,7 +157,7 @@ add_task(async function a_menu_change_and_another_devices_fire_events() {
 
   const popup = await openFavorites();
   const menu = await contextOn(await itemIn(popup, n => n.uri === A));
-  await chooseMenuItem(menu, "delete");
+  await chooseInContextMenu(menu, "delete");
   await closeMenus();
   const removed = await nextEvent(extension);
   Assert.equal(removed.name, "onRemoved", "a delete in the menu is heard");

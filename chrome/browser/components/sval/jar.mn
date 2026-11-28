@@ -30,6 +30,7 @@ browser.jar:
     content/browser/sval/firefox-icons/chevron-right-16x16.svg (firefox-icons/chevron-right-16x16.svg)
     content/browser/sval/firefox-icons/chevron-up-12x12.svg (firefox-icons/chevron-up-12x12.svg)
     content/browser/sval/firefox-icons/chevron-up-16x16.svg (firefox-icons/chevron-up-16x16.svg)
+    content/browser/sval/firefox-icons/chevrons-right-16x16.svg (firefox-icons/chevrons-right-16x16.svg)
     content/browser/sval/firefox-icons/circle-arrow-up-16x16.svg (firefox-icons/circle-arrow-up-16x16.svg)
     content/browser/sval/firefox-icons/circle-help-16x16.svg (firefox-icons/circle-help-16x16.svg)
     content/browser/sval/firefox-icons/cloud-16x16.svg (firefox-icons/cloud-16x16.svg)
@@ -43,7 +44,6 @@ browser.jar:
     content/browser/sval/firefox-icons/file-check-16x16.svg (firefox-icons/file-check-16x16.svg)
     content/browser/sval/firefox-icons/file-text-16x16.svg (firefox-icons/file-text-16x16.svg)
     content/browser/sval/firefox-icons/folder-16x16.svg (firefox-icons/folder-16x16.svg)
-    content/browser/sval/firefox-icons/gauge-16x16.svg (firefox-icons/gauge-16x16.svg)
     content/browser/sval/firefox-icons/globe-16x16.svg (firefox-icons/globe-16x16.svg)
     content/browser/sval/firefox-icons/grip-vertical-16x16.svg (firefox-icons/grip-vertical-16x16.svg)
     content/browser/sval/firefox-icons/history-16x16.svg (firefox-icons/history-16x16.svg)
@@ -126,7 +126,7 @@ browser.jar:
 % override chrome://global/skin/icons/arrow-right-12.svg chrome://browser/content/sval/firefox-icons/chevron-right-12x12.svg
 % override chrome://global/skin/icons/arrow-right.svg chrome://browser/content/sval/firefox-icons/chevron-right-16x16.svg
 % override chrome://global/skin/icons/check.svg chrome://browser/content/sval/firefox-icons/check-16x16.svg
-% override chrome://global/skin/icons/chevron.svg chrome://browser/content/sval/firefox-icons/gauge-16x16.svg
+% override chrome://global/skin/icons/chevron.svg chrome://browser/content/sval/firefox-icons/chevrons-right-16x16.svg
 % override chrome://global/skin/icons/close.svg chrome://browser/content/sval/firefox-icons/x-16x16.svg
 % override chrome://global/skin/icons/cursor-arrow.svg chrome://browser/content/sval/firefox-icons/mouse-pointer-2-16x16.svg
 % override chrome://global/skin/icons/defaultFavicon.svg chrome://browser/content/sval/firefox-icons/globe-16x16.svg
@@ -197,6 +197,8 @@ browser.jar:
     content/browser/sval/default-bookmarks.html (default-bookmarks.html)
     content/browser/sval/ext-bookmarks.js      (ext-bookmarks.js)
     content/browser/sval/sval-header.css       (sval-header.css)
+    content/browser/sval/sval-menu.css         (sval-menu.css)
+    content/browser/sval/sval-popover.css      (sval-popover.css)
     content/browser/sval/sval-panel-toolbar.css (sval-panel-toolbar.css)
     content/browser/sval/sval-stem.css         (sval-stem.css)
     content/browser/sval/sval-launcher.css     (sval-launcher.css)
@@ -523,6 +525,7 @@ browser.jar:
     content/browser/sval/icons/cookie.svg (icons/cookie.svg)
     content/browser/sval/icons/rotate-ccw.svg (icons/rotate-ccw.svg)
     content/browser/sval/icons/chevron-right.svg (icons/chevron-right.svg)
+    content/browser/sval/icons/chevrons-right.svg (icons/chevrons-right.svg)
     content/browser/sval/icons/external-link.svg (icons/external-link.svg)
     content/browser/sval/icons/link.svg (icons/link.svg)
     content/browser/sval/icons/sun.svg (icons/sun.svg)

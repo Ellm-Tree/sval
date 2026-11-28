@@ -168,6 +168,8 @@ export const ICONS = Object.freeze({
   "site-data": "icons/cookie.svg",
   restore: "icons/rotate-ccw.svg",
   next: "icons/chevron-right.svg",
+  // The » of a toolbar whose controls overflow into a panel.
+  overflow: "icons/chevrons-right.svg",
   "open-external": "icons/external-link.svg",
   link: "icons/link.svg",
   light: "icons/sun.svg",
@@ -365,7 +367,7 @@ export const FIREFOX_ICONS = Object.freeze({
   "chrome://global/skin/icons/arrow-right-12.svg": ["next", 12, 12, true],
   "chrome://global/skin/icons/arrow-right.svg": ["next", 16, 16, true],
   "chrome://global/skin/icons/check.svg": ["check", 16, 16, true],
-  "chrome://global/skin/icons/chevron.svg": ["performance", 16, 16, true],
+  "chrome://global/skin/icons/chevron.svg": ["overflow", 16, 16, true],
   "chrome://global/skin/icons/close.svg": ["close", 16, 16, true],
   "chrome://global/skin/icons/cursor-arrow.svg": ["browsing", 16, 16, true],
   "chrome://global/skin/icons/defaultFavicon.svg": ["page", 16, 16, true],

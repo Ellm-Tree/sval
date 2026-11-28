@@ -104,7 +104,7 @@ async function usersTab() {
  */
 async function moveVia(id, ws) {
   const menu = await contextMenuIn(window, id);
-  await menuCommand(menu, `[data-move-workspace="${CSS.escape(ws)}"]`);
+  await menuCommand(menu, `moveWorkspace:${ws}`);
 }
 
 /**
@@ -128,12 +128,13 @@ add_task(async function the_menu_lists_agents_workspaces_apart() {
 
   const menu = await contextMenuIn(window, id);
   const entries = [
-    ...menu.querySelector('[data-command="moveToWorkspace"] menupopup')
-      .children,
+    ...menuItem({ popup: menu }, "moveToWorkspace").menupopup.children,
   ];
   const at = selector => entries.findIndex(el => el.matches(selector));
+  // An entry by its id in the menu.
+  const entry = item => `[data-sval-menu-id="${CSS.escape(item)}"]`;
   const caption = at("[data-agents-caption]");
-  const ownAt = at(`[data-move-workspace="${CSS.escape(own)}"]`);
+  const ownAt = at(entry(`moveWorkspace:${own}`));
   const appAt = at("menu[data-agent-app]");
   Assert.greater(ownAt, -1, "the user's workspace is offered");
   Assert.ok(
@@ -142,11 +143,11 @@ add_task(async function the_menu_lists_agents_workspaces_apart() {
   );
   Assert.less(
     ownAt,
-    at('[data-move-workspace=""]'),
+    at(entry("moveWorkspace:")),
     "the user's come before New Workspace"
   );
   Assert.less(
-    at('[data-move-workspace=""]'),
+    at(entry("moveWorkspace:")),
     caption,
     "and New Workspace before the agents' caption"
   );
@@ -155,8 +156,9 @@ add_task(async function the_menu_lists_agents_workspaces_apart() {
     "the caption is no choice"
   );
   Assert.greater(appAt, caption, "the agent's app follows it");
-  const agentEntry = entries[appAt].querySelector(
-    `:scope > menupopup > [data-move-workspace="${CSS.escape(ws)}"]`
+  const agentEntry = menuItem(
+    { popup: entries[appAt].menupopup },
+    `moveWorkspace:${ws}`
   );
   Assert.ok(agentEntry, "and lists the agent's workspace");
   Assert.equal(

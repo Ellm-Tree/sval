@@ -96,7 +96,7 @@ add_task(async function a_renamed_workspace_keeps_its_name_in_a_new_window() {
     SvalPanel._els.switcher,
     SvalPanel._els.workspaceMenu
   );
-  await menuCommand(menu, '[data-command="edit"]');
+  await menuCommand(menu, "edit");
   const doc = await dialogIn(window, ".sval-nw-name");
   Assert.equal(doc.querySelector(".sval-nw-name").value, "Draft");
   typeIn(doc.querySelector(".sval-nw-name"), "Final");
@@ -121,7 +121,7 @@ add_task(async function a_tab_moved_to_another_workspace_loads_there() {
   const id = await nodeOfTab(await openPage(page));
 
   const menu = await contextMenuIn(window, id);
-  await menuCommand(menu, `[data-move-workspace="${CSS.escape(elsewhere)}"]`);
+  await menuCommand(menu, `moveWorkspace:${elsewhere}`);
   await TestUtils.waitForCondition(
     () =>
       SvalPanel.nodes[id]?.placement.parent === elsewhere && !rowIn(window, id),

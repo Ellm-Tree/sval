@@ -36,6 +36,7 @@ import {
   readGranular,
 } from "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs";
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
+import { SvalPopover } from "moz-src:///browser/components/sval/SvalPopover.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -829,8 +830,8 @@ export class ProtectionButton {
     this.doc = win.document;
     this.button = null;
     this.panel = null;
-    /** Whether the panel moves the focus into itself once it shows. */
-    this.focusOnShow = false;
+    /** The panel, as `SvalPopover.create` gave it. */
+    this.popover = null;
     /**
      * The tab whose page the panel had the focus over as it began to close,
      * or null when the focus was elsewhere.
@@ -915,31 +916,36 @@ export class ProtectionButton {
     anchor.before(button);
     this.button = button;
 
-    const panel = doc.createXULElement("panel");
-    panel.id = PANEL_ID;
-    panel.setAttribute("type", "arrow");
-    // The panel hangs past the button's outer edge, and the button stands
-    // near the window's; a slide keeps it whole at the screen's edge
-    // (`nsMenuPopupFrame::SlideOrResize`) where a flip would narrow it.
-    panel.setAttribute("flip", "slide");
-    panel.setAttribute("orient", "vertical");
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-label", "Protections");
     // Gecko blurs whatever has the focus as a panel shows and again as it
     // hides (`nsXULPopupManager`, the `noautofocus` checks), so the panel
     // places it itself both ways. Opened from the keyboard it focuses its
-    // first control, as `PanelMultiView.openPopup` does for a keyboard
-    // trigger, through the call `PopupNotifications` uses. Closed while the
-    // focus was in it, the focus goes back to the button, unless something
-    // else took it or another tab is showing.
-    panel.addEventListener("popupshown", () => {
-      button.setAttribute("open", "true");
-      button.setAttribute("aria-expanded", "true");
-      if (this.focusOnShow) {
-        this.focusOnShow = false;
-        doc.commandDispatcher.advanceFocusIntoSubtree(panel);
-      }
+    // first control (`SvalPopover`'s `focus`). Closed while the focus was in
+    // it, the focus goes back to the button, unless something else took it
+    // or another tab is showing.
+    this.popover = SvalPopover.create(doc, {
+      name: PANEL_ID,
+      label: "Protections",
+      // The panel hangs past the button's outer edge, and the button stands
+      // near the window's; a slide keeps it whole at the screen's edge
+      // (`nsMenuPopupFrame::SlideOrResize`) where a flip would narrow it.
+      attributes: { flip: "slide", orient: "vertical" },
+      // Grows from its button, reaching past it as the header's popovers do.
+      stem: { hang: true },
+      onHidden: () => {
+        this.view = "main";
+        this.picked = null;
+        const tab = this.returnFocusTo;
+        this.returnFocusTo = null;
+        if (
+          tab === win.gBrowser.selectedTab &&
+          !doc.commandDispatcher.focusedElement &&
+          !button.hidden
+        ) {
+          button.focus();
+        }
+      },
     });
+    const panel = this.popover.popup;
     // Esc in the certificate view goes back to the main view; a further
     // Esc closes the panel. The popup manager closes an open panel on Esc from its
     // listener on the document (`nsXULPopupManager::KeyDown`), so this
@@ -961,28 +967,13 @@ export class ProtectionButton {
       },
       { capture: true }
     );
-    panel.addEventListener("popuphiding", () => {
-      this.returnFocusTo = panel.contains(doc.activeElement)
-        ? win.gBrowser.selectedTab
-        : null;
-    });
-    panel.addEventListener("popuphidden", () => {
-      button.removeAttribute("open");
-      button.setAttribute("aria-expanded", "false");
-      this.focusOnShow = false;
-      this.view = "main";
-      this.picked = null;
-      const tab = this.returnFocusTo;
-      this.returnFocusTo = null;
-      if (
-        tab === win.gBrowser.selectedTab &&
-        !doc.commandDispatcher.focusedElement &&
-        !button.hidden
-      ) {
-        button.focus();
+    panel.addEventListener("popuphiding", event => {
+      if (event.target === panel) {
+        this.returnFocusTo = panel.contains(doc.activeElement)
+          ? win.gBrowser.selectedTab
+          : null;
       }
     });
-    doc.getElementById("mainPopupSet").append(panel);
     this.panel = panel;
 
     const progress = {
@@ -1191,18 +1182,14 @@ export class ProtectionButton {
       return;
     }
     this.render(state);
-    if (this.panel.state === "closed") {
-      this.focusOnShow = focus;
+    if (this.popover.isOpen()) {
+      return;
     }
-    this.panel.openPopup(this.button, {
-      position: "bottomleft topleft",
-      y: 6,
-      triggerEvent: null,
-    });
+    this.popover.openFrom(this.button, "bottomleft topleft", { focus });
   }
 
   close() {
-    this.panel.hidePopup();
+    this.popover.close();
   }
 
   /**

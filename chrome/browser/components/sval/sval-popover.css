@@ -1,0 +1,179 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's popovers (`SvalPopover`). This sheet states each property Firefox's
+ * `popup.css` sets on a panel and its content box, so that sheet decides
+ * nothing on a popover. The values are the design system's panel roles
+ * (`--panel-*`), which the window's palettes (`sval-header.css`) and each
+ * popover's own rules set. A popover takes the window's popup colours
+ * whether it is placed as an arrow panel or not. The header's panels that
+ * Firefox makes are popovers too (`SvalPopover.adopt`).
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+panel[sval-popover] {
+  --panel-background-color: inherit;
+  --panel-text-color: inherit;
+  --panel-border-color: inherit;
+
+  /* macOS draws a popup in the system menu's look and shadow unless told
+     otherwise; a popover draws its own. */
+  @media (-moz-platform: macos) {
+    --panel-box-shadow: none;
+    --panel-box-shadow-margin: 0px;
+  }
+
+  appearance: none;
+  background-color: transparent;
+  color-scheme: light dark;
+  min-width: 1px;
+  -moz-window-input-region-margin: var(--panel-box-shadow-margin);
+  margin: calc(-1 * var(--panel-box-shadow-margin));
+
+  &::part(content) {
+    display: flex;
+    box-sizing: border-box;
+    padding: var(--panel-padding);
+    color: var(--panel-text-color);
+    background: var(--panel-background-color);
+    border-radius: var(--panel-border-radius);
+    border: 1px solid var(--panel-border-color);
+    width: var(--panel-width);
+    box-shadow: var(--panel-box-shadow);
+    margin: var(--panel-box-shadow-margin);
+    min-width: 0;
+    min-height: 0;
+    max-height: round(up, 100% - 2 * var(--panel-box-shadow-margin), 1px);
+    max-width: round(up, 100% - 2 * var(--panel-box-shadow-margin), 1px);
+    overflow: clip;
+  }
+
+  &[orient="vertical"]::part(content) {
+    flex-direction: column;
+  }
+
+  /* A popover stays inside its window, which Gecko holds it to
+     (`nsMenuPopupFrame::GetConstraintRect`), shrinking it where there is
+     less room than it needs; what it holds scrolls in what is left, inside
+     the content box. A scroller draws its scrollbar over its own corners
+     whatever its radius, so the content box, which clips to its rounded
+     corners, is never the scroller. A `panelmultiview` scrolls its own
+     views. A menu the popover holds, as the site menu holds a permission's
+     values, keeps its own. */
+  &:not(:has(> panelmultiview)) > :not(menupopup) {
+    min-height: 0;
+    overflow-y: auto;
+    border-radius: max(0px, calc(var(--panel-border-radius) - var(--panel-padding)));
+    scrollbar-width: thin;
+  }
+
+  /* Firefox's panels that lay out their own room (`panelmultiview`). */
+  &.panel-no-padding::part(content) {
+    padding: 0;
+  }
+
+  /* A Linux window manager with no alpha draws a popup square and opaque. */
+  @media (-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)) {
+    opacity: 1 !important;
+    --panel-box-shadow-margin: 0px !important;
+    --panel-border-radius: 0px !important;
+  }
+}
+
+/* An arrow popover slides and fades in from its side as it opens. macOS
+ * moves and fades the whole popup window, its shadow included, which keeps
+ * the system from working out the shadow's shape again on every frame. */
+panel[sval-popover][type="arrow"] {
+  transition-timing-function: var(--animation-easing-function), ease-out;
+
+  &:not([animate="false"]) {
+    transition-duration: 0.18s;
+  }
+
+  @media not (-moz-platform: macos) {
+    transition-property: transform, opacity;
+    will-change: transform, opacity;
+    opacity: 0;
+
+    @media not (prefers-reduced-motion) {
+      transform: translateY(-70px);
+
+      &:where([side="bottom"]) {
+        transform: translateY(70px);
+      }
+
+      /* Where Gecko cannot move a popup's window smoothly. */
+      @media not (-moz-panel-animations) {
+        transform: none;
+      }
+    }
+  }
+
+  @media (-moz-platform: macos) {
+    transition-property:
+      -moz-window-transform,
+      -moz-window-opacity;
+
+    @media not (prefers-reduced-motion) {
+      -moz-window-transform: translateY(-70px);
+
+      &:where([side="bottom"]) {
+        -moz-window-transform: translateY(70px);
+      }
+    }
+
+    /* Before Big Sur the window fades in too; from Big Sur a faded window
+       loses its shadow. */
+    @media not (-moz-mac-big-sur-theme) {
+      -moz-window-opacity: 0;
+    }
+
+    &[animate="cancel"] {
+      -moz-window-opacity: 0;
+    }
+  }
+
+  &[animate="cancel"] {
+    -moz-window-transform: none;
+    transform: none;
+  }
+
+  &:is([animate="false"], [animate="open"]) {
+    opacity: 1;
+    transform: none;
+    -moz-window-opacity: 1;
+    -moz-window-transform: none;
+    transition-timing-function: var(--animation-easing-function), ease-in-out;
+  }
+
+  &[animating] {
+    pointer-events: none;
+  }
+}
+
+/* A see-through window's popovers are see-through too, as its menus are
+ * (`sval-menu.css`, which says how each platform's backdrop is laid): the
+ * window's colour at its share over the system's backdrop for a menu, with
+ * the system's shadow and corners. A popover that grows from its button
+ * keeps its stem, whose shape the backdrop takes (`SvalStem`), with no edge
+ * or shadow drawn round it. With an id's weight, over a popover's own
+ * shadow and room. */
+@media (not (forced-colors)) and ((-moz-platform: macos) or (-moz-platform: linux) or (-moz-windows-mica-popups)) {
+  :root[data-sval-translucent] panel[sval-popover]:not(#sval-popover-weight) {
+    --panel-background-color: var(--sval-tint-accent);
+    --sval-stem-edge: transparent;
+    --sval-stem-box-shadow: none;
+    --panel-box-shadow: none;
+    --panel-box-shadow-margin: 0px;
+    --panel-border-color: transparent;
+    -moz-window-shadow: auto;
+    appearance: auto;
+    -moz-default-appearance: menupopup;
+    background-color: transparent;
+
+    @media not (-moz-platform: macos) {
+      --panel-border-radius: 0px;
+    }
+  }
+}

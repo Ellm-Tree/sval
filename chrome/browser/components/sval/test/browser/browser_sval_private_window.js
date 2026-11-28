@@ -174,7 +174,7 @@ async function rowMenuOffers(win, row, command) {
   EventUtils.synthesizeMouseAtCenter(row, { type: "contextmenu" }, win);
   await within(shown, 10_000, "the context menu opening");
   assertTidySeparators(menu, "the row's menu");
-  const item = menu.querySelector(`[data-command="${command}"]`);
+  const item = menuItem(win.SvalPanel.rowMenu.menu, command);
   const offered = !!item && !item.hidden;
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
   menu.hidePopup();

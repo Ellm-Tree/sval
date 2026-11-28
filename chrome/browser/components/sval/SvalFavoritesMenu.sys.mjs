@@ -12,6 +12,10 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import {
+  MENU_ID_ATTR,
+  SvalMenu,
+} from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -23,15 +27,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ROOT_GUIDS: "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-  ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   MENU_KEYS: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
   PINS_ROOT: "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-  applyShowIn: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
-  fillShowIn: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
-  menuItem: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
-  showInMenu: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
-  tidySeparators: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
+  showInItem: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
   onShowInCommand: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
   showInWorkspaces: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
 });
@@ -50,6 +49,9 @@ const MAX_OPEN_PREF = "browser.tabs.maxOpenBeforeWarn";
  * @type {WeakMap<Window, Function>}
  */
 const detachers = new WeakMap();
+
+/** @type {WeakMap<Window, object>} Each window's menu, as SvalMenu gave it. */
+const handles = new WeakMap();
 
 /**
  * What the menu is about, for the favorite, folder or separator `guid`.
@@ -138,124 +140,88 @@ export const SvalFavoritesMenu = {
   attach(win, popup) {
     detachers.get(win)?.();
     const doc = win.document;
-    const menu = doc.createXULElement("menupopup");
-    menu.id = FAVORITES_CONTEXT_MENU_ID;
-    const item = (command, label) => lazy.menuItem(doc, command, label);
-    const separator = () => doc.createXULElement("menuseparator");
-    // Undo names Firefox's undo key, which {@link _onKey} answers here.
-    const undo = item("undo", "Undo");
-    undo.setAttribute("key", "key_undo");
-    undo.setAttribute(
-      "aria-keyshortcuts",
-      lazy.ariaShortcut({ modifiers: "accel", key: "z" })
-    );
+    /** The menu's popup, which holds what it is open on. */
+    let menu = null;
     // The home page's row is in pin order, not its favorites' order in
     // their folders, so a tile there moves along the row. Each carries the
     // row's own key for the same move (`home/favorites.js`).
-    const rowMove = direction => {
-      const el = item(
-        direction === "left" ? "moveLeft" : "moveRight",
-        direction === "left" ? "Move Left" : "Move Right"
-      );
-      const key =
-        lazy.MENU_KEYS[direction === "left" ? "moveLeft" : "moveRight"];
-      el.setAttribute("key", key.id);
-      el.setAttribute("aria-keyshortcuts", lazy.ariaShortcut(key));
-      return el;
-    };
-    // Where a pin shows (pins spec §7), for a pin in the row.
-    const { menu: showIn, popup: showInPopup } = lazy.showInMenu(doc);
-    const moveTo = doc.createXULElement("menu");
-    moveTo.dataset.command = "moveTo";
-    moveTo.setAttribute("label", "Move to");
-    const moveToPopup = doc.createXULElement("menupopup");
-    moveTo.append(moveToPopup);
-
-    // Like commands sit together, each kind between separators that
-    // `_showing` hides wherever a kind has nothing to show.
-    menu.append(
-      undo,
-      separator(),
-      item("open", "Open"),
-      item("openWindow", "Open in New Window"),
-      item("openPrivate", "Open in Private Window"),
-      item("openAll", "Open All"),
-      separator(),
-      item("pinHome", "Pin"),
-      item("pinHere", "Pin to This Workspace"),
-      showIn,
-      separator(),
-      item("rename", "Rename…"),
-      item("editAddress", "Edit Address…"),
-      item("delete", "Delete"),
-      separator(),
-      moveTo,
+    const rowMove = direction => ({
+      id: direction === "left" ? "moveLeft" : "moveRight",
+      label: direction === "left" ? "Move Left" : "Move Right",
+      key: lazy.MENU_KEYS[direction === "left" ? "moveLeft" : "moveRight"],
+    });
+    // Like commands sit together, each kind between separators SvalMenu
+    // hides wherever a kind has nothing to show.
+    const items = [
+      // Undo names Firefox's undo key, which {@link _onKey} answers here.
+      {
+        id: "undo",
+        label: "Undo",
+        key: { id: "key_undo", modifiers: "accel", key: "z" },
+      },
+      "separator",
+      { id: "open", label: "Open" },
+      { id: "openWindow", label: "Open in New Window" },
+      { id: "openPrivate", label: "Open in Private Window" },
+      { id: "openAll", label: "Open All" },
+      "separator",
+      { id: "pinHome", label: "Pin" },
+      { id: "pinHere", label: "Pin to This Workspace" },
+      // Where a pin shows (pins spec §7), for a pin in the row.
+      lazy.showInItem(
+        () => menu._svalTarget.guid,
+        () => {
+          const panel = win.SvalPanel;
+          return panel?.nodes ? lazy.showInWorkspaces(panel.nodes) : [];
+        },
+        err =>
+          SvalLog.error(
+            `favorites: a pin's scope was not saved: ${SvalLog.errorName(err)}`
+          )
+      ),
+      "separator",
+      { id: "rename", label: "Rename…" },
+      { id: "editAddress", label: "Edit Address…" },
+      { id: "delete", label: "Delete" },
+      "separator",
+      {
+        id: "moveTo",
+        label: "Move to",
+        fill: () => this._moveToItems(menu),
+      },
       // Dragging is not the only way to put favorites in order.
-      item("moveUp", "Move Up"),
-      item("moveDown", "Move Down"),
+      { id: "moveUp", label: "Move Up" },
+      { id: "moveDown", label: "Move Down" },
       rowMove("left"),
       rowMove("right"),
-      separator(),
-      item("newFolder", "New Folder…"),
-      item("newSeparator", "New Separator"),
-      separator(),
-      item("export", "Export…")
-    );
-
-    menu.addEventListener("popupshowing", event => {
-      if (event.target === menu) {
-        this._showing(win, menu);
-      } else if (event.target === showInPopup) {
-        const panel = win.SvalPanel;
-        lazy.fillShowIn(
-          showInPopup,
-          menu._svalTarget.guid,
-          panel?.nodes ? lazy.showInWorkspaces(panel.nodes) : []
-        );
-      } else if (event.target === moveToPopup) {
-        this._fillMoveTo(win, menu, moveToPopup).catch(err =>
+      "separator",
+      { id: "newFolder", label: "New Folder…" },
+      { id: "newSeparator", label: "New Separator" },
+      "separator",
+      { id: "export", label: "Export…" },
+    ];
+    const handle = SvalMenu.create(doc, {
+      name: FAVORITES_CONTEXT_MENU_ID,
+      items,
+      onShowing: () => this._showing(win, menu),
+      onCommand: (id, folder, event) => {
+        if (lazy.onShowInCommand(id, event)) {
+          return;
+        }
+        this._run(win, menu, id, folder).catch(err =>
           SvalLog.error(
-            `favorites: could not list folders: ${SvalLog.errorName(err)}`
+            `favorites: a menu command failed: ${SvalLog.errorName(err)}`
           )
         );
-      }
-    });
-    showInPopup.addEventListener("popuphidden", event => {
-      if (event.target === showInPopup) {
-        lazy
-          .applyShowIn(showInPopup)
-          .catch(err =>
-            SvalLog.error(
-              `favorites: a pin's scope was not saved: ${SvalLog.errorName(err)}`
-            )
-          );
-      }
-    });
-    menu.addEventListener("command", event => {
-      if (event.target.dataset.showIn) {
-        lazy.onShowInCommand(showInPopup, event.target);
-        return;
-      }
-      const command = event.target.closest("[data-command], [data-folder]");
-      if (!command) {
-        return;
-      }
-      this._run(win, menu, command).catch(err =>
-        SvalLog.error(
-          `favorites: a menu command failed: ${SvalLog.errorName(err)}`
-        )
-      );
-    });
-
-    menu.addEventListener("popuphidden", event => {
-      if (event.target === menu) {
+      },
+      onHidden: () => {
         menu._svalTrigger = null;
         menu._svalGuid = null;
         menu._svalRow = null;
-      }
+      },
     });
-
-    doc.getElementById("mainPopupSet").append(menu);
+    menu = handle.popup;
+    handles.set(win, handle);
     popup.setAttribute("context", FAVORITES_CONTEXT_MENU_ID);
     const onKey = event => this._onKey(popup, menu, event);
     win.addEventListener("keydown", onKey, true);
@@ -266,6 +232,14 @@ export const SvalFavoritesMenu = {
       menu.remove();
     });
     return menu;
+  },
+
+  /**
+   * @param {Window} win A browser window.
+   * @returns {object|undefined} its menu, as `SvalMenu.create` gave it.
+   */
+  menuOf(win) {
+    return handles.get(win);
   },
 
   /**
@@ -419,47 +393,42 @@ export const SvalFavoritesMenu = {
         show[command] = command === "delete";
       }
     }
-    for (const el of menu.querySelectorAll(":scope > [data-command]")) {
-      el.hidden = !show[el.dataset.command];
+    const item = id => menu.querySelector(`:scope > [${MENU_ID_ATTR}="${id}"]`);
+    for (const el of menu.querySelectorAll(`:scope > [${MENU_ID_ATTR}]`)) {
+      el.hidden = !show[el.getAttribute(MENU_ID_ATTR)];
     }
     // At either end of the row one way is closed: the item stays, disabled,
     // so the pair keeps its place.
     if (target?.row) {
-      menu.querySelector('[data-command="moveLeft"]').disabled =
-        !target.row.left;
-      menu.querySelector('[data-command="moveRight"]').disabled =
-        !target.row.right;
+      item("moveLeft").disabled = !target.row.left;
+      item("moveRight").disabled = !target.row.right;
     }
     if (show.pinHome) {
-      const item = menu.querySelector('[data-command="pinHome"]');
-      item.setAttribute("label", pin ? "Move to Favorites" : "Pin");
-      item.dataset.pinned = String(pin);
+      const pinHome = item("pinHome");
+      pinHome.setAttribute("label", pin ? "Move to Favorites" : "Pin");
+      pinHome.dataset.pinned = String(pin);
     }
     // No pins in a private window (pins spec §7), so nowhere to show one.
-    menu.querySelector('[data-command="showIn"]').hidden =
-      !inRow || !!win.SvalPanel?.inMemory;
-    menu.querySelector('[data-command="pinHere"]').hidden =
+    item("showIn").hidden = !inRow || !!win.SvalPanel?.inMemory;
+    item("pinHere").hidden =
       !show.pinHome ||
       pin ||
       !lazy.SvalWindowWorkspace.of(win).id ||
       !!win.SvalPanel.inMemory;
-    lazy.tidySeparators(menu);
   },
 
   /**
    * Lists every folder the target can move into, its own folder disabled,
-   * and never the target or anything inside it.
+   * and never the target or anything inside it, each `folder:` and its guid.
    *
-   * @param {Window} win
    * @param {Element} menu
-   * @param {Element} popup
-   * @returns {Promise<void>}
+   * @returns {object[]} the items of Move to.
    */
-  async _fillMoveTo(win, menu, popup) {
+  _moveToItems(menu) {
     const target = menu._svalTarget;
-    popup.replaceChildren();
+    const items = [];
     if (!target) {
-      return;
+      return items;
     }
     const current = target.item.parentGuid;
     const folders = lazy.SvalFavorites.folders();
@@ -479,34 +448,33 @@ export const SvalFavoritesMenu = {
         skipBelow = folder.depth;
         continue;
       }
-      const el = win.document.createXULElement("menuitem");
-      el.dataset.folder = folder.guid;
-      el.setAttribute(
-        "label",
-        `${" ".repeat(folder.depth)}${folder.title || "Untitled folder"}`
-      );
-      el.setAttribute("aria-label", folder.title || "Untitled folder");
-      if (folder.depth > 0) {
-        el.setAttribute("aria-description", `in ${above[folder.depth - 1]}`);
-      }
-      if (folder.guid === current) {
-        el.setAttribute("disabled", "true");
-      }
-      popup.append(el);
+      items.push({
+        id: `folder:${folder.guid}`,
+        label: `${" ".repeat(folder.depth)}${folder.title || "Untitled folder"}`,
+        attributes: {
+          "aria-label": folder.title || "Untitled folder",
+          "aria-description":
+            folder.depth > 0 ? `in ${above[folder.depth - 1]}` : null,
+        },
+        disabled: folder.guid === current,
+        data: folder.guid,
+      });
     }
+    return items;
   },
 
   /**
    * @param {Window} win
    * @param {Element} menu
-   * @param {Element} el The chosen item.
+   * @param {string} id The chosen item's id.
+   * @param {string} [folder] The folder a Move to item names.
    * @returns {Promise<void>}
    */
-  _run(win, menu, el) {
+  _run(win, menu, id, folder) {
     const { SvalFavorites } = lazy;
     const target = menu._svalTarget;
-    if (el.dataset.folder) {
-      return SvalFavorites.move(target.guid, el.dataset.folder);
+    if (id.startsWith("folder:")) {
+      return SvalFavorites.move(target.guid, folder);
     }
     const open = (where, isPrivate = false) =>
       SvalFavorites.open(win, target.item, { where, isPrivate });
@@ -543,7 +511,7 @@ export const SvalFavoritesMenu = {
       newSeparator: () => this._newSeparator(target),
       export: () => win.SvalPanel?.openExport(),
     };
-    return Promise.resolve(commands[el.dataset.command]?.());
+    return Promise.resolve(commands[id]?.());
   },
 
   /**

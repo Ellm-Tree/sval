@@ -158,13 +158,13 @@ add_task(async function another_devices_favorite_can_only_be_deleted() {
   Assert.ok(bad.disabled, "drawn disabled");
   const menu = await contextOn(bad);
   Assert.deepEqual(
-    Array.from(menu.querySelectorAll(":scope > [data-command]"))
+    Array.from(menu.querySelectorAll(":scope > [data-sval-menu-id]"))
       .filter(el => !el.hidden)
-      .map(el => el.dataset.command),
+      .map(el => el.getAttribute("data-sval-menu-id")),
     ["delete"],
     "Delete is its only command"
   );
-  await chooseMenuItem(menu, "delete");
+  await chooseInContextMenu(menu, "delete");
   await TestUtils.waitForCondition(
     () => !store.get(planted),
     "and Delete removes it"

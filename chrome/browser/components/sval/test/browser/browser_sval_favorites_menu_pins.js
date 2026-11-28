@@ -120,7 +120,7 @@ add_task(async function pin_copies_a_favorite_into_the_row() {
   let popup = await openFavorites();
   let menu = await contextOn(await itemIn(popup, n => n.guid === p));
   Assert.ok(shownCommands(menu).includes("pinHome"), "Pin is offered");
-  await chooseMenuItem(menu, "pinHome");
+  await chooseInContextMenu(menu, "pinHome");
   await TestUtils.waitForCondition(
     () => store.pinsWithUrl(P).length === 1,
     "a pin of its address"

@@ -7,7 +7,8 @@
  * bar's Workspaces menu all draw an entry with these, so a Workspace reads
  * the same wherever it is listed.
  *
- * Each takes a `SvalPanelModel.switcherItems` entry and holds no state.
+ * Each takes a `SvalPanelModel.switcherItems` entry and holds no state. An
+ * entry here is a `SvalMenu` item, plain data, which these fill in.
  */
 
 import {
@@ -74,32 +75,54 @@ export function usersOwn(item) {
 }
 
 /**
- * Starts the devices' part of a workspace list: a separator after any of
- * the user's entries, then {@link DEVICES_CAPTION}. A `menucaption` in a
- * menu Gecko draws, which the arrow keys pass over, and a disabled item
- * in one a native menu bar can show, which draws no `menucaption`.
+ * Sets an attribute of an entry.
  *
- * @param {Element} popup The `menupopup` being filled.
+ * @param {object} entry A `SvalMenu` item.
+ * @param {string} name
+ * @param {string} value
+ */
+function setAttribute(entry, name, value) {
+  entry.attributes = { ...entry.attributes, [name]: value };
+}
+
+/**
+ * Adds a class to an entry.
+ *
+ * @param {object} entry A `SvalMenu` item.
+ * @param {string} name
+ */
+function addClass(entry, name) {
+  const names = new Set((entry.className ?? "").split(/\s+/).filter(Boolean));
+  names.add(name);
+  entry.className = [...names].join(" ");
+}
+
+/**
+ * Starts the devices' part of a workspace list: a separator, which
+ * `SvalMenu` hides with nothing above it, then {@link DEVICES_CAPTION}. A
+ * `menucaption` in a menu Gecko draws, which the arrow keys pass over, and
+ * a disabled item in one a native menu bar can show, which draws no
+ * `menucaption`.
+ *
  * @param {object} [options]
  * @param {boolean} [options.native] Whether a native menu bar shows it.
+ * @returns {Array<object|string>}
  */
-export function appendDevicesCaption(popup, { native = false } = {}) {
-  if (native || popup.querySelector(":scope > [data-workspace-id]")) {
-    popup.append(popup.ownerDocument.createXULElement("menuseparator"));
-  }
-  const caption = popup.ownerDocument.createXULElement(
-    native ? "menuitem" : "menucaption"
-  );
-  caption.setAttribute("label", DEVICES_CAPTION);
-  caption.setAttribute("data-devices-caption", "true");
-  if (native) {
-    caption.setAttribute("disabled", "true");
-    caption.classList.add("menuitem-iconic", "sval-workspace-menuitem");
-    caption.setAttribute("image", DEVICE_PHONE_URL);
-  } else {
-    caption.className = "sval-devices-caption";
-  }
-  popup.append(caption);
+export function devicesCaption({ native = false } = {}) {
+  const caption = native
+    ? {
+        label: DEVICES_CAPTION,
+        disabled: true,
+        icon: DEVICE_PHONE_URL,
+        className: "sval-workspace-menuitem",
+      }
+    : {
+        type: "caption",
+        label: DEVICES_CAPTION,
+        className: "sval-devices-caption",
+      };
+  setAttribute(caption, "data-devices-caption", "true");
+  return ["separator", caption];
 }
 
 /**
@@ -107,40 +130,40 @@ export function appendDevicesCaption(popup, { native = false } = {}) {
  * its accessible description. Its tabs are open on that device and none
  * of them in a window here, so the count is the tree's.
  *
- * @param {Element} el A workspace `menu` or `menuitem`.
+ * @param {object} entry A workspace's entry.
  * @param {object} item Its `switcherItems` entry.
  * @param {object} nodes The document's `nodes` map.
  */
-export function countDeviceTabs(el, item, nodes) {
+export function countDeviceTabs(entry, item, nodes) {
   const count = descendantTabCount(nodes, item.id);
   const text = count === 1 ? "1 tab" : `${count} tabs`;
-  el.setAttribute("acceltext", text);
-  const described = el.getAttribute("description");
-  el.setAttribute("description", described ? `${text}. ${described}` : text);
+  entry.acceltext = text;
+  const described = entry.attributes?.description;
+  setAttribute(
+    entry,
+    "description",
+    described ? `${text}. ${described}` : text
+  );
 }
 
 /**
- * Starts the agents' part of a switcher list before its first agent entry:
- * a separator after any of the user's entries, then
+ * Starts the agents' part of a switcher list: a separator, then
  * {@link AGENTS_CAPTION}. A `menucaption`, a menu's own heading, which the
  * arrow keys pass over.
  * Each entry under it keeps its robot face, so the marking never rests on
  * the heading alone.
  *
- * @param {Element} popup The `menupopup` being filled.
- * @param {object} item The entry about to be appended.
+ * @returns {Array<object|string>}
  */
-export function appendAgentsCaption(popup, item) {
-  if (!item.agent || popup.querySelector(".sval-agents-caption")) {
-    return;
-  }
-  if (popup.querySelector(":scope > [data-workspace-id]")) {
-    popup.append(popup.ownerDocument.createXULElement("menuseparator"));
-  }
-  const caption = popup.ownerDocument.createXULElement("menucaption");
-  caption.className = "sval-agents-caption";
-  caption.setAttribute("label", AGENTS_CAPTION);
-  popup.append(caption);
+export function agentsCaption() {
+  return [
+    "separator",
+    {
+      type: "caption",
+      label: AGENTS_CAPTION,
+      className: "sval-agents-caption",
+    },
+  ];
 }
 
 /**
@@ -148,63 +171,64 @@ export function appendAgentsCaption(popup, item) {
  * separator, then a disabled item that names them. A native menu bar draws
  * no `menucaption`.
  *
- * @param {Element} popup
+ * @returns {Array<object|string>}
  */
-export function appendAgentsMenuCaption(popup) {
-  const caption = popup.ownerDocument.createXULElement("menuitem");
-  caption.setAttribute("label", AGENTS_CAPTION);
-  caption.setAttribute("disabled", "true");
-  caption.setAttribute("data-agents-caption", "true");
-  caption.classList.add("menuitem-iconic", "sval-workspace-menuitem");
-  caption.setAttribute("image", AGENT_ROBOT_URL);
-  popup.append(popup.ownerDocument.createXULElement("menuseparator"), caption);
+export function agentsMenuCaption() {
+  const caption = {
+    label: AGENTS_CAPTION,
+    disabled: true,
+    icon: AGENT_ROBOT_URL,
+    className: "sval-workspace-menuitem",
+  };
+  setAttribute(caption, "data-agents-caption", "true");
+  return ["separator", caption];
 }
 
 /**
- * Appends the agents' workspaces to `popup`: one menu for each app, the
- * agent's name and its app's mark (`markAgentApp`), holding its
- * workspaces (`appendAgentAppEntries`). Every menu that lists the
- * agents' workspaces draws them this way, because every workspace of an
- * app carries the app's name, and only the task tells them apart.
+ * The agents' workspaces: one menu for each app, the agent's name and its
+ * app's mark (`markAgentApp`), holding its workspaces
+ * (`agentAppEntries`). Every menu that lists the agents' workspaces draws
+ * them this way, because every workspace of an app carries the app's name,
+ * and only the task tells them apart.
  *
- * @param {Element} popup
  * @param {object[]} items The agents' `switcherItems` entries.
- * @param {function(object): Element} entryFor Draws one workspace's entry.
- * @returns {Element[]} Each app's `menu`.
+ * @param {function(object): object} entryFor One workspace's entry.
+ * @param {string} [popupClassName] The class of each app's submenu.
+ * @returns {object[]} Each app's menu.
  */
-export function appendAgentApps(popup, items, entryFor) {
+export function agentApps(items, entryFor, popupClassName) {
   const apps = [];
   for (const [app, entries] of Map.groupBy(items, item => item.agent)) {
-    const el = popup.ownerDocument.createXULElement("menu");
-    el.setAttribute("data-agent-app", app);
-    labelMenuEntry(el, app);
-    markAgentApp(el, entries[0].brand);
-    const appPopup = popup.ownerDocument.createXULElement("menupopup");
-    appendAgentAppEntries(appPopup, entries, entryFor);
-    el.append(appPopup);
-    popup.append(el);
-    apps.push(el);
+    const entry = {
+      items: agentAppEntries(entries, entryFor),
+      popupClassName,
+    };
+    setAttribute(entry, "data-agent-app", app);
+    labelMenuEntry(entry, app);
+    markAgentApp(entry, entries[0].brand);
+    apps.push(entry);
   }
   return apps;
 }
 
 /**
- * Appends one agent app's workspaces to `popup`, the one a session used
- * last first (decision 1998), each wearing its model's mark
- * (`markAgentModel`). The app's menus and the strip's list of an
- * app ({@link _openStripAppMenu}) both draw them this way.
+ * One agent app's workspaces, the one a session used last first (decision
+ * 1998), each wearing its model's mark (`markAgentModel`). The app's menus
+ * and the strip's list of an app (`SvalPanelStrip`) both draw them this way.
  *
- * @param {Element} popup
  * @param {object[]} entries The app's `switcherItems` entries.
- * @param {function(object): Element} entryFor Draws one workspace's entry.
+ * @param {function(object): object} entryFor One workspace's entry.
+ * @returns {object[]}
  */
-export function appendAgentAppEntries(popup, entries, entryFor) {
+export function agentAppEntries(entries, entryFor) {
   const used = item => agentWorkspaceEntry(item.id)?.lastUsed ?? -Infinity;
-  for (const item of entries.toSorted((a, b) => used(b) - used(a))) {
-    const el = entryFor(item);
-    markAgentModel(el, item.id);
-    popup.append(el);
-  }
+  return entries
+    .toSorted((a, b) => used(b) - used(a))
+    .map(item => {
+      const entry = entryFor(item);
+      markAgentModel(entry, item.id);
+      return entry;
+    });
 }
 
 /**
@@ -225,18 +249,21 @@ export function agentWorkspaceEntry(id) {
  * Gives an agent workspace's entry its model's mark as its image, or
  * none when its session named no model Sval knows.
  *
- * @param {Element} el A workspace `menu` or `menuitem`.
+ * @param {object} entry A workspace's entry.
  * @param {string} id
  */
-export function markAgentModel(el, id) {
+export function markAgentModel(entry, id) {
   const url = brandURL(modelBrandOf(agentWorkspaceEntry(id)?.model));
   if (url) {
-    el.removeAttribute("type");
-    el.classList.add(iconicClass(el), "sval-workspace-menuitem");
-    el.setAttribute("image", url);
+    delete entry.type;
+    addClass(entry, "sval-workspace-menuitem");
+    entry.icon = url;
   } else {
-    el.removeAttribute("image");
-    el.classList.remove(iconicClass(el), "sval-workspace-menuitem");
+    delete entry.icon;
+    entry.className = (entry.className ?? "")
+      .split(/\s+/)
+      .filter(name => name && name !== "sval-workspace-menuitem")
+      .join(" ");
   }
 }
 
@@ -296,18 +323,18 @@ function deviceMarkURL(nodes, id) {
  * Labels an agent workspace's entry in its app's menu: its task, then
  * where its session ran, the model, and when a session last used it.
  *
- * @param {Element} el A `menu` or `menuitem`.
+ * @param {object} entry A workspace's entry.
  * @param {object} item Its `switcherItems` entry.
  */
-export function labelAgentEntry(el, item) {
+export function labelAgentEntry(entry, item) {
   const task = workspaceName(item);
-  const entry = agentWorkspaceEntry(item.id);
+  const session = agentWorkspaceEntry(item.id);
   const detail = [
-    entry?.dir ? folderName(entry.dir) : "",
-    entry?.model ?? "",
-    entry?.lastUsed ? usedAgo(entry.lastUsed) : "",
+    session?.dir ? folderName(session.dir) : "",
+    session?.model ?? "",
+    session?.lastUsed ? usedAgo(session.lastUsed) : "",
   ].filter(Boolean);
-  labelMenuEntry(el, [task, ...detail].join(" · "), task);
+  labelMenuEntry(entry, [task, ...detail].join(" · "), task);
 }
 
 /**
@@ -372,11 +399,11 @@ export function workspaceName(item) {
  * Labels a workspace's menu entry (`switcherItemLabel`), keyed by
  * its name, which is what type-ahead finds it by.
  *
- * @param {Element} el A `menuitem`.
+ * @param {object} entry A workspace's entry.
  * @param {object} item Its `switcherItems` entry.
  */
-export function labelWorkspaceEntry(el, item) {
-  labelMenuEntry(el, switcherItemLabel(item), workspaceName(item));
+export function labelWorkspaceEntry(entry, item) {
+  labelMenuEntry(entry, switcherItemLabel(item), workspaceName(item));
 }
 
 /**
@@ -391,16 +418,18 @@ export function labelWorkspaceEntry(el, item) {
  * keyed entry starts with chooses that entry outright, even when an
  * unkeyed entry's label starts with it too.
  *
- * @param {Element} el A `menuitem` or `menu`.
+ * @param {object} entry A `SvalMenu` item.
  * @param {string} label
  * @param {string} [name] The part of `label` that names the entry.
+ * @returns {object} `entry`.
  */
-export function labelMenuEntry(el, label, name = label) {
-  el.setAttribute("label", label);
+export function labelMenuEntry(entry, label, name = label) {
+  entry.label = label;
   const key = name.match(/[\p{L}\p{N}]/u)?.[0];
   if (key) {
-    el.setAttribute("accesskey", key);
+    setAttribute(entry, "accesskey", key);
   }
+  return entry;
 }
 
 /**
@@ -413,20 +442,20 @@ export function labelMenuEntry(el, label, name = label) {
  * (`nsMenuItemX::SetupIcon`), so an entry with a mark is a plain item,
  * which shows `checked` all the same (`nsMenuItemX::SetChecked`).
  *
- * @param {Element} el A workspace `menu` or `menuitem`.
+ * @param {object} entry A workspace's entry.
  * @param {object} item Its `switcherItems` entry.
  * @param {object} nodes The document's `nodes` map.
  */
-export function markWorkspaceItem(el, item, nodes) {
+export function markWorkspaceItem(entry, item, nodes) {
   const { mark } = workspaceIcon(nodes, item.id);
   if (!mark) {
     return;
   }
-  el.removeAttribute("type");
-  el.classList.add(iconicClass(el), "sval-workspace-menuitem");
-  el.setAttribute("image", mark);
+  delete entry.type;
+  addClass(entry, "sval-workspace-menuitem");
+  entry.icon = mark;
   if (item.agent) {
-    describeMenuEntry(el, AGENT_TEXT);
+    describeMenuEntry(entry, AGENT_TEXT);
   }
 }
 
@@ -434,24 +463,13 @@ export function markWorkspaceItem(el, item, nodes) {
  * Gives an agent app's menu its app's mark, as `markWorkspaceItem` gives
  * each of its Workspaces theirs.
  *
- * @param {Element} el The app's `menu`.
+ * @param {object} entry The app's menu.
  * @param {string|null} brand `SvalAgentBrands.agentBrandOf`'s answer.
  */
-function markAgentApp(el, brand) {
-  el.classList.add(iconicClass(el), "sval-workspace-menuitem");
-  el.setAttribute("image", agentMarkURL(brand));
-  describeMenuEntry(el, AGENT_TEXT);
-}
-
-/**
- * The class that shows an entry's `image`: Firefox's `menu.css` keys a
- * `menu`'s icon on `menu-iconic` and a `menuitem`'s on `menuitem-iconic`.
- *
- * @param {Element} el A `menu` or `menuitem`.
- * @returns {string}
- */
-function iconicClass(el) {
-  return el.localName === "menu" ? "menu-iconic" : "menuitem-iconic";
+function markAgentApp(entry, brand) {
+  addClass(entry, "sval-workspace-menuitem");
+  entry.icon = agentMarkURL(brand);
+  describeMenuEntry(entry, AGENT_TEXT);
 }
 
 /**
@@ -460,12 +478,12 @@ function iconicClass(el) {
  * accessible description (`XULMenuitemAccessible::Description`); a menu
  * item's tooltip reaches no screen reader.
  *
- * @param {Element} el A `menuitem`.
+ * @param {object} entry
  * @param {string} text
  */
-function describeMenuEntry(el, text) {
-  el.setAttribute("tooltiptext", text);
-  el.setAttribute("description", text);
+function describeMenuEntry(entry, text) {
+  setAttribute(entry, "tooltiptext", text);
+  setAttribute(entry, "description", text);
 }
 
 /**
@@ -474,20 +492,20 @@ function describeMenuEntry(el, text) {
  * and a device's keep their mark (`workspaceIcon`), the one image an item
  * has, and the description says the Workspace is isolated.
  *
- * @param {Element} el A workspace `menu` or `menuitem`.
+ * @param {object} entry A workspace's entry.
  * @param {object} item The entry it draws.
  * @param {object} nodes The document's `nodes` map.
  */
-export function markIsolatedItem(el, item, nodes) {
+export function markIsolatedItem(entry, item, nodes) {
   if (!lazy.SvalWorkspaceJar.isIsolated(nodes, item.id)) {
     return;
   }
   describeMenuEntry(
-    el,
+    entry,
     item.agent ? `${AGENT_TEXT}. ${ISOLATED_TEXT}` : ISOLATED_TEXT
   );
   if (!workspaceIcon(nodes, item.id).mark) {
-    el.classList.add(iconicClass(el), "sval-workspace-menuitem");
-    el.setAttribute("image", ISOLATED_BOX_URL);
+    addClass(entry, "sval-workspace-menuitem");
+    entry.icon = ISOLATED_BOX_URL;
   }
 }

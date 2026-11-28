@@ -349,7 +349,7 @@ add_task(async function the_keyboard_works_every_control() {
   await within(shown, 10_000, "Enter opening the font menu");
   const fonts = byId("sval-style-font-menu");
   const hidden = BrowserTestUtils.waitForPopupEvent(fonts, "hidden");
-  fonts.activateItem(fonts.querySelector('[data-font="serif"]'));
+  fonts.activateItem(menuItem({ popup: fonts }, "serif"));
   await within(hidden, 10_000, "the font menu closing");
   await until(
     () => byId("sval-style-font")?.dataset.font === "serif",

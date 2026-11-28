@@ -130,7 +130,7 @@ add_task(async function pinning_from_the_favorites_menu_puts_a_tile_on_home() {
   for (const [n, guid] of [docs, work].entries()) {
     const popup = await openFavorites();
     const item = await itemIn(popup, row => row.guid === guid);
-    await chooseMenuItem(await contextOn(item), "pinHome");
+    await chooseInContextMenu(await contextOn(item), "pinHome");
     await closeMenus();
     await TestUtils.waitForCondition(
       () => store.home().length === n + 1,
@@ -543,11 +543,11 @@ add_task(async function a_tile_menu_is_the_favorites_menu() {
     "a pin's menu is a favorite's, moving along the row"
   );
   Assert.equal(
-    menu.querySelector('[data-command="pinHome"]').dataset.pinned,
+    menuItem({ popup: menu }, "pinHome").dataset.pinned,
     "true",
     "the item moves a pin to Favorites"
   );
-  await chooseMenuItem(menu, "rename");
+  await chooseInContextMenu(menu, "rename");
   await confirm(await typeInto("Handbook"));
   await TestUtils.waitForCondition(
     async () =>
@@ -579,7 +579,7 @@ add_task(async function a_tile_menu_is_the_favorites_menu() {
   await closeMenus();
 
   menu = await tileMenuOn(browser, ".fav-row .fav-tile[data-kind=favorite]");
-  await chooseMenuItem(menu, "pinHome");
+  await chooseInContextMenu(menu, "pinHome");
   await TestUtils.waitForCondition(
     () => !store.isPinned(docs),
     "Move to Favorites moves the tile it was opened on"
@@ -617,13 +617,12 @@ add_task(async function the_tile_menu_moves_a_tile_without_a_drag() {
   const tab = await homeTab(3);
   const browser = tab.linkedBrowser;
   Assert.deepEqual(await tileNames(browser), ["Docs", "Work", "News"]);
-  const item = (menu, command) =>
-    menu.querySelector(`[data-command="${command}"]`);
+  const item = (menu, command) => menuItem({ popup: menu }, command);
 
   let menu = await tileMenuOn(browser, ".fav-row li:first-child .fav-tile");
   Assert.ok(item(menu, "moveLeft").disabled, "the first tile cannot move left");
   Assert.ok(!item(menu, "moveRight").disabled);
-  await chooseMenuItem(menu, "moveRight");
+  await chooseInContextMenu(menu, "moveRight");
   await TestUtils.waitForCondition(
     async () =>
       JSON.stringify(await tileNames(browser)) ===
@@ -641,7 +640,7 @@ add_task(async function the_tile_menu_moves_a_tile_without_a_drag() {
   // A folder's tile is a button, and moves the same way.
   menu = await tileMenuOn(browser, ".fav-row .fav-tile[data-kind=folder]");
   Assert.ok(item(menu, "moveLeft").disabled, "the folder is first");
-  await chooseMenuItem(menu, "moveRight");
+  await chooseInContextMenu(menu, "moveRight");
   await TestUtils.waitForCondition(
     async () =>
       JSON.stringify(await tileNames(browser)) ===
@@ -654,7 +653,7 @@ add_task(async function the_tile_menu_moves_a_tile_without_a_drag() {
     item(menu, "moveRight").disabled,
     "the last tile cannot move right"
   );
-  await chooseMenuItem(menu, "moveLeft");
+  await chooseInContextMenu(menu, "moveLeft");
   await TestUtils.waitForCondition(
     async () =>
       JSON.stringify(await tileNames(browser)) ===

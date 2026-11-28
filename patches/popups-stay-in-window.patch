@@ -1,0 +1,58 @@
+Sval: a window's popups stay inside the window
+
+Every menu, panel and tooltip a Sval window opens stays inside that
+window: one that reaches past an edge flips, slides or shrinks to fit,
+and its content scrolls. nsMenuPopupFrame::GetConstraintRect constrains
+a chrome popup to the screen alone, so a popover could run off the
+window and over the system's Dock; this adds the window's own rect, as
+a content shell's popups already have, inset from the window's edges by
+ui.popup.window_inset so a popup never meets an edge exactly. A popup
+can still reach as far as its anchor does, so one that grows from a
+button nearer an edge than the inset lines up with the button. The input
+margin, the room a popup keeps for its shadow, may still reach past it.
+
+diff --git a/layout/xul/nsMenuPopupFrame.cpp b/layout/xul/nsMenuPopupFrame.cpp
+index a7b2131ceb..6efd0f9b83 100644
+--- a/layout/xul/nsMenuPopupFrame.cpp
++++ b/layout/xul/nsMenuPopupFrame.cpp
+@@ -1906,7 +1906,22 @@ Maybe<nsRect> nsMenuPopupFrame::GetConstraintRect(
+   if (mInContentShell) {
+     // For content shells, clip to the client area rather than the screen area
+     AddConstraint(aRootScreenRect);
+-  } else if (!mOverrideConstraintRect.IsEmpty()) {
++  } else if (pc->IsChrome()) {
++    // A chrome window's popups stay inside the window too, inset from its
++    // edges.
++    nsRect window = aRootScreenRect;
++    const nscoord inset = nsPresContext::CSSPixelsToAppUnits(
++        int32_t(StaticPrefs::ui_popup_window_inset()));
++    if (window.width > 2 * inset && window.height > 2 * inset) {
++      window.Deflate(inset);
++    }
++    // A popup can still line up with an anchor that stands nearer an edge.
++    if (!aAnchorRect.IsEmpty()) {
++      window = window.UnionEdges(aAnchorRect.Intersect(aRootScreenRect));
++    }
++    AddConstraint(window);
++  }
++  if (!mInContentShell && !mOverrideConstraintRect.IsEmpty()) {
+     AddConstraint(mOverrideConstraintRect);
+     // This is currently only used for <select> elements where we want to
+     // constrain vertically to the screen but not horizontally, so do the
+diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
+index da1da960c6..bd19305f0f 100644
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -19569,6 +19569,12 @@
+   value: false
+   mirror: always
+ 
++# How far inside its chrome window's edges a popup stays, in CSS pixels.
++- name: ui.popup.window_inset
++  type: uint32_t
++  value: 0
++  mirror: always
++
+ # Negate scroll, true will make the mouse scroll wheel move the screen the
+ # same direction as with most desktops or laptops.
+ - name: ui.scrolling.negate_wheel_scroll

@@ -259,6 +259,7 @@ Object.assign(SvalPanel, {
       root.removeAttribute("data-sval-tint");
       root.removeAttribute("data-sval-ink");
       root.removeAttribute("data-sval-see-through");
+      root.removeAttribute("data-sval-translucent");
       root.removeAttribute("windowsmica");
       return;
     }
@@ -273,6 +274,9 @@ Object.assign(SvalPanel, {
     root.setAttribute("data-sval-tint", "true");
     root.setAttribute("data-sval-ink", look.side);
     root.toggleAttribute("data-sval-see-through", !!look.accent);
+    // Some of what is behind the window shows, which the window's menus
+    // follow (`sval-menu.css`); at no transparency the window is opaque.
+    root.toggleAttribute("data-sval-translucent", look.transparency > 0);
     root.toggleAttribute(
       "windowsmica",
       look.material === "acrylic" || look.material === "blur"

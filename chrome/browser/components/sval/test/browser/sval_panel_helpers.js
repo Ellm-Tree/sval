@@ -325,18 +325,14 @@ function openContextMenu(row) {
 }
 
 /**
- * Chooses the item whose `data-command` is `command` in an open menu.
+ * Chooses the item `command` in an open menu `SvalMenu` built.
  *
  * @param {Element} menu An open `menupopup`.
- * @param {string} command A `data-command` value.
+ * @param {string} command The item's id in the menu.
  * @returns {Promise<void>}
  */
 function activateMenuItem(menu, command) {
-  return chooseMenuItem(
-    menu.querySelector(`[data-command="${command}"]`),
-    menu,
-    `"${command}"`
-  );
+  return pickMenuItem({ popup: menu }, command);
 }
 
 /**
@@ -345,7 +341,7 @@ function activateMenuItem(menu, command) {
  * dialog open.
  *
  * @param {string} id A node drawn as a row.
- * @param {string} command A `data-command` value.
+ * @param {string} command The item's id in the row menu.
  * @returns {Promise<void>}
  */
 async function chooseOnRow(id, command) {
@@ -361,7 +357,7 @@ async function chooseOnRow(id, command) {
  * workspace's entry in the open switcher for any other.
  *
  * @param {string} id A workspace id.
- * @param {string} command A `data-command` value.
+ * @param {string} command The item's id in the workspace menu.
  * @returns {Promise<void>}
  */
 async function chooseOnWorkspace(id, command) {
@@ -377,9 +373,7 @@ async function chooseOnWorkspace(id, command) {
   const opened = BrowserTestUtils.waitForPopupEvent(switcher, "shown");
   SvalPanel._els.switcher.click();
   await within(opened, 10_000, "the switcher showing");
-  const entry = switcher.querySelector(
-    `menu[data-workspace-id="${CSS.escape(id)}"]`
-  );
+  const entry = menuItem({ popup: switcher }, `workspace:${id}`);
   Assert.ok(entry, "the switcher lists the workspace");
   // An agent's workspace is listed in its app's submenu, which a person
   // opens on the way to it.

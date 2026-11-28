@@ -11,6 +11,7 @@
  * The panel makes one of these for its window.
  */
 
+import { SvalMenu } from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
 import {
   STRIP_FOLDED_PREF,
   STRIP_NAMES,
@@ -27,8 +28,8 @@ import {
 import {
   AGENT_TEXT,
   ISOLATED_TEXT,
+  agentAppEntries,
   agentWorkspaceEntry,
-  appendAgentAppEntries,
   labelAgentEntry,
   switcherItemLabel,
   usersOwn,
@@ -124,8 +125,12 @@ export class SvalPanelStrip {
   /** The strip's element, once built. */
   #el = null;
 
-  /** An agent app's menu of Workspaces, opened from the strip. */
+  /**
+   * An agent app's menu of Workspaces, opened from the strip, and that menu
+   * as `SvalMenu.create` gave it.
+   */
   #appMenu = null;
+  #appMenuHandle = null;
 
   /** Watches the strip's view for a change of width. */
   #resize = null;
@@ -142,6 +147,11 @@ export class SvalPanelStrip {
   /** An agent app's menu of Workspaces, once the strip has opened one. */
   get appMenu() {
     return this.#appMenu;
+  }
+
+  /** The last agent app's menu, as `SvalMenu.create` gave it. */
+  get appMenuHandle() {
+    return this.#appMenuHandle;
   }
 
   /**
@@ -1029,46 +1039,42 @@ export class SvalPanelStrip {
       return;
     }
     this.#appMenu?.hidePopup();
-    this.#window.document.getElementById("sval-strip-app-menu")?.remove();
-    const menu = this.#window.document.createXULElement("menupopup");
-    // Grows from the app's tile, reaching past it as the header's
-    // popovers do (`SvalStem`).
-    menu.id = "sval-strip-app-menu";
-    menu.setAttribute("nonnative", "");
-    menu.setAttribute("consumeoutsideclicks", "true");
-    menu.setAttribute("sval-stem-host", "");
-    menu.setAttribute("sval-stem-hang", "");
-    menu.classList.add("toolbar-menupopup", "sval-agent-app-popup");
-    menu.dataset.agentApp = label;
-    appendAgentAppEntries(menu, items, item => {
-      const entry = this.#window.document.createXULElement("menuitem");
-      entry.dataset.workspaceId = item.id;
-      labelAgentEntry(entry, item);
-      if (item.current) {
-        entry.setAttribute("aria-current", "true");
-      }
-      return entry;
-    });
-    menu.addEventListener("command", event => {
-      const id = event.target.dataset?.workspaceId;
-      if (id) {
-        this.#view.pickWorkspace(id, event.shiftKey);
-      }
-    });
-    menu.addEventListener("popuphidden", event => {
-      if (event.target !== menu) {
-        return;
-      }
-      el.setAttribute("aria-expanded", "false");
-      menu.remove();
-      if (this.#appMenu === menu) {
-        this.#appMenu = null;
-        if (!this.#el.querySelector(".sval-strip-view:hover")) {
-          this.release();
+    const handle = SvalMenu.create(this.#window.document, {
+      name: "sval-strip-app-menu",
+      look: "panel",
+      className: "sval-agent-app-popup",
+      // Grows from the app's tile, reaching past it as the header's
+      // popovers do (`SvalStem`).
+      stem: { hang: true },
+      transient: true,
+      items: agentAppEntries(items, item => {
+        const entry = {
+          id: `workspace:${item.id}`,
+          data: item.id,
+          attributes: {
+            "data-workspace-id": item.id,
+            "aria-current": item.current ? "true" : null,
+          },
+        };
+        labelAgentEntry(entry, item);
+        return entry;
+      }),
+      onCommand: (id, workspace, event) =>
+        this.#view.pickWorkspace(workspace, event.shiftKey),
+      onHidden: () => {
+        el.setAttribute("aria-expanded", "false");
+        if (this.#appMenu === menu) {
+          this.#appMenu = null;
+          if (!this.#el.querySelector(".sval-strip-view:hover")) {
+            this.release();
+          }
         }
-      }
+      },
     });
-    this.#window.document.getElementById("mainPopupSet").append(menu);
+    const menu = handle.popup;
+    menu.setAttribute("consumeoutsideclicks", "true");
+    menu.dataset.agentApp = label;
+    this.#appMenuHandle = handle;
     this.#appMenu = menu;
     this.#hold();
     el.setAttribute("aria-expanded", "true");
@@ -1077,7 +1083,7 @@ export class SvalPanelStrip {
     const row = el.closest(".sval-strip-row");
     Promise.allSettled(row.getAnimations().map(a => a.finished)).then(() => {
       if (this.#appMenu === menu) {
-        menu.openPopup(el.querySelector(".sval-strip-face"), "after_start");
+        handle.openFrom(el.querySelector(".sval-strip-face"), "after_start");
       }
     });
   }

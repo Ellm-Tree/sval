@@ -53,6 +53,7 @@ async function sizeTo(win, width) {
     const resized = BrowserTestUtils.waitForEvent(win, "resize");
     win.resizeTo(target, win.outerHeight);
     await within(resized, 10_000, `the window resizing to ${target}`);
+    await windowStill(win);
   }
   await settled(win);
 }
@@ -545,4 +546,135 @@ add_task(async function the_overflow_panel_offers_no_customize_mode() {
       .querySelector('[command="cmd_CustomizeToolbars"]'),
     "an overflowed widget's context menu has no item that opens customize mode"
   );
+});
+
+add_task(async function the_overflow_button_draws_its_chevrons() {
+  const { iconURL } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalIcons.sys.mjs"
+  );
+  const button = document.getElementById("nav-bar-overflow-button");
+  const url = getComputedStyle(button)
+    .listStyleImage.replace(/^url\("/, "")
+    .replace(/"\)$/, "");
+  const shapeOf = async href => {
+    const text = await (await fetch(href)).text();
+    const svg = new DOMParser().parseFromString(text, "image/svg+xml");
+    return [...svg.querySelectorAll("path, polyline, circle, rect, line")].map(
+      el => el.outerHTML.replace(/\s+/g, " ")
+    );
+  };
+  Assert.deepEqual(
+    await shapeOf(url),
+    await shapeOf(iconURL("overflow")),
+    "the » button draws the inventory's overflow chevrons"
+  );
+  Assert.notDeepEqual(
+    await shapeOf(url),
+    await shapeOf(iconURL("performance")),
+    "and no gauge"
+  );
+});
+
+add_task(async function the_overflow_button_closes_the_last_pill() {
+  const width = window.outerWidth;
+  atTaskEnd(() => sizeTo(window, width));
+  await openTab("https://example.com/");
+  await sizeTo(window, 0);
+  const button = document.getElementById("nav-bar-overflow-button");
+  const extensions = document.getElementById("unified-extensions-button");
+  Assert.ok(button.checkVisibility(), "the » button shows");
+  const iconOf = el =>
+    el.querySelector(":scope > .toolbarbutton-icon").getBoundingClientRect();
+  const box = button.getBoundingClientRect();
+  const theirs = extensions.getBoundingClientRect();
+  Assert.equal(iconOf(button).width, iconOf(extensions).width, "icon width");
+  Assert.equal(iconOf(button).height, iconOf(extensions).height, "icon height");
+  Assert.equal(box.height, theirs.height, "button height");
+  Assert.equal(box.top, theirs.top, "on the same line");
+  const style = getComputedStyle(button);
+  const pill = getComputedStyle(extensions);
+  for (const name of ["background-color", "border-top-color", "box-shadow"]) {
+    Assert.equal(
+      style.getPropertyValue(name),
+      pill.getPropertyValue(name),
+      `the » button is filled as the pills are: ${name}`
+    );
+  }
+  // It closes the pill before it, with no gap between them.
+  const before = [
+    ...document.querySelectorAll(
+      "#nav-bar-customization-target > :is(toolbarbutton, toolbaritem)"
+    ),
+  ]
+    .filter(el => el.checkVisibility())
+    .at(-1);
+  Assert.equal(
+    Math.round(box.left),
+    Math.round(before.getBoundingClientRect().right),
+    `the » button follows ${before.id} with no gap`
+  );
+  Assert.equal(
+    getComputedStyle(before).borderEndEndRadius,
+    "0px",
+    `${before.id} leaves the pill's end to the » button`
+  );
+  Assert.equal(style.borderEndEndRadius, "999px", "which rounds it");
+});
+
+add_task(async function the_overflow_panel_is_as_wide_as_its_rows() {
+  const width = window.outerWidth;
+  atTaskEnd(() => sizeTo(window, width));
+  await openTab("https://example.com/");
+  await sizeTo(window, 0);
+  const navbar = document.getElementById("nav-bar");
+  const panel = document.getElementById("widget-overflow");
+  await within(navbar.overflowable.show(), 5_000, "the overflow panel opening");
+  atTaskEnd(async () => {
+    if (panel.state !== "closed") {
+      const hidden = BrowserTestUtils.waitForPopupEvent(panel, "hidden");
+      PanelMultiView.hidePopup(panel);
+      await within(hidden, 5_000, "the overflow panel closing");
+    }
+  });
+  const rows = [
+    ...document.querySelectorAll(
+      "#widget-overflow .widget-overflow-list > :is(toolbarbutton, toolbaritem)"
+    ),
+  ].filter(row => row.checkVisibility());
+  Assert.greater(rows.length, 0, "the panel holds rows");
+  const view = document.getElementById("widget-overflow-mainView");
+  // Each row as wide as its own icon and label make it.
+  const natural = Math.max(
+    ...rows.map(row => {
+      const style = getComputedStyle(row);
+      row.style.width = "max-content";
+      const own = row.getBoundingClientRect().width;
+      row.style.removeProperty("width");
+      return own + parseFloat(style.marginLeft) + parseFloat(style.marginRight);
+    })
+  );
+  const wide = view.getBoundingClientRect().width;
+  Assert.lessOrEqual(
+    wide,
+    Math.ceil(natural) + 1,
+    "the panel is no wider than its widest row needs"
+  );
+  Assert.less(
+    wide,
+    29 * parseFloat(getComputedStyle(view).fontSize),
+    "and narrower than Firefox's main menu"
+  );
+  for (const row of rows) {
+    const style = getComputedStyle(row);
+    Assert.equal(style.borderTopStyle, "none", `${row.id} has no frame`);
+    Assert.equal(style.boxShadow, "none", `${row.id} has no shadow`);
+    const label = row.querySelector(":scope > .toolbarbutton-text");
+    if (label) {
+      Assert.lessOrEqual(
+        label.scrollWidth,
+        label.clientWidth,
+        `${row.id}'s label is whole`
+      );
+    }
+  }
 });

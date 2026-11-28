@@ -58,6 +58,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLinkDownloads:
     "moz-src:///browser/components/sval/SvalLinkDownloads.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+  SvalPopover: "moz-src:///browser/components/sval/SvalPopover.sys.mjs",
   SvalMacWindowOrder:
     "moz-src:///browser/components/sval/SvalMacWindowOrder.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
@@ -190,6 +191,14 @@ const handedOff = new WeakSet();
  * @type {WeakMap<Window, object>}
  */
 const reopening = new WeakMap();
+
+/**
+ * Peek -> `{menu, switcher}`, its "Open in another Workspace" menu and its
+ * Peeks switcher, as `SvalPopover.create` gave them.
+ *
+ * @type {WeakMap<Window, object>}
+ */
+const peekPopovers = new WeakMap();
 
 /**
  * @param {Window} win
@@ -1082,7 +1091,8 @@ async function renderOpenButton(win) {
  */
 async function openWorkspaceMenu(win) {
   const doc = win.document;
-  const panel = doc.getElementById("sval-peek-menu");
+  const { menu } = peekPopovers.get(win);
+  const panel = menu.popup;
   const anchor = doc.getElementById("sval-peek-open");
   const found = await destinations();
   if (win.closed || !found) {
@@ -1143,7 +1153,10 @@ async function openWorkspaceMenu(win) {
     item.append(row, inWindow);
     list.append(item);
   }
-  panel.openPopup(anchor, { position: "bottomright topright", y: 4 });
+  menu.openFrom(anchor, "bottomright topright", {
+    focus: true,
+    button: doc.getElementById("sval-peek-open-more"),
+  });
 }
 
 /**
@@ -1183,7 +1196,8 @@ export function lastUsedText(ms, now) {
  */
 function openSwitcher(win, { byKey = false } = {}) {
   const doc = win.document;
-  const panel = doc.getElementById("sval-peek-switcher");
+  const { switcher } = peekPopovers.get(win);
+  const panel = switcher.popup;
 
   const now = SvalPeek._now();
   const all = peersOf(win);
@@ -1254,18 +1268,8 @@ function openSwitcher(win, { byKey = false } = {}) {
   }
   // Opened from the keyboard, focus goes to the first row, as a menu's does;
   // a click leaves it where it was.
-  if (byKey) {
-    const focusIn = () => doc.commandDispatcher.advanceFocusIntoSubtree(panel);
-    panel.addEventListener("popupshown", focusIn, { once: true });
-    panel.addEventListener(
-      "popuphidden",
-      () => panel.removeEventListener("popupshown", focusIn),
-      { once: true }
-    );
-  }
-  panel.openPopup(doc.getElementById("sval-peek-tag"), {
-    position: "bottomleft topleft",
-    y: 4,
+  switcher.openFrom(doc.getElementById("sval-peek-tag"), "bottomleft topleft", {
+    focus: byKey,
   });
 }
 
@@ -1405,26 +1409,25 @@ function buildHeader(win) {
   group.setAttribute("skipintoolbarset", "true");
   target.after(group);
 
-  const popups = doc.getElementById("mainPopupSet");
-  const menu = doc.createXULElement("panel");
-  menu.id = "sval-peek-menu";
-  menu.className = "sval-peek-popup";
-  menu.setAttribute("type", "arrow");
-  menu.setAttribute("role", "dialog");
-  menu.setAttribute("aria-label", "Open in another Workspace");
-  menu.append(htmlElement(doc, "div", { className: "sval-peek-menu-list" }));
-  menu.addEventListener("popupshown", () => {
-    more.setAttribute("open", "true");
-    doc.commandDispatcher.advanceFocusIntoSubtree(menu);
+  const menu = lazy.SvalPopover.create(doc, {
+    name: "sval-peek-menu",
+    className: "sval-peek-popup",
+    label: "Open in another Workspace",
   });
-  menu.addEventListener("popuphidden", () => more.removeAttribute("open"));
+  menu.popup.append(
+    htmlElement(doc, "div", { className: "sval-peek-menu-list" })
+  );
+  peekPopovers.set(win, { menu });
 
-  const switcher = doc.createXULElement("panel");
-  switcher.id = "sval-peek-switcher";
-  switcher.className = "sval-peek-popup";
-  switcher.setAttribute("type", "arrow");
-  switcher.setAttribute("role", "dialog");
-  switcher.setAttribute("aria-label", "Peeks");
+  // A panel lays its content out in a row unless it is vertical.
+  const switcherHandle = lazy.SvalPopover.create(doc, {
+    name: "sval-peek-switcher",
+    className: "sval-peek-popup",
+    label: "Peeks",
+    attributes: { orient: "vertical" },
+  });
+  peekPopovers.get(win).switcher = switcherHandle;
+  const switcher = switcherHandle.popup;
   const header = htmlElement(doc, "div", {
     className: "sval-peek-switcher-header",
   });
@@ -1451,18 +1454,11 @@ function buildHeader(win) {
       peer.close();
     }
   });
-  // A panel lays its content out in a row unless it is vertical.
-  switcher.setAttribute("orient", "vertical");
   const footer = htmlElement(doc, "div", {
     className: "sval-peek-switcher-footer",
   });
   footer.append(closeAll);
   switcher.append(header, rows, footer);
-  switcher.addEventListener("popupshown", () => {
-    tag.setAttribute("open", "true");
-  });
-  switcher.addEventListener("popuphidden", () => tag.removeAttribute("open"));
-  popups.append(menu, switcher);
 }
 
 let initialized = false;
@@ -1474,6 +1470,16 @@ export const SvalPeek = {
   isPeek,
   destinationChoices,
   openInFirstWorkspace,
+
+  /**
+   * @param {Window} win A Peek.
+   * @returns {{menu: object, switcher: object}|undefined} its "Open in
+   *   another Workspace" menu and its Peeks switcher, as
+   *   `SvalPopover.create` gave them.
+   */
+  popoversOf(win) {
+    return peekPopovers.get(win);
+  },
 
   /**
    * The clock idle closes are timed by, which a test of a computer's sleep

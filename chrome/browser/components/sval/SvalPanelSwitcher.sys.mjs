@@ -17,6 +17,11 @@
 import * as SvalPanelModel from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import * as SvalTree from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import * as SvalWorkspaceEntries from "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs";
+import {
+  MENU_ID_ATTR,
+  SvalMenu,
+  tidySeparators,
+} from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -28,15 +33,11 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalWorkspaceJar:
     "moz-src:///browser/components/sval/SvalWorkspaceJar.sys.mjs",
-  ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   dropSide: "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
-  openContextMenu:
-    "moz-src:///browser/components/sval/SvalPanelRowMenu.sys.mjs",
   shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   showDropLine: "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
-  tidySeparators: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
 });
 // A namespace: the module exports functions, and no object of its name.
 ChromeUtils.defineLazyGetter(lazy, "SvalAgentControl", () =>
@@ -138,6 +139,9 @@ export class SvalPanelSwitcher {
   /** Whether the workspace menu was last opened on the strip. */
   #menuOnStrip = false;
 
+  /** The workspace menu, as `SvalMenu.create` gave it. */
+  #workspaceMenu = null;
+
   /**
    * @param {Window} win The panel's chrome window.
    * @param {PanelView} view
@@ -229,8 +233,9 @@ export class SvalPanelSwitcher {
     // (`nsMenuPopupFrame::ConsumeOutsideClicks`), and that press on the
     // switcher would open it again.
     menu.setAttribute("consumeoutsideclicks", "true");
-    menu.setAttribute("nonnative", "");
-    menu.classList.add("toolbar-menupopup");
+    // A panel's look from the start, which Gecko asks before `popupshowing`
+    // fills it (`fill`), so it is never handed to a native menu.
+    SvalMenu.fill(menu, [], { look: "panel" });
     menu.addEventListener("contextmenu", event =>
       this.#onMenuContextMenu(event)
     );
@@ -369,42 +374,63 @@ export class SvalPanelSwitcher {
     // from every window and in the order a swipe goes ({@link
     // _stepWorkspace}).
     const items = this.list();
-    menu.textContent = "";
+    const entries = [];
     for (const item of items.filter(entry =>
       SvalWorkspaceEntries.usersOwn(entry)
     )) {
-      const el = this.#workspaceEntry(item);
+      const entry = this.#workspaceEntry(item);
       // The user's own workspaces are put in order by dragging, as
       // Favorites are in theirs; the devices' and agents' lists keep
       // their own order.
       if (!this.#view.inMemory) {
-        el.setAttribute("draggable", "true");
+        entry.attributes.draggable = "true";
       }
-      menu.append(el);
+      entries.push(entry);
     }
     const devices = items.filter(entry => entry.device);
     if (devices.length) {
-      SvalWorkspaceEntries.appendDevicesCaption(menu);
+      entries.push(...SvalWorkspaceEntries.devicesCaption());
     }
     for (const item of devices) {
-      const el = this.#workspaceEntry(item);
-      SvalWorkspaceEntries.countDeviceTabs(el, item, this.#view.nodes);
-      menu.append(el);
+      const entry = this.#workspaceEntry(item);
+      SvalWorkspaceEntries.countDeviceTabs(entry, item, this.#view.nodes);
+      entries.push(entry);
     }
-    this.#appendSwitcherAgentApps(
-      menu,
-      items.filter(entry => entry.agent)
+    const agents = items.filter(entry => entry.agent);
+    if (agents.length) {
+      entries.push(
+        ...SvalWorkspaceEntries.agentsCaption(),
+        // Each is a workspace's entry, as the user's own are
+        // (`#agentWorkspaceRow`), its app's submenu drawn as the switcher.
+        ...SvalWorkspaceEntries.agentApps(
+          agents,
+          item => this.#agentWorkspaceRow(item),
+          "sval-agent-app-popup"
+        )
+      );
+    }
+    entries.push(
+      "separator",
+      SvalWorkspaceEntries.labelMenuEntry(
+        // Draws nothing until the user gives the key one in Settings.
+        { id: "newWorkspace", key: { id: lazy.NEW_WORKSPACE_KEY } },
+        "New Workspace…"
+      )
     );
-
-    if (menu.firstChild) {
-      menu.append(this.#window.document.createXULElement("menuseparator"));
+    SvalMenu.fill(menu, entries, { look: "panel" });
+    for (const el of menu.querySelectorAll("menu[data-workspace-id]")) {
+      // Pressed without picking the workspace (`#onSwitcherMouseUp`); the
+      // submenu's media entry is the keyboard's way to it.
+      const audio = this.#window.document.createElementNS(
+        "http://www.w3.org/1999/xhtml",
+        "button"
+      );
+      audio.className = "sval-switcher-audio";
+      audio.setAttribute("tabindex", "-1");
+      audio.setAttribute("aria-hidden", "true");
+      el.append(audio);
+      this.#paintEntrySound(el);
     }
-    const addWorkspace = this.#window.document.createXULElement("menuitem");
-    SvalWorkspaceEntries.labelMenuEntry(addWorkspace, "New Workspace…");
-    addWorkspace.setAttribute("data-sval-new-workspace", "true");
-    // Draws nothing until the user gives the key one in Settings.
-    addWorkspace.setAttribute("key", lazy.NEW_WORKSPACE_KEY);
-    menu.append(addWorkspace);
   }
 
   /**
@@ -537,87 +563,51 @@ export class SvalPanelSwitcher {
    * (`#onSwitcherMouseUp`), whose submenu acts on it.
    *
    * @param {object} item Its `switcherItems` entry.
-   * @returns {Element}
+   * @returns {object} its `SvalMenu` item.
    */
   #workspaceEntry(item) {
-    const el = this.#window.document.createXULElement("menu");
-    el.setAttribute("data-workspace-id", item.id);
-    // What `refillOpen` compares. An agent's entry is
-    // labelled with its last use too (`labelAgentEntry`), which
-    // changes as time passes.
-    el.dataset.entryName = SvalWorkspaceEntries.switcherItemLabel(item);
-    // The emoji leads the label as it leads the switcher's own name, so an
-    // entry reads, and is announced, as the button does once chosen.
-    SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
-    SvalWorkspaceEntries.markWorkspaceItem(el, item, this.#view.nodes);
-    SvalWorkspaceEntries.markIsolatedItem(el, item, this.#view.nodes);
-    if (item.current) {
-      el.setAttribute("aria-current", "true");
-    }
-    const popup = this.#window.document.createXULElement("menupopup");
-    // Drawn as its parent is (`buildMenu`): a submenu left
-    // native is drawn by the platform, apart from the switcher's style.
-    popup.setAttribute("nonnative", "");
-    popup.classList.add("toolbar-menupopup");
+    const items = [];
     // A workspace has one window (spec §10.7), so only a workspace no
     // window shows is offered a new one.
     if (!item.current && !item.elsewhere) {
-      const open = this.#window.document.createXULElement("menuitem");
-      open.setAttribute("data-open-workspace-id", item.id);
-      SvalWorkspaceEntries.labelMenuEntry(open, "Open in New Window");
       // Shift+Enter and a Shift-click on the workspace's entry do the
       // same (`#onSwitcherMenuKeyDown`, `#onSwitcherMouseUp`).
       const shiftEnter = { keycode: "VK_RETURN", modifiers: "shift" };
       const shiftClick = lazy.clickText("shift");
-      open.setAttribute(
-        "acceltext",
-        `${lazy.shortcutText(shiftEnter)} or ${shiftClick}`
+      items.push(
+        SvalWorkspaceEntries.labelMenuEntry(
+          {
+            id: "openWorkspace",
+            data: item.id,
+            key: shiftEnter,
+            acceltext: `${lazy.shortcutText(shiftEnter)} or ${shiftClick}`,
+            attributes: { "data-open-workspace-id": item.id },
+          },
+          "Open in New Window"
+        ),
+        "separator"
       );
-      open.setAttribute("aria-keyshortcuts", lazy.ariaShortcut(shiftEnter));
-      popup.append(
-        open,
-        this.#window.document.createXULElement("menuseparator")
-      );
     }
-    popup.append(...this.#workspaceCommandItems());
-    this.#syncWorkspaceCommands(popup, item.id);
-    el.append(popup);
-    // Pressed without picking the workspace (`#onSwitcherMouseUp`);
-    // the submenu's media entry is the keyboard's way to it.
-    const audio = this.#window.document.createElementNS(
-      "http://www.w3.org/1999/xhtml",
-      "button"
-    );
-    audio.className = "sval-switcher-audio";
-    audio.setAttribute("tabindex", "-1");
-    audio.setAttribute("aria-hidden", "true");
-    el.append(audio);
-    this.#paintEntrySound(el);
-    return el;
-  }
-
-  /**
-   * The agents' workspaces in the switcher, under their caption
-   * (`appendAgentApps`). Each is a workspace's entry, as the user's
-   * own are (`#agentWorkspaceRow`).
-   *
-   * @param {Element} menu The switcher's `menupopup`.
-   * @param {object[]} items The agents' `switcherItems` entries.
-   */
-  #appendSwitcherAgentApps(menu, items) {
-    if (!items.length) {
-      return;
-    }
-    SvalWorkspaceEntries.appendAgentsCaption(menu, items[0]);
-    const apps = SvalWorkspaceEntries.appendAgentApps(menu, items, item =>
-      this.#agentWorkspaceRow(item)
-    );
-    for (const el of apps) {
-      // Drawn as the switcher is (`buildMenu`).
-      const popup = el.querySelector(":scope > menupopup");
-      popup.setAttribute("nonnative", "");
-      popup.classList.add("toolbar-menupopup", "sval-agent-app-popup");
-    }
+    items.push(...this.#workspaceCommandItems());
+    const entry = {
+      id: `workspace:${item.id}`,
+      data: item.id,
+      items,
+      attributes: {
+        "data-workspace-id": item.id,
+        // What `refillOpen` compares. An agent's entry is labelled with
+        // its last use too (`labelAgentEntry`), which changes as time
+        // passes.
+        "data-entry-name": SvalWorkspaceEntries.switcherItemLabel(item),
+        "aria-current": item.current ? "true" : null,
+      },
+    };
+    // The emoji leads the label as it leads the switcher's own name, so an
+    // entry reads, and is announced, as the button does once chosen.
+    SvalWorkspaceEntries.labelWorkspaceEntry(entry, item);
+    SvalWorkspaceEntries.markWorkspaceItem(entry, item, this.#view.nodes);
+    SvalWorkspaceEntries.markIsolatedItem(entry, item, this.#view.nodes);
+    return entry;
   }
 
   /**
@@ -626,41 +616,41 @@ export class SvalPanelSwitcher {
    * mark of the model its session said it runs on, when Sval knows it.
    *
    * @param {object} item Its `switcherItems` entry.
-   * @returns {Element}
+   * @returns {object}
    */
   #agentWorkspaceRow(item) {
-    const el = this.#workspaceEntry(item);
-    SvalWorkspaceEntries.labelAgentEntry(el, item);
-    return el;
+    const entry = this.#workspaceEntry(item);
+    SvalWorkspaceEntries.labelAgentEntry(entry, item);
+    return entry;
   }
 
   /**
-   * @param {Event} event `command` from the switcher: a workspace `menuitem`,
-   *   an entry's "Open in New Window", or "New Workspace…".
+   * @param {Event} event `command` from the switcher: an entry's "Open in
+   *   New Window" or one of its commands, or "New Workspace…".
    */
   #onSwitcherCommand(event) {
     if (this.#view.inMemory) {
       return;
     }
-    if (event.target.hasAttribute("data-sval-new-workspace")) {
+    const id = event.target.getAttribute(MENU_ID_ATTR);
+    if (id === "newWorkspace") {
       this.#view.run("addWorkspace", null);
       return;
     }
-    const { workspaceId, openWorkspaceId, command } = event.target.dataset;
-    if (openWorkspaceId) {
-      this.openInNewWindow(openWorkspaceId);
+    if (id === "openWorkspace") {
+      this.openInNewWindow(SvalMenu.dataOf(event.target));
       return;
     }
-    if (command) {
-      const id = event.target.closest("menu[data-workspace-id]")?.dataset
-        .workspaceId;
-      if (id) {
-        this.#runWorkspaceCommand(command, id);
-      }
+    // An entry chosen as an item is, as `activateItem` and a native menu
+    // choose one, is the switch its click makes (`#onSwitcherMouseUp`).
+    if (id?.startsWith("workspace:")) {
+      this.pick(SvalMenu.dataOf(event.target), event.shiftKey);
       return;
     }
-    if (workspaceId) {
-      this.pick(workspaceId, event.shiftKey);
+    const workspace = event.target.closest("menu[data-workspace-id]")?.dataset
+      .workspaceId;
+    if (id && workspace) {
+      this.#runWorkspaceCommand(id, workspace);
     }
   }
 
@@ -1148,64 +1138,57 @@ export class SvalPanelSwitcher {
    * @returns {Element} the `menupopup`.
    */
   buildWorkspaceMenu() {
-    const menu = this.#window.document.createXULElement("menupopup");
-    menu.id = "sval-workspace-context-menu";
-    this.#window.document.getElementById(menu.id)?.remove();
-    // A Workspace no window shows can have one of its own, as the switcher
-    // menu's entries offer; `#onWorkspaceMenuShowing` shows it on the
-    // strip.
-    const open = this.#window.document.createXULElement("menuitem");
-    open.setAttribute("data-open-workspace", "true");
-    open.setAttribute("label", "Open in New Window");
-    menu.append(
-      open,
-      this.#window.document.createXULElement("menuseparator"),
-      ...this.#workspaceCommandItems(),
-      ...this.#stripNamesItems()
-    );
-    menu.addEventListener("popupshowing", event => {
-      if (event.target === menu) {
-        this.#onWorkspaceMenuShowing();
-      }
+    this.#workspaceMenu = SvalMenu.create(this.#window.document, {
+      name: "sval-workspace-context-menu",
+      items: [
+        // A Workspace no window shows can have one of its own, as the
+        // switcher menu's entries offer; `#onWorkspaceMenuShowing` shows it
+        // on the strip.
+        { id: "openWorkspace", label: "Open in New Window" },
+        "separator",
+        ...this.#workspaceCommandItems(),
+        ...this.#stripNamesItems(),
+      ],
+      onShowing: () => this.#onWorkspaceMenuShowing(),
+      onCommand: (id, names) => this.#onWorkspaceMenuCommand(id, names),
     });
-    menu.addEventListener("command", event =>
-      this.#onWorkspaceMenuCommand(event)
-    );
-    this.#window.document.getElementById("mainPopupSet").append(menu);
-    return menu;
+    return this.#workspaceMenu.popup;
+  }
+
+  /** The workspace menu, as `SvalMenu.create` gave it. */
+  get workspaceMenu() {
+    return this.#workspaceMenu;
   }
 
   /**
    * The strip's names controls, which the Workspace menu shows under its
    * commands when it opens on the strip (`#syncStripNamesItems`).
    * Each sets what Settings › Appearance sets, "The strip shows"
-   * (`SvalPanelModel.STRIP_NAMES_PREF`).
+   * (`SvalPanelModel.STRIP_NAMES_PREF`), the value its data.
    *
-   * @returns {Element[]}
+   * @returns {Array<object|string>}
    */
   #stripNamesItems() {
-    const item = (names, label) => {
-      const el = this.#window.document.createXULElement("menuitem");
-      el.setAttribute("data-strip-names", names);
-      el.setAttribute("label", label);
-      return el;
-    };
-    const separator = this.#window.document.createXULElement("menuseparator");
-    separator.setAttribute("data-strip-names-separator", "true");
-    const show = this.#window.document.createXULElement("menu");
-    show.setAttribute("data-strip-names-menu", "true");
-    show.setAttribute("label", "Show Workspace Names");
-    const popup = this.#window.document.createXULElement("menupopup");
-    popup.append(
-      item("all", "On Every Workspace"),
-      item("current", "On the Current Workspace")
-    );
-    show.append(popup);
     return [
-      separator,
-      item("all", "Show Every Workspace's Name"),
-      item("none", "Hide Workspace Names"),
-      show,
+      "separator",
+      {
+        id: "stripNamesAll",
+        label: "Show Every Workspace's Name",
+        data: "all",
+      },
+      { id: "stripNamesNone", label: "Hide Workspace Names", data: "none" },
+      {
+        id: "stripNamesMenu",
+        label: "Show Workspace Names",
+        items: [
+          { id: "stripNamesShowAll", label: "On Every Workspace", data: "all" },
+          {
+            id: "stripNamesShowCurrent",
+            label: "On the Current Workspace",
+            data: "current",
+          },
+        ],
+      },
     ];
   }
 
@@ -1218,21 +1201,11 @@ export class SvalPanelSwitcher {
    * @param {boolean} onStrip
    */
   #syncStripNamesItems(onStrip) {
-    const menu = this.#view.els.workspaceMenu;
     const names = this.#view.strip.names();
-    for (const el of menu.querySelectorAll(
-      ":scope > [data-strip-names], :scope > [data-strip-names-separator], :scope > [data-strip-names-menu]"
-    )) {
-      let shown = onStrip;
-      if (el.dataset.stripNames === "all") {
-        shown &&= names === "current";
-      } else if (el.dataset.stripNames === "none") {
-        shown &&= names !== "none";
-      } else if (el.hasAttribute("data-strip-names-menu")) {
-        shown &&= names === "none";
-      }
-      el.hidden = !shown;
-    }
+    const item = id => this.#workspaceMenu.item(id);
+    item("stripNamesAll").hidden = !onStrip || names !== "current";
+    item("stripNamesNone").hidden = !onStrip || names === "none";
+    item("stripNamesMenu").hidden = !onStrip || names !== "none";
   }
 
   /**
@@ -1240,32 +1213,26 @@ export class SvalPanelSwitcher {
    * switcher entry's submenu list them. `#syncWorkspaceCommands` shows
    * the ones that apply.
    *
-   * @returns {Element[]}
+   * @returns {Array<object|string>}
    */
   #workspaceCommandItems() {
-    const item = (command, label) => {
-      const el = this.#window.document.createXULElement("menuitem");
-      el.setAttribute("data-command", command);
-      el.setAttribute("label", label);
-      return el;
-    };
     return [
       // Labelled, and shown only for this device's agents, by
       // `#syncWorkspaceCommands`.
-      item("stopAgent", "Stop Agent"),
+      { id: "stopAgent", label: "Stop Agent" },
       // Labelled with the agent's name, and shown with Stop, by
       // `#syncWorkspaceCommands`.
-      item("agentPermissions", "Permissions…"),
-      this.#window.document.createXULElement("menuseparator"),
+      { id: "agentPermissions", label: "Permissions…" },
+      "separator",
       // Labelled, and hidden while nothing plays, by
       // `#syncWorkspaceCommands`.
-      item("media", "Pause Media"),
-      this.#window.document.createXULElement("menuseparator"),
-      item("edit", "Edit…"),
-      item("isolateWorkspace", "Isolate Workspace…"),
-      item("shareWorkspace", "Stop isolating Workspace…"),
-      this.#window.document.createXULElement("menuseparator"),
-      item("deleteWorkspace", "Delete Workspace…"),
+      { id: "media", label: "Pause Media" },
+      "separator",
+      { id: "edit", label: "Edit…" },
+      { id: "isolateWorkspace", label: "Isolate Workspace…" },
+      { id: "shareWorkspace", label: "Stop isolating Workspace…" },
+      "separator",
+      { id: "deleteWorkspace", label: "Delete Workspace…" },
     ];
   }
 
@@ -1278,12 +1245,12 @@ export class SvalPanelSwitcher {
    * @param {string} id A workspace id.
    */
   #syncWorkspaceCommands(popup, id) {
-    const command = name => popup.querySelector(`[data-command="${name}"]`);
+    const command = name =>
+      popup.querySelector(`:scope > [${MENU_ID_ATTR}="${name}"]`);
     // A window's one temporary workspace on a tree in memory is not the
     // user's to delete (`SvalPanelModel.contextMenuItems`).
     const remove = command("deleteWorkspace");
     remove.hidden = !!this.#view.inMemory;
-    remove.previousElementSibling.hidden = !!this.#view.inMemory;
     // The last workspace stays: a window always shows one (spec §5.4).
     remove.toggleAttribute(
       "disabled",
@@ -1301,7 +1268,6 @@ export class SvalPanelSwitcher {
     stop.hidden = !agent;
     const permissions = command("agentPermissions");
     permissions.hidden = !agent;
-    permissions.nextElementSibling.hidden = !agent;
     if (agent) {
       permissions.setAttribute("label", `${agent.label} Permissions…`);
     }
@@ -1312,8 +1278,8 @@ export class SvalPanelSwitcher {
     const media = command("media");
     const action = this.workspaceMedia(id);
     media.hidden = !action;
-    media.nextElementSibling.hidden = !action;
     media.setAttribute("label", this.#view.mediaLabel(action));
+    tidySeparators(popup);
   }
 
   /**
@@ -1363,7 +1329,7 @@ export class SvalPanelSwitcher {
     }
     this.#menuWorkspace = id;
     this.#menuOnStrip = onStrip;
-    lazy.openContextMenu(this.#view.els.workspaceMenu, anchor, event);
+    this.#workspaceMenu.openAt(event, anchor);
   }
 
   /**
@@ -1396,14 +1362,12 @@ export class SvalPanelSwitcher {
     );
     // A Workspace has one window (spec §10.7). The switcher's menu offers
     // a new one in each entry's submenu, and the strip here.
-    const open = menu.querySelector(":scope > [data-open-workspace]");
-    open.hidden =
+    this.#workspaceMenu.item("openWorkspace").hidden =
       !this.#menuOnStrip ||
       !!this.#view.inMemory ||
       !item ||
       item.current ||
       this.#view.workspace.shownElsewhere().has(id);
-    open.nextElementSibling.hidden = open.hidden;
     // The column shows no names whatever the choice, so it offers no names
     // controls.
     this.#syncStripNamesItems(
@@ -1412,21 +1376,22 @@ export class SvalPanelSwitcher {
   }
 
   /**
-   * @param {Event} event `command` from the workspace menu.
+   * @param {string} id The workspace menu's item chosen.
+   * @param {string} [names] What a names control sets the strip to show.
    */
-  #onWorkspaceMenuCommand(event) {
-    const { command, stripNames, openWorkspace } = event.target.dataset;
-    if (stripNames) {
-      Services.prefs.setStringPref(SvalPanelModel.STRIP_NAMES_PREF, stripNames);
+  #onWorkspaceMenuCommand(id, names) {
+    if (id.startsWith("stripNames")) {
+      Services.prefs.setStringPref(SvalPanelModel.STRIP_NAMES_PREF, names);
       return;
     }
-    if (openWorkspace && this.#menuWorkspace) {
+    if (!this.#menuWorkspace) {
+      return;
+    }
+    if (id === "openWorkspace") {
       this.openInNewWindow(this.#menuWorkspace);
       return;
     }
-    if (command && this.#menuWorkspace) {
-      this.#runWorkspaceCommand(command, this.#menuWorkspace);
-    }
+    this.#runWorkspaceCommand(id, this.#menuWorkspace);
   }
 
   /**
@@ -1472,127 +1437,129 @@ export class SvalPanelSwitcher {
   }
 
   /**
-   * Fills "Move to workspace" with every workspace of the user's but this
-   * window's, then "New workspace…" (import spec §6), then the devices'
-   * workspaces (decision 2254) and the agents' after a caption each, the
-   * agents' grouped by app
-   * (`appendAgentApps`). A row moved into an agent's workspace is
+   * "Move to workspace": every workspace of the user's but this window's,
+   * then "New workspace…" (import spec §6), then the devices' workspaces
+   * (decision 2254) and the agents' after a caption each, the agents'
+   * grouped by app (`agentApps`). A row moved into an agent's workspace is
    * handed to the agent, once the user has agreed (`moveToWorkspace`), so
-   * those entries never mix with the user's.
+   * those entries never mix with the user's. Each is `moveWorkspace:` and
+   * its id, the id its data, and New Workspace's data is empty.
    *
    * The row menu's entries also fill the menu bar's Tab menu
    * (`SvalPanelRowMenu.barItems`), so the caption is the one the menu bar's
-   * Workspaces menu draws (`appendAgentsMenuCaption`).
+   * Workspaces menu draws (`agentsMenuCaption`).
    *
-   * @param {Element} popup The submenu's `menupopup`, empty.
    * @param {string[]} ids The rows the menu is for.
+   * @returns {Array<object|string>} the submenu's items.
    */
-  fillMoveToWorkspace(popup, ids) {
+  moveToWorkspaceItems(ids) {
     const others = this.list().filter(
       item => !item.current && !ids.includes(item.id)
     );
-    const own = others.filter(item => SvalWorkspaceEntries.usersOwn(item));
-    for (const item of own) {
-      const entry = this.#window.document.createXULElement("menuitem");
-      entry.setAttribute("data-move-workspace", item.id);
-      SvalWorkspaceEntries.labelWorkspaceEntry(entry, item);
-      popup.append(entry);
-    }
-    if (own.length) {
-      popup.append(this.#window.document.createXULElement("menuseparator"));
-    }
-    const fresh = this.#window.document.createXULElement("menuitem");
-    fresh.setAttribute("data-move-workspace", "");
-    SvalWorkspaceEntries.labelMenuEntry(fresh, "New Workspace…");
-    popup.append(fresh);
-    const devices = others.filter(item => item.device);
-    if (devices.length) {
-      SvalWorkspaceEntries.appendDevicesCaption(popup, {
-        native: true,
-      });
-    }
-    for (const item of devices) {
-      const entry = this.#window.document.createXULElement("menuitem");
-      entry.setAttribute("data-move-workspace", item.id);
-      SvalWorkspaceEntries.labelWorkspaceEntry(entry, item);
-      SvalWorkspaceEntries.markWorkspaceItem(entry, item, this.#view.nodes);
-      popup.append(entry);
-    }
-    const agents = others.filter(item => item.agent);
-    if (agents.length) {
-      SvalWorkspaceEntries.appendAgentsMenuCaption(popup);
-    }
-    SvalWorkspaceEntries.appendAgentApps(popup, agents, item => {
-      const entry = this.#window.document.createXULElement("menuitem");
-      entry.setAttribute("data-move-workspace", item.id);
-      entry.setAttribute("data-agent", "true");
-      SvalWorkspaceEntries.labelAgentEntry(entry, item);
-      return entry;
+    const entry = item => ({
+      id: `moveWorkspace:${item.id}`,
+      data: item.id,
+      attributes: {},
     });
-  }
-
-  /**
-   * Fills the menu bar's Workspaces menu after its fixed items
-   * (`SvalMenuBar`): every workspace the switcher lists, this window's
-   * checked, then the workspace menu's commands on this window's workspace.
-   *
-   * A native menu bar draws no submenu style, so the devices' workspaces
-   * follow `appendDevicesCaption`'s caption, and the agents'
-   * `appendAgentsMenuCaption`'s, grouped by app
-   * (`appendAgentApps`). Each entry wears its mark (`markWorkspaceItem`),
-   * or the user's emoji in its label.
-   *
-   * @param {Element} popup
-   */
-  fillMenuBar(popup) {
-    if (!this.#view.built) {
-      return;
-    }
-    const entry = item => {
-      const el = this.#window.document.createXULElement("menuitem");
-      el.setAttribute("type", "checkbox");
-      el.setAttribute("data-workspace-id", item.id);
-      if (item.current) {
-        el.setAttribute("checked", "true");
-      }
-      return el;
-    };
-    const items = this.list();
-    for (const item of items.filter(i => SvalWorkspaceEntries.usersOwn(i))) {
+    const items = [];
+    for (const item of others.filter(i => SvalWorkspaceEntries.usersOwn(i))) {
       const el = entry(item);
       SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
-      popup.append(el);
+      items.push(el);
     }
-    const devices = items.filter(i => i.device);
+    items.push(
+      "separator",
+      SvalWorkspaceEntries.labelMenuEntry(
+        { id: "moveWorkspace:", data: "" },
+        "New Workspace…"
+      )
+    );
+    const devices = others.filter(item => item.device);
     if (devices.length) {
-      SvalWorkspaceEntries.appendDevicesCaption(popup, {
-        native: true,
-      });
+      items.push(...SvalWorkspaceEntries.devicesCaption({ native: true }));
     }
     for (const item of devices) {
       const el = entry(item);
       SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
       SvalWorkspaceEntries.markWorkspaceItem(el, item, this.#view.nodes);
-      popup.append(el);
+      items.push(el);
+    }
+    const agents = others.filter(item => item.agent);
+    if (agents.length) {
+      items.push(
+        ...SvalWorkspaceEntries.agentsMenuCaption(),
+        ...SvalWorkspaceEntries.agentApps(agents, item => {
+          const el = entry(item);
+          el.attributes["data-agent"] = "true";
+          SvalWorkspaceEntries.labelAgentEntry(el, item);
+          return el;
+        })
+      );
+    }
+    return items;
+  }
+
+  /**
+   * Fills the menu bar's Workspaces menu (`SvalMenuBar`): its own items,
+   * then every workspace the switcher lists, this window's checked, each
+   * `workspace:` and its id, then the workspace menu's commands on this
+   * window's workspace.
+   *
+   * A native menu bar draws no submenu style, so the devices' workspaces
+   * follow `devicesCaption`'s caption, and the agents'
+   * `agentsMenuCaption`'s, grouped by app (`agentApps`). Each entry wears
+   * its mark (`markWorkspaceItem`), or the user's emoji in its label.
+   *
+   * @param {Element} popup
+   * @param {Array<object|string>} fixed The menu bar's own items, first.
+   */
+  fillMenuBar(popup, fixed) {
+    if (!this.#view.built) {
+      SvalMenu.fill(popup, fixed);
+      return;
+    }
+    const entry = item => ({
+      id: `workspace:${item.id}`,
+      data: item.id,
+      type: "checkbox",
+      checked: item.current,
+    });
+    const items = this.list();
+    const entries = [];
+    for (const item of items.filter(i => SvalWorkspaceEntries.usersOwn(i))) {
+      const el = entry(item);
+      SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
+      entries.push(el);
+    }
+    const devices = items.filter(i => i.device);
+    if (devices.length) {
+      entries.push(...SvalWorkspaceEntries.devicesCaption({ native: true }));
+    }
+    for (const item of devices) {
+      const el = entry(item);
+      SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
+      SvalWorkspaceEntries.markWorkspaceItem(el, item, this.#view.nodes);
+      entries.push(el);
     }
     const agents = items.filter(i => i.agent);
     if (agents.length) {
-      SvalWorkspaceEntries.appendAgentsMenuCaption(popup);
+      entries.push(
+        ...SvalWorkspaceEntries.agentsMenuCaption(),
+        ...SvalWorkspaceEntries.agentApps(agents, item => {
+          const el = entry(item);
+          SvalWorkspaceEntries.labelAgentEntry(el, item);
+          return el;
+        })
+      );
     }
-    SvalWorkspaceEntries.appendAgentApps(popup, agents, item => {
-      const el = entry(item);
-      SvalWorkspaceEntries.labelAgentEntry(el, item);
-      return el;
-    });
-    const commands = this.#workspaceCommandItems();
-    popup.append(
-      this.#window.document.createXULElement("menuseparator"),
-      ...commands
-    );
+    SvalMenu.fill(popup, [
+      ...fixed,
+      "separator",
+      ...entries,
+      "separator",
+      ...this.#workspaceCommandItems(),
+    ]);
     this.#syncWorkspaceCommands(popup, this.#view.workspace.id);
-    // With no workspace of the person's own, the first caption follows the
-    // menu bar's own separator (`SvalMenuBar`).
-    lazy.tidySeparators(popup);
   }
 
   /**
@@ -1602,13 +1569,16 @@ export class SvalPanelSwitcher {
     if (!this.#view.built) {
       return;
     }
-    const { workspaceId, command } = event.target.dataset;
-    if (command) {
-      this.#runWorkspaceCommand(command, this.#view.workspace.id);
-    } else if (workspaceId && workspaceId !== this.#view.workspace.id) {
+    const id = event.target.getAttribute(MENU_ID_ATTR) ?? "";
+    const workspace = id.startsWith("workspace:")
+      ? SvalMenu.dataOf(event.target)
+      : null;
+    if (!workspace) {
+      this.#runWorkspaceCommand(id, this.#view.workspace.id);
+    } else if (workspace !== this.#view.workspace.id) {
       // The agent's window stays the agent's while it holds it, so the
       // workspace opens in a window of its own (`SvalAgentMarking`).
-      this.pick(workspaceId, !!this.#view.agentMarking?.blocking);
+      this.pick(workspace, !!this.#view.agentMarking?.blocking);
     }
   }
 }

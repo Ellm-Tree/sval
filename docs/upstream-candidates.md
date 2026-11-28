@@ -21,6 +21,24 @@ Each entry gives:
 
 ## Sval's own fixes
 
+### A popup whose appearance changes keeps the window shadow it had
+
+- **Patch**: `patches/popup-shadow-follows-appearance.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `nsMenuPopupFrame::GetShadowStyle` reads the appearance as
+  well as `-moz-window-shadow`, but `nsMenuPopupFrame::DidSetComputedStyle`
+  sends the shadow style to the widget only when `-moz-window-shadow`
+  changes. A popup made with `appearance: none` that then takes
+  `appearance: auto` with `-moz-default-appearance: menupopup` keeps
+  `WindowShadow::Panel`, and on macOS no menu material
+  (`setEffectViewWrapperForStyle`).
+- **Evidence**: on macOS, Firefox's extensions panel and doorhangers, given
+  a menu's appearance as they open in a see-through window, showed the
+  page behind them sharp through their fill, where Sval's popovers made
+  with that appearance showed the menu material.
+- **Upstream**: a one-line change, with a test that would need a widget
+  accessor for the shadow style.
+
 ### A search engine's icon missing once stays missing for the session
 
 - **Patch**: `patches/search-icon-retry.patch`

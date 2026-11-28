@@ -1,0 +1,25 @@
+Sval: a popup takes its menu backdrop when only its appearance changes
+
+nsMenuPopupFrame::GetShadowStyle() reads the appearance as well as
+-moz-window-shadow, and the window shadow style decides the system
+backdrop a macOS popup gets (setEffectViewWrapperForStyle). But
+DidSetComputedStyle sends the shadow style to the widget only when
+-moz-window-shadow changes, so a popup whose appearance changes from
+none to menupopup keeps the plain view it was made with, and shows what
+is behind it without the menu's material. Firefox's panels that Sval
+draws as popovers change their appearance this way as they open in a
+see-through window.
+
+diff --git a/layout/xul/nsMenuPopupFrame.cpp b/layout/xul/nsMenuPopupFrame.cpp
+index 6293a170d3..a7b2131ceb 100644
+--- a/layout/xul/nsMenuPopupFrame.cpp
++++ b/layout/xul/nsMenuPopupFrame.cpp
+@@ -513,6 +513,8 @@ void nsMenuPopupFrame::DidSetComputedStyle(ComputedStyle* aOldStyle) {
+   if (aOldStyle->StyleDisplay()->EffectiveAppearance() !=
+       StyleDisplay()->EffectiveAppearance()) {
+     flags += WidgetStyle::MicaBackdrop;
++    // GetShadowStyle() depends on the appearance too.
++    flags += WidgetStyle::Shadow;
+   }
+ 
+   const auto& pc = *PresContext();

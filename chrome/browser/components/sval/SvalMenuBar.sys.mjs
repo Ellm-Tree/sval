@@ -40,6 +40,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalFavoritesView:
     "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+  MENU_ID_ATTR: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
+  SvalMenu: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
+  tidySeparators: "moz-src:///browser/components/sval/SvalMenu.sys.mjs",
   SvalSiteControls:
     "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs",
   SvalSiteStylePanel:
@@ -70,21 +73,6 @@ export const STYLE_MENU_ITEM_ID = "sval-menu-site-style";
 export const SCREENSHOT_MENU_ITEM_ID = "sval-menu-screenshot";
 
 /**
- * @param {Document} doc
- * @param {string} label
- * @param {string} [key] The `<key>` it names.
- * @returns {Element}
- */
-function menuItem(doc, label, key) {
-  const el = doc.createXULElement("menuitem");
-  el.setAttribute("label", label);
-  if (key) {
-    el.setAttribute("key", key);
-  }
-  return el;
-}
-
-/**
  * New Workspace, the panel's toggle, then every workspace and the workspace
  * menu's commands (`SvalPanelSwitcher.fillMenuBar`).
  *
@@ -93,38 +81,51 @@ function menuItem(doc, label, key) {
  */
 function mountWorkspaces(win, popup) {
   const doc = win.document;
-  const fresh = menuItem(doc, "New Workspace…", NEW_WORKSPACE_KEY);
-  fresh.id = NEW_WORKSPACE_MENU_ITEM_ID;
-  fresh.addEventListener("command", () => newWorkspace(win));
-  const toggle = menuItem(doc, "Show Workspace Panel", PANEL_TOGGLE_KEY);
-  toggle.id = PANEL_MENU_ITEM_ID;
-  toggle.addEventListener("command", () => win.SvalPanel?.toggleFromKey());
-  const fixedEnd = doc.createXULElement("menuseparator");
-  popup.append(fresh, toggle, fixedEnd);
+  // New Workspace and the panel's toggle, as they stand as the menu opens.
+  const fixed = () => {
+    // What `SvalPanel.toggleFromKey` toggles, and when it does nothing.
+    const container = doc.getElementById("sval-panel-container");
+    const usable = !!container && !container.hidden;
+    const shown = usable && !container.hasAttribute("sval-collapsed");
+    return [
+      {
+        id: "newWorkspace",
+        label: "New Workspace…",
+        key: { id: NEW_WORKSPACE_KEY },
+        disabled: !lazy.userPanel(win),
+        attributes: { id: NEW_WORKSPACE_MENU_ITEM_ID },
+      },
+      {
+        id: "panelToggle",
+        label: shown ? "Hide Workspace Panel" : "Show Workspace Panel",
+        key: { id: PANEL_TOGGLE_KEY },
+        disabled: !usable,
+        attributes: {
+          id: PANEL_MENU_ITEM_ID,
+          "data-panel": shown ? "shown" : "hidden",
+        },
+      },
+    ];
+  };
+  lazy.SvalMenu.fill(popup, fixed());
 
   popup.addEventListener("popupshowing", event => {
     if (event.target !== popup) {
       return;
     }
-    fresh.toggleAttribute("disabled", !lazy.userPanel(win));
-    // What `SvalPanel.toggleFromKey` toggles, and when it does nothing.
-    const container = doc.getElementById("sval-panel-container");
-    const usable = !!container && !container.hidden;
-    toggle.toggleAttribute("disabled", !usable);
-    const shown = usable && !container.hasAttribute("sval-collapsed");
-    toggle.setAttribute(
-      "label",
-      shown ? "Hide Workspace Panel" : "Show Workspace Panel"
-    );
-    toggle.dataset.panel = shown ? "shown" : "hidden";
-    while (fixedEnd.nextSibling) {
-      fixedEnd.nextSibling.remove();
+    if (win.SvalPanel) {
+      win.SvalPanel.switcher.fillMenuBar(popup, fixed());
+    } else {
+      lazy.SvalMenu.fill(popup, fixed());
     }
-    win.SvalPanel?.switcher.fillMenuBar(popup);
-    fixedEnd.hidden = !fixedEnd.nextSibling;
   });
   popup.addEventListener("command", event => {
-    if (event.target !== fresh && event.target !== toggle) {
+    const id = event.target.getAttribute(lazy.MENU_ID_ATTR);
+    if (id === "newWorkspace") {
+      newWorkspace(win);
+    } else if (id === "panelToggle") {
+      win.SvalPanel?.toggleFromKey();
+    } else {
       win.SvalPanel?.switcher.runMenuBarCommand(event);
     }
   });
@@ -138,11 +139,17 @@ function mountWorkspaces(win, popup) {
  * @param {Element} popup
  */
 function mountFavorites(win, popup) {
-  const doc = win.document;
   const isPrivate = lazy.PrivateBrowsingUtils.isWindowPrivate(win);
-  const page = menuItem(doc, "Add to Favorites");
-  page.id = FAVORITE_PAGE_MENU_ITEM_ID;
-  page.setAttribute("data-fixed", "");
+  // Kept ahead of the favorites `SvalFavoritesView` draws (`data-fixed`).
+  lazy.SvalMenu.fill(popup, [
+    {
+      id: "favoritePage",
+      label: "Add to Favorites",
+      attributes: { id: FAVORITE_PAGE_MENU_ITEM_ID, "data-fixed": "" },
+    },
+    { type: "separator", attributes: { "data-fixed": "" } },
+  ]);
+  const page = popup.querySelector(`#${FAVORITE_PAGE_MENU_ITEM_ID}`);
   page.addEventListener("command", () =>
     lazy.SvalFavorites.toggle(win).catch(err =>
       lazy.SvalLog.error(
@@ -150,9 +157,6 @@ function mountFavorites(win, popup) {
       )
     )
   );
-  const fixedEnd = doc.createXULElement("menuseparator");
-  fixedEnd.setAttribute("data-fixed", "");
-  popup.append(page, fixedEnd);
 
   popup.addEventListener("popupshowing", event => {
     if (event.target !== popup) {
@@ -194,36 +198,42 @@ function mountFavorites(win, popup) {
  * @param {Element} popup
  */
 function mountTab(win, popup) {
-  const doc = win.document;
   const panel = win.SvalPanel;
-  const copyAddress = menuItem(doc, "Copy Address", COPY_ADDRESS_KEY);
-  copyAddress.id = COPY_ADDRESS_MENU_ITEM_ID;
-  copyAddress.addEventListener("command", () => lazy.copyAddress(win));
-  const items = panel.rowMenu.barItems();
-  const modesStart = doc.createXULElement("menuseparator");
-  const modes = MODE_MENU_ITEMS.map(({ mode, id }) => {
-    const el = menuItem(doc, `${MODE_NAMES[mode]}…`, MODE_KEYS[mode]);
-    el.id = id;
-    el.addEventListener("command", () =>
-      lazy.SvalSiteControls.toggleMode(win, mode, false)
-    );
-    return el;
-  });
-  const style = menuItem(
-    doc,
-    lazy.SvalSiteStylePanel.STYLE_MENU_LABEL,
-    STYLE_KEY
-  );
-  style.id = STYLE_MENU_ITEM_ID;
-  style.addEventListener("command", () =>
-    lazy.SvalSiteStylePanel.open(win, { focus: true })
-  );
-  const screenshot = doc.createXULElement("menuitem");
-  screenshot.id = SCREENSHOT_MENU_ITEM_ID;
-  screenshot.setAttribute("command", "Browser:Screenshot");
-  screenshot.setAttribute("key", "key_screenshot");
-  doc.l10n.setAttributes(screenshot, "main-context-menu-take-screenshot");
-  popup.append(copyAddress, ...items, modesStart, ...modes, style, screenshot);
+  const modes = MODE_MENU_ITEMS.map(({ mode, id }) => ({
+    id: `mode:${mode}`,
+    label: `${MODE_NAMES[mode]}…`,
+    key: { id: MODE_KEYS[mode] },
+    data: mode,
+    attributes: { id },
+  }));
+  lazy.SvalMenu.fill(popup, [
+    {
+      id: "copyAddress",
+      label: "Copy Address",
+      key: { id: COPY_ADDRESS_KEY },
+      attributes: { id: COPY_ADDRESS_MENU_ITEM_ID },
+    },
+    ...panel.rowMenu.barItems(),
+    "separator",
+    ...modes,
+    {
+      id: "styleSiteEditor",
+      label: lazy.SvalSiteStylePanel.STYLE_MENU_LABEL,
+      key: { id: STYLE_KEY },
+      attributes: { id: STYLE_MENU_ITEM_ID },
+    },
+    {
+      id: "screenshot",
+      l10n: { id: "main-context-menu-take-screenshot" },
+      key: { id: "key_screenshot" },
+      attributes: {
+        id: SCREENSHOT_MENU_ITEM_ID,
+        command: "Browser:Screenshot",
+      },
+    },
+  ]);
+  const item = id =>
+    popup.querySelector(`:scope > [${lazy.MENU_ID_ATTR}="${id}"]`);
 
   popup.addEventListener("popupshowing", event => {
     if (event.target !== popup) {
@@ -231,27 +241,33 @@ function mountTab(win, popup) {
     }
     // Hides every entry it does not name, the modes among them.
     panel.rowMenu.syncBar(popup);
+    const copyAddress = item("copyAddress");
     copyAddress.hidden = false;
     copyAddress.toggleAttribute("disabled", !win.gBrowser.currentURI?.spec);
-    MODE_MENU_ITEMS.forEach(({ mode }, i) => {
-      modes[i].hidden = false;
-      modes[i].toggleAttribute(
-        "disabled",
-        !lazy.SvalSiteControls.offered(win, mode)
-      );
-    });
+    for (const { mode } of MODE_MENU_ITEMS) {
+      const el = item(`mode:${mode}`);
+      el.hidden = false;
+      el.toggleAttribute("disabled", !lazy.SvalSiteControls.offered(win, mode));
+    }
+    const style = item("styleSiteEditor");
     style.hidden = false;
     style.toggleAttribute("disabled", !lazy.SvalSiteStylePanel.offered(win));
-    screenshot.hidden = !lazy.ScreenshotsUtils.screenshotsEnabled;
-    modesStart.hidden = !items.some(el => !el.hidden);
+    item("screenshot").hidden = !lazy.ScreenshotsUtils.screenshotsEnabled;
+    lazy.tidySeparators(popup);
   });
   popup.addEventListener("command", event => {
-    if (
-      !modes.includes(event.target) &&
-      event.target !== style &&
-      event.target !== screenshot &&
-      event.target !== copyAddress
-    ) {
+    const id = event.target.getAttribute(lazy.MENU_ID_ATTR) ?? "";
+    if (id === "copyAddress") {
+      lazy.copyAddress(win);
+    } else if (id.startsWith("mode:")) {
+      lazy.SvalSiteControls.toggleMode(
+        win,
+        lazy.SvalMenu.dataOf(event.target),
+        false
+      );
+    } else if (id === "styleSiteEditor") {
+      lazy.SvalSiteStylePanel.open(win, { focus: true });
+    } else if (id !== "screenshot") {
       panel.rowMenu.runBarCommand(event);
     }
   });

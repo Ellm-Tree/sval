@@ -385,13 +385,15 @@ add_task(async function the_launcher_floats_whole_from_the_column() {
 
 /**
  * Opens Favorites from the column with the panel on `side`, and checks the
- * menu grows from the button into the window, in either text direction.
+ * menu grows from the button into the window, in either text direction,
+ * wherever the toolbar stands.
  *
  * @param {string} side
  * @param {boolean} [rtl] Whether the window's text runs right to left.
+ * @param {boolean} [inPanel] Whether the toolbar stands in the panel.
  */
-async function checkPopoverBesideColumn(side, rtl = false) {
-  await toolbarInPanel(true);
+async function checkPopoverBesideColumn(side, rtl = false, inPanel = true) {
+  await toolbarInPanel(inPanel);
   if (rtl) {
     await SpecialPowers.pushPrefEnv({ set: [["intl.l10n.pseudo", "bidi"]] });
     atTaskEnd(() => SpecialPowers.popPrefEnv());
@@ -401,25 +403,67 @@ async function checkPopoverBesideColumn(side, rtl = false) {
     );
   }
   await panelOn(side);
-  await panelWidth(window, 48);
-  const what = `on the ${side}${rtl ? ", right to left" : ""}`;
+  if (inPanel) {
+    await panelWidth(window, 48);
+  } else {
+    // With no toolbar to draw, the panel's own 48px layout follows its
+    // width (`sval-panel.css`).
+    SvalPanel._setPanelWidth(48);
+    atTaskEnd(() => SvalPanel._setPanelWidth(null));
+    const container = document.getElementById("sval-panel-container");
+    await TestUtils.waitForCondition(
+      () => Math.round(container.getBoundingClientRect().width) === 48,
+      "the panel standing 48px wide"
+    );
+  }
+  const what = `on the ${side}${rtl ? ", right to left" : ""}${inPanel ? "" : ", the toolbar above the page"}`;
   const button = box(SvalPanel._els.favorites);
   const panel = box(document.getElementById("sval-panel-container"));
   const page = box(gBrowser.selectedBrowser.closest(".browserStack"));
+  // The column stands at the window's edge and the page beside it.
+  const atLeft = panel.left < page.left;
   Assert.ok(
     button.left >= panel.left && button.right <= panel.right,
     `Favorites stands inside the column ${what}`
   );
-  // The column stands at the window's edge and the page beside it.
-  const atLeft = panel.left < page.left;
-  const [edgeRoom, pageRoom] = atLeft
-    ? [button.left - panel.left, page.left - button.right]
-    : [panel.right - button.right, button.left - page.right];
-  Assert.less(
-    Math.abs(edgeRoom - pageRoom),
-    0.5,
-    `Favorites stands ${edgeRoom}px from the window's edge and ${pageRoom}px from the page ${what}`
+  Assert.equal(
+    Math.round(button.width),
+    PILL,
+    `Favorites is one circle in its pill ${what}`
   );
+  // The column stands each circle, and each row of the tree, as far from
+  // the window's edge as from the page, wherever the toolbar is.
+  const rowEl = [...document.querySelectorAll(".sval-panel .sval-row")].find(
+    el => el.getBoundingClientRect().width
+  );
+  // A classic scrollbar beside the tree takes its own room, on the side the
+  // tree's text ends; an overlay scrollbar, as macOS draws, takes none.
+  let scroller = rowEl.parentElement;
+  while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
+    scroller = scroller.parentElement;
+  }
+  const gutter = scroller
+    ? scroller.getBoundingClientRect().width -
+      scroller.clientWidth -
+      parseFloat(getComputedStyle(scroller).borderLeftWidth) -
+      parseFloat(getComputedStyle(scroller).borderRightWidth)
+    : 0;
+  const gutterLeft =
+    scroller && getComputedStyle(scroller).direction === "rtl" ? gutter : 0;
+  const gutterRight = gutter - gutterLeft;
+  for (const [name, el, left, right] of [
+    ["Favorites", button, 0, 0],
+    ["a row of the tree", box(rowEl), gutterLeft, gutterRight],
+  ]) {
+    const [edgeRoom, pageRoom] = atLeft
+      ? [el.left - panel.left - left, page.left - el.right - right]
+      : [panel.right - el.right - right, el.left - page.right - left];
+    Assert.less(
+      Math.abs(edgeRoom - pageRoom),
+      0.5,
+      `${name} stands ${edgeRoom}px from the window's edge and ${pageRoom}px from the page ${what}`
+    );
+  }
   const menu = SvalPanel._els.favoritesMenu;
   const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
   SvalPanel.openFavorites();
@@ -489,6 +533,60 @@ add_task(async function a_popover_opens_into_the_window_right_to_left() {
 add_task(
   async function a_popover_opens_into_the_window_right_to_left_on_the_right() {
     await checkPopoverBesideColumn("right", true);
+  }
+);
+
+/**
+ * Narrows the panel to its column and opens Favorites in the same task,
+ * and checks the menu opens beside the column, from the width the panel
+ * has as the menu opens.
+ *
+ * @param {boolean} inPanel Whether the toolbar stands in the panel.
+ */
+async function checkBesideAsThePanelNarrows(inPanel) {
+  await toolbarInPanel(inPanel);
+  await panelOn("left");
+  const container = document.getElementById("sval-panel-container");
+  Assert.greater(
+    container.getBoundingClientRect().width,
+    48,
+    "the panel stands wider than its column"
+  );
+  const menu = SvalPanel._els.favoritesMenu;
+  const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
+  SvalPanel._setPanelWidth(48);
+  atTaskEnd(() => SvalPanel._setPanelWidth(null));
+  SvalPanel.openFavorites();
+  await within(shown, 10_000, "the Favorites menu opening");
+  atTaskEnd(async () => {
+    const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
+    menu.hidePopup();
+    await within(hidden, 10_000, "the Favorites menu closing");
+  });
+  Assert.equal(
+    menu.getAttribute("sval-stem-side"),
+    "right",
+    `it opens beside the column ${inPanel ? "" : "with the toolbar above the page "}as the panel narrows`
+  );
+}
+
+add_task(async function favorites_opens_beside_as_the_panel_narrows() {
+  await checkBesideAsThePanelNarrows(true);
+});
+
+add_task(
+  async function favorites_opens_beside_as_the_panel_narrows_above_the_page() {
+    await checkBesideAsThePanelNarrows(false);
+  }
+);
+
+add_task(async function a_popover_opens_beside_the_column_above_the_page() {
+  await checkPopoverBesideColumn("left", false, false);
+});
+
+add_task(
+  async function a_popover_opens_beside_the_column_on_the_right_above_the_page() {
+    await checkPopoverBesideColumn("right", false, false);
   }
 );
 

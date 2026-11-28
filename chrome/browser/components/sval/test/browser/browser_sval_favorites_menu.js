@@ -95,11 +95,8 @@ async function undoFrom(el) {
   const popup = await openFavorites();
   const target = el(popup);
   const menu = await contextOn(await target);
-  Assert.ok(
-    !menu.querySelector('[data-command="undo"]').hidden,
-    "the menu offers Undo"
-  );
-  await chooseMenuItem(menu, "undo");
+  Assert.ok(!menuItem({ popup: menu }, "undo").hidden, "the menu offers Undo");
+  await chooseInContextMenu(menu, "undo");
   await closeMenus();
 }
 
@@ -143,7 +140,7 @@ add_task(async function the_keyboard_opens_the_menu_and_renames() {
     "a favorite's menu"
   );
   await TestUtils.waitForCondition(() => {
-    const rename = menu.querySelector('[data-command="rename"]');
+    const rename = menuItem({ popup: menu }, "rename");
     if (rename.hasAttribute("_moz-menuactive")) {
       return true;
     }
@@ -193,7 +190,7 @@ add_task(async function a_folder_menu() {
     ],
     "a folder's menu"
   );
-  await chooseMenuItem(menu, "newFolder");
+  await chooseInContextMenu(menu, "newFolder");
   await confirm(await typeInto("Inside"));
   await TestUtils.waitForCondition(
     () => childrenOf(folder.guid).join() === "B,Inside",
@@ -213,7 +210,7 @@ add_task(async function new_separator_goes_before_the_item() {
 
   let popup = await openFavorites();
   let menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  await chooseMenuItem(menu, "newSeparator");
+  await chooseInContextMenu(menu, "newSeparator");
   await TestUtils.waitForCondition(
     () => childrenOf(FAVORITES_ROOT).join() === "A,-,Folder",
     "New Separator puts one before the folder"
@@ -258,7 +255,7 @@ add_task(async function edit_address_refuses_a_non_address() {
   await seed();
   const popup = await openFavorites();
   const menu = await contextOn(await itemIn(popup, n => n.uri === A));
-  await chooseMenuItem(menu, "editAddress");
+  await chooseInContextMenu(menu, "editAddress");
   const doc = await typeInto("javascript:alert(1)");
   const buttons = doc.querySelectorAll("sval-dialog sval-button");
   await TestUtils.waitForCondition(
@@ -287,7 +284,7 @@ add_task(async function move_to_lists_folders_and_moves() {
   const folder = await seed();
   const popup = await openFavorites();
   let menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  const moveTo = menu.querySelector('[data-command="moveTo"]');
+  const moveTo = menuItem({ popup: menu }, "moveTo");
   const listShown = BrowserTestUtils.waitForPopupEvent(
     moveTo.menupopup,
     "shown"
@@ -295,10 +292,12 @@ add_task(async function move_to_lists_folders_and_moves() {
   moveTo.openMenu(true);
   await within(listShown, 10_000, "the Move To list showing");
   await TestUtils.waitForCondition(() => moveTo.menupopup.children.length);
-  const listed = Array.from(moveTo.menupopup.children, el => el.dataset.folder);
+  const listed = Array.from(moveTo.menupopup.children, el =>
+    el.getAttribute("data-sval-menu-id")
+  );
   Assert.deepEqual(
     listed,
-    [FAVORITES_ROOT],
+    [`folder:${FAVORITES_ROOT}`],
     "a folder is never offered itself"
   );
   Assert.equal(
@@ -310,20 +309,20 @@ add_task(async function move_to_lists_folders_and_moves() {
 
   const again = await openFavorites();
   menu = await contextOn(await itemIn(again, n => n.uri === A));
-  const target = menu.querySelector('[data-command="moveTo"]');
+  const target = menuItem({ popup: menu }, "moveTo");
   const shown = BrowserTestUtils.waitForPopupEvent(target.menupopup, "shown");
   target.openMenu(true);
   await within(shown, 10_000, "the Move To list showing");
   const into = await TestUtils.waitForCondition(() =>
-    target.menupopup.querySelector(`[data-folder="${folder.guid}"]`)
+    menuItem({ popup: menu }, `folder:${folder.guid}`)
   );
   Assert.ok(
     into
       .getAttribute("aria-description")
       ?.includes(
-        target.menupopup
-          .querySelector(`[data-folder="${FAVORITES_ROOT}"]`)
-          .getAttribute("aria-label")
+        menuItem({ popup: menu }, `folder:${FAVORITES_ROOT}`).getAttribute(
+          "aria-label"
+        )
       ),
     "a nested folder says what it is in, which its indent shows the eye"
   );
@@ -354,7 +353,7 @@ add_task(async function move_up_and_down_reorder_without_dragging() {
 
   let popup = await openFavorites();
   let menu = await contextOn(await itemIn(popup, n => n.uri === A));
-  await chooseMenuItem(menu, "moveDown");
+  await chooseInContextMenu(menu, "moveDown");
   await TestUtils.waitForCondition(
     () => order().join() === "Folder,A",
     "Move Down put A after the folder"
@@ -367,7 +366,7 @@ add_task(async function move_up_and_down_reorder_without_dragging() {
     !shownCommands(menu).includes("moveDown"),
     "the last one has no Move Down"
   );
-  await chooseMenuItem(menu, "moveUp");
+  await chooseInContextMenu(menu, "moveUp");
   await TestUtils.waitForCondition(
     () => order().join() === "A,Folder",
     "Move Up put it back first"
@@ -379,7 +378,7 @@ add_task(async function delete_and_undo() {
   const folder = await seed();
   let popup = await openFavorites();
   let menu = await contextOn(await itemIn(popup, n => n.uri === A));
-  await chooseMenuItem(menu, "delete");
+  await chooseInContextMenu(menu, "delete");
   await TestUtils.waitForCondition(
     () => !rowFor(popup, A),
     "a favorite leaves the menu at once"
@@ -394,7 +393,7 @@ add_task(async function delete_and_undo() {
 
   popup = await openFavorites();
   menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  await chooseMenuItem(menu, "delete");
+  await chooseInContextMenu(menu, "delete");
   const doc = await dialog();
   Assert.ok(
     doc.querySelector(".sval-dialog-body").textContent.includes("1"),
@@ -407,7 +406,7 @@ add_task(async function delete_and_undo() {
 
   popup = await openFavorites();
   menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  await chooseMenuItem(menu, "delete");
+  await chooseInContextMenu(menu, "delete");
   await confirm(await dialog());
   await TestUtils.waitForCondition(
     () => !favoritesStore().get(folder.guid) && !favoritesFor(B).length,
@@ -431,7 +430,7 @@ add_task(async function open_all_asks_above_the_limit() {
   });
   const popup = await openFavorites();
   const menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  await chooseMenuItem(menu, "openAll");
+  await chooseInContextMenu(menu, "openAll");
   const doc = await dialog();
   Assert.ok(
     doc.querySelector(".sval-dialog-title").textContent.includes("1"),
@@ -462,7 +461,7 @@ add_task(async function open_all_stops_asking_once_told() {
   });
   const popup = await openFavorites();
   const menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  await chooseMenuItem(menu, "openAll");
+  await chooseInContextMenu(menu, "openAll");
   // One tab at a limit of one asks, as `OpenInTabsUtils` does.
   const doc = await dialog();
   const box = doc.querySelector(".sval-dialog-check input");
@@ -553,7 +552,7 @@ add_task(async function a_bookmarklet_runs_on_the_page_both_ways() {
       ],
       "a bookmarklet has one Open"
     );
-    await chooseMenuItem(menu, "open");
+    await chooseInContextMenu(menu, "open");
     await TestUtils.waitForCondition(
       async () => (await runsOnPage()) === "2",
       "Open runs it on the page"
@@ -676,7 +675,7 @@ add_task(async function open_all_leaves_bookmarklets_out() {
   });
   const popup = await openFavorites();
   const menu = await contextOn(await itemIn(popup, n => n.title === "Folder"));
-  await chooseMenuItem(menu, "openAll");
+  await chooseInContextMenu(menu, "openAll");
   const doc = await dialog();
   Assert.ok(
     doc.querySelector(".sval-dialog-title").textContent.includes("1"),
@@ -698,7 +697,7 @@ add_task(async function export_gives_back_the_same_tree() {
   MockFilePicker.returnValue = MockFilePicker.returnOK;
   const popup = await openFavorites();
   const menu = await contextOn(await itemIn(popup, n => n.uri === A));
-  await chooseMenuItem(menu, "export");
+  await chooseInContextMenu(menu, "export");
   // The menu's Export opens the export page, where Favorites start ticked.
   const doc = await openedDialog(".sval-ex-target");
   Assert.ok(doc.querySelector(".sval-ex-favorites").checked);
@@ -821,6 +820,54 @@ add_task(async function folders_nest_and_follow_the_document() {
     "an open menu follows a rename"
   );
   Assert.equal(innerPopup.state, "open", "and keeps its submenus open");
+  await closeMenus();
+});
+
+/**
+ * A change to Favorites while their menu is open draws each favorite again
+ * on the item it had, through `SvalMenu.fill`, moving only what moved.
+ */
+add_task(async function a_redraw_keeps_each_favorites_item() {
+  const folder = await seed();
+  const [c] = await favoritesStore().insertTree([
+    { title: "C", url: "https://example.com/c" },
+  ]);
+  const popup = await openFavorites();
+  const a = await itemIn(popup, n => n.uri === A);
+  const folderItem = await itemIn(popup, n => n.title === "Folder");
+  const b = await itemIn(await openFolder(folderItem), n => n.uri === B);
+  const cItem = popup.querySelector(`[data-guid="${c}"]`);
+  const guids = () =>
+    [...popup.children]
+      .filter(el => el.dataset.guid)
+      .map(el => el.dataset.guid);
+
+  await favoritesStore().move(c, FAVORITES_ROOT, 0);
+  await favoritesStore().rename(a.dataset.guid, "A renamed");
+  await TestUtils.waitForCondition(
+    () => guids()[0] === c && a.getAttribute("label") === "A renamed",
+    "the menu draws the move and the rename"
+  );
+  Assert.deepEqual(
+    guids(),
+    favoritesStore()
+      .children(FAVORITES_ROOT)
+      .map(row => row.guid),
+    "in the document's order"
+  );
+  Assert.equal(
+    popup.querySelector(`[data-guid="${c}"]`),
+    cItem,
+    "the moved favorite keeps its item"
+  );
+  Assert.ok(a.isConnected, "the renamed one keeps its item");
+  Assert.equal(
+    popup.querySelector(`[data-guid="${folder.guid}"]`),
+    folderItem,
+    "the folder keeps its item"
+  );
+  Assert.equal(folderItem.menupopup.state, "open", "and stays open");
+  Assert.ok(b.isConnected, "with its own items");
   await closeMenus();
 });
 
@@ -985,7 +1032,7 @@ add_task(async function the_undo_key_in_favorites_takes_a_change_back() {
   await undoKey("the delete", "A,Folder");
 
   const menu = await contextOn(await itemIn(popup, n => n.uri === A));
-  const undo = menu.querySelector('[data-command="undo"]');
+  const undo = menuItem({ popup: menu }, "undo");
   Assert.equal(undo.getAttribute("key"), "key_undo", "Undo names the key");
   Assert.equal(
     undo.getAttribute("aria-keyshortcuts"),

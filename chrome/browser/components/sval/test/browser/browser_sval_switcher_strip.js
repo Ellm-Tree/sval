@@ -656,25 +656,24 @@ add_task(async function the_right_click_menu_changes_the_names() {
   const { ids } = await withSwitcherPanel({ workspaces: 2 });
   const strip = await useStrip();
   await SpecialPowers.pushPrefEnv({ set: [[STRIP_NAMES_PREF, "all"]] });
-  const menu = SvalPanel._els.workspaceMenu;
+  const handle = SvalPanel.switcher.workspaceMenu;
   // The strip glides from where the last task left it, and a press is made
   // where the item comes to rest.
   await settled(strip);
 
-  const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
-  pressItem(itemOf(ids.workspaces[1]), { type: "contextmenu" });
-  await within(shown, 10_000, "the Workspace's menu opening");
+  await openMenu(handle, () =>
+    pressItem(itemOf(ids.workspaces[1]), { type: "contextmenu" })
+  );
   Assert.ok(
-    !menu.querySelector(":scope > [data-open-workspace]").hidden,
+    !menuItem(handle, "openWorkspace").hidden,
     "it offers the Workspace a window of its own"
   );
-  const hide = menu.querySelector(':scope > [data-strip-names="none"]');
   Assert.ok(
-    menu.querySelector(':scope > [data-strip-names="all"]').hidden &&
-      menu.querySelector(":scope > [data-strip-names-menu]").hidden,
+    menuItem(handle, "stripNamesAll").hidden &&
+      menuItem(handle, "stripNamesMenu").hidden,
     "names on every Workspace can only be hidden"
   );
-  await chooseMenuItem(hide, menu, "Hide Workspace Names");
+  await pickMenuItem(handle, "stripNamesNone");
   await TestUtils.waitForCondition(
     () => strip.dataset.names === "none",
     "the strip showing icons only"
@@ -748,18 +747,16 @@ add_task(async function an_agent_apps_workspaces_share_one_item() {
     () => SvalPanel.strip.appMenu?.state === "open",
     "the app's list"
   );
-  const list = SvalPanel.strip.appMenu;
+  const list = SvalPanel.strip.appMenuHandle;
   Assert.equal(app.getAttribute("aria-expanded"), "true");
   Assert.deepEqual(
-    Array.from(list.children, el => el.dataset.workspaceId).toSorted(),
-    [one, two].toSorted(),
+    Array.from(list.popup.children, el =>
+      el.getAttribute("data-sval-menu-id")
+    ).toSorted(),
+    [`workspace:${one}`, `workspace:${two}`].toSorted(),
     "listing each of the app's Workspaces"
   );
-  const hidden = BrowserTestUtils.waitForPopupEvent(list, "hidden");
-  list.activateItem(
-    list.querySelector(`[data-workspace-id="${CSS.escape(two)}"]`)
-  );
-  await within(hidden, 10_000, "the list closing");
+  await pickMenuItem(list, `workspace:${two}`);
   await switched(two);
   Assert.equal(
     strip.querySelector('.sval-strip-item[aria-selected="true"]'),

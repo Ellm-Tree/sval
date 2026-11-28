@@ -52,7 +52,7 @@ function sweepPastTheTime(observer) {
 function keepLoadedItem(id) {
   const menu = SvalPanel._els.contextMenu;
   SvalPanel.rowMenu.sync(menu, SvalPanel._rowFor(id));
-  return menu.querySelector('[data-command="keepLoaded"]');
+  return menuItem(SvalPanel.rowMenu.menu, "keepLoaded");
 }
 
 add_task(async function a_kept_tab_outlasts_the_idle_unload() {

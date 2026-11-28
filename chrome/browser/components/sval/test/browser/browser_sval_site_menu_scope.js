@@ -55,6 +55,23 @@ async function openMenu() {
   atTaskEnd(closeMenu);
 }
 
+/**
+ * Presses the first hidden row's Show again and waits for its choices.
+ *
+ * @returns {Promise<Element>} the open choices' `menupopup`.
+ */
+async function showAgainChoices() {
+  const shown = BrowserTestUtils.waitForEvent(
+    document,
+    "popupshown",
+    false,
+    event => event.target.id === "sval-site-show-again-menu"
+  );
+  byId("sval-site-hidden-show-0").click();
+  const { target } = await within(shown, 5_000, "the choices opening");
+  return target;
+}
+
 async function closeMenu() {
   if (menu().state === "closed") {
     return;
@@ -161,11 +178,8 @@ add_task(async function show_again_here_excepts_the_host_alone() {
     byId("sval-site-scope-button").click();
     menu().querySelector("[data-scope='example.com']").click();
     byId("sval-site-hidden-toggle").click();
-    const popup = BrowserTestUtils.waitForEvent(menu(), "popupshown");
-    byId("sval-site-hidden-show-0").click();
-    await within(popup, 5_000, "the choices opening");
-    const choices = byId("sval-site-show-again-menu");
-    choices.activateItem(choices.querySelector("[data-where='here']"));
+    const choices = await showAgainChoices();
+    choices.activateItem(menuItem({ popup: choices }, "here"));
     await within(
       TestUtils.waitForCondition(
         () => SvalBlocking.myFilters.includes("#@#"),
@@ -186,16 +200,13 @@ add_task(async function show_again_here_excepts_the_host_alone() {
  * Opens the menu's hidden list, picks `where` from the first row's
  * choices and waits for it to save.
  *
- * @param {string} where The choice's `data-where`.
+ * @param {string} where The choice's id in its menu.
  */
 async function chooseForFirstRow(where) {
   byId("sval-site-hidden-toggle").click();
-  const popup = BrowserTestUtils.waitForEvent(menu(), "popupshown");
-  byId("sval-site-hidden-show-0").click();
-  await within(popup, 5_000, "the choices opening");
-  const choices = byId("sval-site-show-again-menu");
+  const choices = await showAgainChoices();
   const before = SvalBlocking.myFilters;
-  choices.activateItem(choices.querySelector(`[data-where='${where}']`));
+  choices.activateItem(menuItem({ popup: choices }, where));
   await within(
     TestUtils.waitForCondition(
       () => SvalBlocking.myFilters !== before,

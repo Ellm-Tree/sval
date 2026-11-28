@@ -5,28 +5,32 @@
 
 const CACHEABLE = ROOT + "sval_reload_cacheable.sjs";
 
+const { SvalReloadMenu } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalReloadMenu.sys.mjs"
+);
+
 /**
  * Right-clicks the Reload button and resolves with its menu once shown.
  *
- * @returns {Promise<Element>}
+ * @returns {Promise<object>} the menu, as `SvalMenu.create` gave it.
  */
 async function openReloadMenu() {
-  const menu = document.getElementById("sval-reload-menu");
-  const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
-  EventUtils.synthesizeMouseAtCenter(document.getElementById("reload-button"), {
-    type: "contextmenu",
-    button: 2,
-  });
-  await within(shown, 10_000, "the Reload menu showing");
-  return menu;
+  const handle = SvalReloadMenu.menuOf(window);
+  await openMenu(handle, () =>
+    EventUtils.synthesizeMouseAtCenter(
+      document.getElementById("reload-button"),
+      { type: "contextmenu", button: 2 }
+    )
+  );
+  return handle;
 }
 
 /**
- * @param {Element} menu
+ * @param {object} handle
  */
-async function closeMenu(menu) {
-  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.hidePopup();
+async function closeMenu(handle) {
+  const hidden = BrowserTestUtils.waitForPopupEvent(handle.popup, "hidden");
+  handle.close();
   await within(hidden, 10_000, "the Reload menu hiding");
 }
 
@@ -75,14 +79,16 @@ async function fetchCacheable(browser) {
 add_task(async function the_reload_button_offers_its_menu() {
   const tab = await openPage(PAGE);
   const menu = await openReloadMenu();
-  const ids = [...menu.children].filter(i => !i.hidden).map(i => i.id);
+  const ids = [...menu.popup.children]
+    .filter(i => !i.hidden)
+    .map(i => i.getAttribute("data-sval-menu-id"));
   Assert.deepEqual(
     ids,
-    ["sval-reload-normal", "sval-reload-skip-cache", "sval-reload-clear-cache"],
+    ["reload", "skipCache", "clearCache"],
     "Reload, Hard reload and the cache clearing are offered"
   );
   Assert.ok(
-    !menu.querySelector("#sval-reload-clear-cache").hasAttribute("disabled"),
+    !menuItem(menu, "clearCache").hasAttribute("disabled"),
     "a web page's site can be cleared"
   );
   await closeMenu(menu);
@@ -93,7 +99,7 @@ add_task(async function a_page_without_a_site_has_no_cache_to_clear() {
   const tab = await openPage("data:text/html,page");
   const menu = await openReloadMenu();
   Assert.ok(
-    menu.querySelector("#sval-reload-clear-cache").hasAttribute("disabled"),
+    menuItem(menu, "clearCache").hasAttribute("disabled"),
     "a data: page has no site to clear"
   );
   await closeMenu(menu);
@@ -116,7 +122,7 @@ add_task(async function clearing_drops_the_sites_cache_and_reloads() {
     false,
     PAGE
   );
-  menu.activateItem(menu.querySelector("#sval-reload-clear-cache"));
+  menu.popup.activateItem(menuItem(menu, "clearCache"));
   await within(reloaded, 10_000, "the page reloading");
   await pageReady(tab.linkedBrowser, PAGE);
 

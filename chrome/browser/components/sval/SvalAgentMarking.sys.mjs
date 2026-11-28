@@ -117,6 +117,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { WORKSPACES_MENU_ID } from "moz-src:///browser/components/sval/SvalMenuBar.sys.mjs";
+import { MENU_ID_ATTR } from "moz-src:///browser/components/sval/SvalMenu.sys.mjs";
 import {
   AGENT_ACTIVITY_TOPIC,
   CONTROL_TOPIC,
@@ -242,7 +243,7 @@ function inMenuBar(popup) {
 function isWorkspaceChoice(target) {
   return (
     !!target?.closest?.(`#${WORKSPACES_MENU_ID}`) &&
-    target.hasAttribute("data-workspace-id")
+    !!target.getAttribute(MENU_ID_ATTR)?.startsWith("workspace:")
   );
 }
 

@@ -46,30 +46,33 @@ async function aTab(url = PAGE) {
  * Opens the pin's menu on its tile, as a right-click does.
  *
  * @param {Element} tile
- * @returns {Promise<Element>}
+ * @returns {Promise<object>} the pin's menu, as `SvalMenu.create` gave it.
  */
 async function pinMenuOn(tile) {
-  EventUtils.synthesizeMouseAtCenter(tile, { type: "contextmenu", button: 2 });
-  await TestUtils.waitForCondition(
-    () => document.getElementById("sval-pin-context-menu")?.state === "open",
-    "the pin's menu opens"
+  const handle = SvalPanel.pins.pinMenu;
+  await openMenu(handle, () =>
+    EventUtils.synthesizeMouseAtCenter(tile, { type: "contextmenu", button: 2 })
   );
-  return document.getElementById("sval-pin-context-menu");
+  return handle;
 }
 
 /**
- * @param {Element} menu
- * @returns {string[]} the commands a menu shows, "-" for a separator.
+ * @param {object} handle A menu, as `SvalMenu.create` gave it.
+ * @returns {string[]} the items it shows, by id, "-" for a separator.
  */
-function shown(menu) {
-  return Array.from(menu.children)
+function shown(handle) {
+  return Array.from(handle.popup.children)
     .filter(el => !el.hidden)
-    .map(el => (el.localName === "menuseparator" ? "-" : el.dataset.command));
+    .map(el =>
+      el.localName === "menuseparator"
+        ? "-"
+        : el.getAttribute("data-sval-menu-id")
+    );
 }
 
 async function choose(menu, command) {
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.activateItem(menu.querySelector(`[data-command="${command}"]`));
+  menu.activateItem(menuItem({ popup: menu }, command));
   await within(hidden, 10_000, `the menu closing on ${command}`);
 }
 
@@ -87,7 +90,7 @@ add_task(async function a_tab_is_pinned_from_its_menu_as_it_was() {
   });
   await within(showing, 10_000, "the tab's menu opens");
   Assert.ok(
-    !menu.querySelector('[data-command="pin"]').hidden,
+    !menuItem({ popup: menu }, "pin").hidden,
     "a tab's menu offers Pin"
   );
   await choose(menu, "pin");
@@ -134,7 +137,7 @@ add_task(async function a_tab_is_pinned_to_this_workspace() {
   });
   await within(showing, 10_000, "the tab's menu opens");
   Assert.ok(
-    !menu.querySelector('[data-command="pinHere"]').hidden,
+    !menuItem({ popup: menu }, "pinHere").hidden,
     "a tab's menu offers Pin to This Workspace"
   );
   await choose(menu, "pinHere");
@@ -239,16 +242,16 @@ add_task(async function the_pins_menu_and_show_in() {
     "delete",
   ]);
   Assert.ok(
-    menu.querySelector('[data-command="reset"]').hasAttribute("disabled"),
+    menuItem(menu, "reset").hasAttribute("disabled"),
     "Back to saved page is off on the saved page"
   );
 
-  const showIn = menu.querySelector('[data-command="showIn"]');
+  const showIn = menuItem(menu, "showIn");
   const popup = showIn.menupopup;
   const opened = BrowserTestUtils.waitForPopupEvent(popup, "shown");
   showIn.openMenu(true);
   await within(opened, 10_000, "Show in opens");
-  const box = id => popup.querySelector(`[data-workspace="${id}"]`);
+  const box = id => menuItem(menu, `showIn:${id}`);
   Assert.ok(box(home) && box(work), "one box per workspace");
   Assert.equal(box(home).getAttribute("checked"), "true", "every one ticked");
   popup.activateItem(box(home));
@@ -257,8 +260,8 @@ add_task(async function the_pins_menu_and_show_in() {
     "Home is unticked"
   );
   Assert.equal(popup.state, "open", "the submenu stays open while ticking");
-  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
-  menu.hidePopup();
+  const hidden = BrowserTestUtils.waitForPopupEvent(menu.popup, "hidden");
+  menu.close();
   await within(hidden, 10_000, "the menu closes");
   await TestUtils.waitForCondition(() => {
     const scope = store.pinScopeOf(guid);
@@ -286,7 +289,7 @@ add_task(async function delete_removes_the_favorite_and_undo_brings_both() {
     () => rowGuids().join() === [first, guid, last].join(),
     "three pins"
   );
-  await choose(await pinMenuOn(tileOf(guid)), "delete");
+  await pickMenuItem(await pinMenuOn(tileOf(guid)), "delete");
   await TestUtils.waitForCondition(() => !tileOf(guid), "the pin goes");
   Assert.ok(store.get(guid), "its Favorite waits on the panel's message");
   await within(SvalPanel.undo.commit(), 10_000, "the delete");
@@ -317,7 +320,7 @@ add_task(async function the_panels_undo_brings_a_deleted_pin_back() {
     () => rowGuids().join() === [first, guid, last].join(),
     "three pins"
   );
-  await choose(await pinMenuOn(tileOf(guid)), "delete");
+  await pickMenuItem(await pinMenuOn(tileOf(guid)), "delete");
   await TestUtils.waitForCondition(() => !tileOf(guid), "the pin goes");
   Assert.ok(store.isPinned(guid), "the store keeps it while Undo is offered");
   const undo = SvalPanel._els.undoRegion.querySelector(
@@ -364,7 +367,7 @@ add_task(async function the_panels_undo_brings_a_pin_moved_to_favorites_back() {
   Assert.equal(page, tab, "the pin's page is the tab pinned");
   const browser = page.linkedBrowser;
 
-  await choose(await pinMenuOn(tileOf(guid)), "moveToFavorites");
+  await pickMenuItem(await pinMenuOn(tileOf(guid)), "moveToFavorites");
   await TestUtils.waitForCondition(() => !tileOf(guid), "the pin goes");
   Assert.equal(
     store.children(TOOLBAR).at(-1)?.guid,
@@ -442,7 +445,7 @@ add_task(async function a_held_pin_leaves_every_windows_row() {
     "the other window's row shows the pin"
   );
 
-  await choose(await pinMenuOn(tileOf(guid)), "delete");
+  await pickMenuItem(await pinMenuOn(tileOf(guid)), "delete");
   await TestUtils.waitForCondition(() => !tileOf(guid), "the pin goes here");
   Assert.ok(!guidsThere().includes(guid), "and from the other window's row");
   SvalPanel._els.undoRegion

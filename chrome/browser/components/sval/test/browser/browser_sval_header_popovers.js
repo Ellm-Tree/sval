@@ -36,6 +36,11 @@ add_setup(async function () {
   });
 });
 
+// Sval's default window is see-through where the system allows it, where a
+// popover draws its button's face again over the system's backdrop
+// (`SvalStem`): the file checks the solid look.
+add_setup(() => windowSeeThrough(false));
+
 /** Where `sval-stem.css` draws no stem inside the popup. */
 const OPAQUE_POPUPS = window.matchMedia(
   "(-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available))"
@@ -751,13 +756,18 @@ add_task(async function a_menu_on_the_other_side_lets_go() {
   await whileOpen(
     popup.id,
     () => popup.openPopup(button, "before_start"),
-    () => {
+    async () => {
       Assert.less(
         popup.getOuterScreenRect().top,
         onScreen(button).top,
         "the menu is above its button"
       );
-      Assert.ok(!popup.hasAttribute("sval-stem"), "the menu lets go");
+      // A popover off its side measures again for as long as one settles
+      // before it lets go (`SvalStem`'s `place`).
+      await TestUtils.waitForCondition(
+        () => !popup.hasAttribute("sval-stem"),
+        "the menu lets go"
+      );
       Assert.ok(!button.hasAttribute("sval-stem"), "and so does its button");
     }
   );

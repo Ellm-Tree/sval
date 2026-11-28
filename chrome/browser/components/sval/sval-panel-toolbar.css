@@ -485,19 +485,6 @@
   }
 }
 
-/* The page's frame leaves 6px between the panel and the page
-   (`sval-header.css`, page frame), so the column's content takes 6px on the
-   window's side: a circle in its middle stands as far from the window's
-   edge as from the page, on either side and in either text direction. */
-#sval-panel-container[sval-column] {
-  box-sizing: border-box;
-  padding-inline-start: 6px;
-
-  &[sval-placement="right"] {
-    padding-inline: 0 6px;
-  }
-}
-
 /* The footer's records stand in the column too, under Favorites, where
    the toolbar's circles stand. */
 #sval-panel-container[sval-column] .sval-favorites-bar:has(> #sval-panel-records) {
@@ -562,8 +549,11 @@
 
 /* Favorites with its star alone is one circle in its pill, as the
    toolbar's buttons are: 28px in 36px, through a 1px border and 3px of
-   padding. */
-#sval-panel-container:is([sval-column], [sval-short-labels]) .sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
+   padding. The narrowest panel draws it so wherever the toolbar is: its
+   width decides, as it decides the panel's own 48px layout
+   (`sval-panel.css`). A wider panel too narrow for the labels beside the
+   records draws it so too. */
+#sval-panel-container[sval-short-labels] .sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
   flex: none;
   justify-content: center;
   box-sizing: border-box;
@@ -577,11 +567,36 @@
   box-shadow: var(--sval-cluster-shadow);
 }
 
+@container sval-panel (max-width: 72px) {
+  #sval-panel-container .sval-panel-footer > .sval-favorites-bar > .sval-favorites {
+    flex: none;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 36px;
+    min-width: 0;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--sval-cluster-border);
+    border-radius: 999px;
+    background-color: var(--sval-cluster-bg);
+    box-shadow: var(--sval-cluster-shadow);
+
+    &:hover {
+      background: radial-gradient(circle, var(--toolbarbutton-hover-background) 14px, transparent 14px) var(--sval-cluster-bg);
+    }
+
+    &:hover:active,
+    &[aria-expanded="true"] {
+      background: radial-gradient(circle, var(--toolbarbutton-active-background) 14px, transparent 14px) var(--sval-cluster-bg);
+    }
+  }
+}
+
 /* A ringed button in the footer washes the 28px circle inside its ring on
    hover and press, as the toolbar's buttons wash their icons
    (`toolbarbuttons.css`). */
 #sval-panel-container[sval-column] .sval-panel-footer > .sval-feedback-button,
-#sval-panel-container:is([sval-column], [sval-short-labels]) .sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
+#sval-panel-container[sval-short-labels] .sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
   &:hover {
     background: radial-gradient(circle, var(--toolbarbutton-hover-background) 14px, transparent 14px) var(--sval-cluster-bg);
   }

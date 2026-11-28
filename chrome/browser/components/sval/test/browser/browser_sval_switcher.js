@@ -241,7 +241,7 @@ add_task(async function one_workspace_still_has_a_working_switcher() {
     "which no other window can open, since this one shows it"
   );
   Assert.ok(
-    menu.querySelector("[data-sval-new-workspace]"),
+    menuItem({ popup: menu }, "newWorkspace"),
     "and offers to make another"
   );
   await closeSwitcher(menu);
@@ -267,7 +267,7 @@ add_task(async function new_workspace_shows_the_key_the_user_gave_it() {
   const key = document.getElementById(NEW_WORKSPACE_KEY);
 
   let menu = await openSwitcher();
-  let entry = menu.querySelector("[data-sval-new-workspace]");
+  let entry = menuItem({ popup: menu }, "newWorkspace");
   Assert.equal(
     entry.getAttribute("key"),
     NEW_WORKSPACE_KEY,
@@ -284,7 +284,7 @@ add_task(async function new_workspace_shows_the_key_the_user_gave_it() {
     key.removeAttribute("modifiers");
   });
   menu = await openSwitcher();
-  entry = menu.querySelector("[data-sval-new-workspace]");
+  entry = menuItem({ popup: menu }, "newWorkspace");
   Assert.equal(
     entry.getAttribute("acceltext"),
     shortcutText({ key: "N", modifiers: "accel,alt" }),

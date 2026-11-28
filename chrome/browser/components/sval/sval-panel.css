@@ -71,8 +71,7 @@
    the content stands 3px nearer the page: the room from the window's edge
    to the content is the room from the content to the page. A full-screen
    window frames no page, and at 48px the content takes equal room at both
-   sides; the toolbar's column sets its own (`sval-panel-toolbar.css`,
-   column). */
+   sides of a column that stands 6px in from the window's side (below). */
 #sval-panel-container > * {
   --sval-panel-start: calc(var(--space-small) + 3px);
   --sval-panel-end: calc(var(--space-small) - 3px);
@@ -89,9 +88,24 @@
 }
 
 @container sval-panel (max-width: 72px) {
-  #sval-panel-container > * {
+  /* With an id's weight more, over the side's room above. */
+  #sval-panel-container:not(#sval-panel-weight) > * {
     --sval-panel-start: var(--space-small);
     --sval-panel-end: var(--space-small);
+  }
+
+  /* The column, the toolbar's when it stands in the panel, stands 6px in
+     from the window's side, the 6px the page's frame leaves on the other:
+     a circle in its middle stands as far from the window's edge as from the
+     page, on either side and in either text direction. */
+  #sval-panel-container > :is(#sval-panel-toolbar, .sval-panel) {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    margin-inline: 6px 0;
+  }
+
+  #sval-panel-container[sval-placement="right"] > :is(#sval-panel-toolbar, .sval-panel) {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    margin-inline: 0 6px;
   }
 }
 
@@ -1163,126 +1177,6 @@
   width: 0;
   height: 0;
   overflow: hidden;
-}
-
-/* ---------------------------------------------------------------- menus */
-
-/*
- * The Workspace and Favorites menus are drawn alike on every platform: by
- * Gecko (`nonnative`) and as Firefox's own bookmarks menus are
- * (`toolbar-menupopup`, `panelUI-shared.css`), which takes the window's popup
- * colours (`sval-header.css`). These rules are what Sval adds to that.
- */
-
-/* Every menu has a drawn shadow, on macOS too, where `popup.css` leaves menus
- * the window server's faint one. The margin is the popup window's room for
- * `--sval-menu-shadow`: three deviations of its far layer and its drop. A menu attached to
- * its button by the stem (`[sval-stem]`) takes the stem's margin, edge and
- * shadow instead (`sval-stem.css`, spec §9.4). */
-menupopup:not([sval-stem]) {
-  --panel-box-shadow: var(--sval-menu-shadow);
-  --panel-box-shadow-margin: 14px;
-  -moz-window-shadow: none;
-}
-
-/* The active item is where the arrow keys are, so it wears the panel's focus
- * ring (`.sval-row:focus-visible`) over the hover wash. A `menu` whose submenu
- * is open stays active, so the ring moves into the submenu with the keys.
- * The pointer makes an item active too, so the Workspace menu rings it only
- * once a key is pressed in the menu (`sval-keys`, which the pointer's next
- * move clears). */
-:is(#sval-workspace-menu[sval-keys], #sval-favorites-menu) :is(menu, menuitem)[_moz-menuactive]:not([open]) {
-  outline: var(--focus-outline-width) solid var(--focus-outline-color);
-  outline-offset: calc(-1 * var(--focus-outline-width));
-}
-
-/* The window's own workspace, in its place in the switcher's list or an
-   agent app's list under the strip. */
-:is(#sval-workspace-menu menu, .sval-agent-app-popup > menuitem)[aria-current="true"] {
-  font-weight: var(--font-weight-semibold);
-  /* The selected tab's marks: an accent bar at the start edge and a tinted
-     fill, so the row reads as "you are here" at a glance. */
-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  box-shadow: inset 4px 0 0 var(--color-accent-primary);
-  background-color: var(--sval-current-fill);
-
-  &:-moz-locale-dir(rtl) {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-    box-shadow: inset -4px 0 0 var(--color-accent-primary);
-  }
-}
-
-/* The Workspace menu opens over the switcher (`SvalPanelSwitcher.open`), at
- * least as wide as it, and shows at most twelve rows
- * (`SvalPanel._scrollSwitcherMenu`). */
-#sval-workspace-menu {
-  &::part(content) {
-    min-width: var(--sval-switcher-width, 0);
-  }
-
-  &::part(arrowscrollbox-scrollbox) {
-    max-height: var(--sval-menu-rows-max, none);
-  }
-}
-
-/* Where a drag will drop in the Favorites menu or the switcher: a line before
- * or after the item, as Firefox's bookmarks menus draw one between items
- * (`places-popup`'s drop indicator). `SvalFavoritesView` and
- * `SvalPanel._showWorkspaceDrop` set `data-drop`. */
-#sval-favorites-menu :is(menu, menuitem, menuseparator),
-#sval-workspace-menu > menu {
-  /* Painted, so the item keeps its size while the line moves. */
-  &:is([data-drop="before"], [data-drop="after"]) {
-    background-image: linear-gradient(var(--focus-outline-color), var(--focus-outline-color));
-    background-repeat: no-repeat;
-    background-size: 100% var(--space-xxsmall);
-  }
-
-  &[data-drop="before"] {
-    background-position: top;
-  }
-
-  &[data-drop="after"] {
-    background-position: bottom;
-  }
-}
-
-/* High contrast. The window's popup colours are Sval's own (`sval-header.css`),
- * so the menus restate what Firefox's tokens would give them: an edge that
- * shows under increased contrast, and under forced colours the system's menu
- * colours, as `popup.css` gives every menu, with the active item in the
- * selection's pair and a disabled one in GrayText. `(forced-colors)` for the
- * reason the panel's own block gives (below). */
-@media (prefers-contrast) {
-  :is(#sval-workspace-menu, #sval-favorites-menu) {
-    &,
-    menupopup {
-      --panel-border-color: currentColor;
-    }
-  }
-}
-
-@media (forced-colors) {
-  :is(#sval-workspace-menu, #sval-favorites-menu) {
-    &,
-    menupopup {
-      --panel-background-color: Menu;
-      --panel-text-color: MenuText;
-      --panel-border-color: MenuText;
-      --panel-box-shadow: none;
-      --button-background-color-ghost-hover: SelectedItem;
-      --button-background-color-ghost-active: SelectedItem;
-      --button-text-color-ghost-hover: SelectedItemText;
-      --button-text-color-ghost-active: SelectedItemText;
-      --button-text-color-ghost-disabled: GrayText;
-      --focus-outline-color: SelectedItemText;
-    }
-
-    /* A disabled item is not filled when active, so its ring is on Menu. */
-    :is(menu, menuitem)[disabled] {
-      --focus-outline-color: MenuText;
-    }
-  }
 }
 
 /* -------------------------------------------------------------- header */

@@ -23,6 +23,7 @@ import {
   watchNotices,
 } from "moz-src:///browser/components/sval/SvalAppNotices.sys.mjs";
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
+import { SvalPopover } from "moz-src:///browser/components/sval/SvalPopover.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -120,8 +121,10 @@ function fill(panel, lines) {
     {},
     ...lines.map(line => drawLine(panel, line))
   );
-  // Drawn again as a notice comes or goes, the list keeps its place.
-  const scrolled = panel.firstElementChild?.scrollTop ?? 0;
+  // Drawn again as a notice comes or goes while open, the list keeps its
+  // place; it opens at its top.
+  const scrolled =
+    panel.state === "open" ? (panel.firstElementChild?.scrollTop ?? 0) : 0;
   panel.replaceChildren(list);
   list.scrollTop = scrolled;
 }
@@ -130,45 +133,27 @@ function fill(panel, lines) {
  * The window's popover, built on first use.
  *
  * @param {Window} win
- * @returns {Element}
+ * @returns {object} the popover, as `SvalPopover.create` gave it.
  */
 function panelFor(win) {
-  let panel = panels.get(win);
-  if (panel) {
-    return panel;
+  let handle = panels.get(win);
+  if (handle) {
+    return handle;
   }
-  const doc = win.document;
-  panel = doc.createXULElement("panel");
-  panel.id = NOTICES_PANEL_ID;
-  panel.setAttribute("type", "arrow");
-  // An arrow panel's default flip shrinks a popover that reaches past the
-  // screen (`nsMenuPopupFrame::FlipOrResize`), cutting off its content; a
-  // slide moves it whole (`nsMenuPopupFrame::SlideOrResize`).
-  panel.setAttribute("flip", "slide");
-  panel.setAttribute("orient", "vertical");
-  panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-label", "Notices");
-  panel.addEventListener("popupshowing", event => {
-    if (event.target === panel) {
-      fill(panel, updateLines(win));
-    }
+  handle = SvalPopover.create(win.document, {
+    name: NOTICES_PANEL_ID,
+    label: "Notices",
+    // An arrow panel's default flip shrinks a popover that reaches past the
+    // screen (`nsMenuPopupFrame::FlipOrResize`), cutting off its content; a
+    // slide moves it whole (`nsMenuPopupFrame::SlideOrResize`).
+    attributes: { flip: "slide", orient: "vertical" },
+    // Grows from its button, reaching past it as the header's popovers do.
+    stem: { hang: true },
+    onShowing: () => fill(handle.popup, updateLines(win)),
+    onHidden: () => handle.popup.removeAttribute("noautohide"),
   });
-  panel.addEventListener("popupshown", () => {
-    doc.getElementById(NOTICES_BUTTON_ID)?.setAttribute("open", "true");
-    if (panel._svalFocusOnShow) {
-      doc.commandDispatcher.advanceFocusIntoSubtree(panel);
-    }
-    panel._svalFocusOnShow = false;
-  });
-  panel.addEventListener("popuphidden", event => {
-    if (event.target === panel) {
-      doc.getElementById(NOTICES_BUTTON_ID)?.removeAttribute("open");
-      panel.removeAttribute("noautohide");
-    }
-  });
-  doc.getElementById("mainPopupSet").append(panel);
-  panels.set(win, panel);
-  return panel;
+  panels.set(win, handle);
+  return handle;
 }
 
 export const SvalNoticesButton = {
@@ -201,7 +186,7 @@ export const SvalNoticesButton = {
       button.hidden = !lines.length;
       button.toggleAttribute("badged", !!lines.length);
     }
-    const panel = panels.get(win);
+    const panel = panels.get(win)?.popup;
     if (!panel || panel.state === "closed" || panel.state === "hiding") {
       const fresh = lazy.AppMenuNotifications.notifications.filter(
         notice =>
@@ -214,7 +199,7 @@ export const SvalNoticesButton = {
         button?.checkVisibility()
       ) {
         fresh.forEach(notice => opened.add(notice));
-        panelFor(win).setAttribute("noautohide", "true");
+        panelFor(win).popup.setAttribute("noautohide", "true");
         this.open(win);
       }
       return;
@@ -239,16 +224,19 @@ export const SvalNoticesButton = {
     if (!button || button.hidden) {
       return;
     }
-    const panel = panelFor(win);
-    if (panel.state === "open" || panel.state === "showing") {
-      panel.hidePopup();
+    const handle = panelFor(win);
+    if (handle.isOpen()) {
+      handle.close();
       return;
     }
-    panel._svalFocusOnShow = focus;
-    panel.openPopup(button, {
-      position: "bottomright topright",
-      y: 6,
-      triggerEvent: null,
-    });
+    handle.openFrom(button, "bottomright topright", { focus });
+  },
+
+  /**
+   * @param {Window} win A browser window.
+   * @returns {object} its popover, as `SvalPopover.create` gave it.
+   */
+  popoverOf(win) {
+    return panelFor(win);
   },
 };

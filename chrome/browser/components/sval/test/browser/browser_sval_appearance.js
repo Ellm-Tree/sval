@@ -131,11 +131,11 @@ function openWorkspaceMenu() {
  * Chooses one entry in an open popup and waits for the popup to close.
  *
  * @param {Element} menu An open `menupopup`.
- * @param {string} selector Which entry.
+ * @param {string} id Which entry, by its id in the menu.
  * @returns {Promise<void>}
  */
-function activate(menu, selector) {
-  return chooseMenuItem(menu.querySelector(selector), menu, selector);
+function activate(menu, id) {
+  return pickMenuItem({ popup: menu }, id);
 }
 
 /**
@@ -192,11 +192,12 @@ add_task(
     const menu = await openContextMenu(SvalPanel._rowElementFor(ids.group));
     for (const command of ["rename", "setColor", "setEmoji"]) {
       Assert.ok(
-        !menu.querySelector(`[data-command="${command}"]:not([hidden])`),
+        !menuItem({ popup: menu }, command) ||
+          menuItem({ popup: menu }, command).hidden,
         `a group's menu folds ${command} into Edit`
       );
     }
-    await activate(menu, '[data-command="edit"]');
+    await activate(menu, "edit");
     const opened = await within(answering, 10_000, "the Edit dialog");
     await TestUtils.waitForCondition(
       async () => (await storedAppearance(engine, ids.group)).color,
@@ -384,7 +385,7 @@ add_task(async function the_switcher_edits_the_workspace() {
   let list = await openSwitcher();
   // Each entry's own submenu edits that entry's workspace.
   Assert.ok(
-    !list.querySelector(':scope > [data-command="edit"]'),
+    !list.querySelector(':scope > [data-sval-menu-id="edit"]'),
     "a left-click lists workspaces and offers no edit"
   );
   let hiddenList = BrowserTestUtils.waitForPopupEvent(list, "hidden");
@@ -394,13 +395,15 @@ add_task(async function the_switcher_edits_the_workspace() {
   const answering = answerEditDialog({ color: "purple" });
   const menu = await openWorkspaceMenu();
   Assert.deepEqual(
-    [...menu.querySelectorAll("[data-command]:not([hidden])")].map(
-      item => item.dataset.command
-    ),
+    [
+      ...menu.querySelectorAll(
+        ":scope > menuitem[data-sval-menu-id]:not([hidden])"
+      ),
+    ].map(item => item.getAttribute("data-sval-menu-id")),
     ["edit", "isolateWorkspace", "deleteWorkspace"],
     "a right-click offers Edit, Isolate and Delete"
   );
-  await activate(menu, '[data-command="edit"]');
+  await activate(menu, "edit");
   let opened = await within(answering, 10_000, "the Edit dialog");
   await TestUtils.waitForCondition(
     async () => (await storedAppearance(engine, ids.workspace)).color,
@@ -627,11 +630,11 @@ add_task(async function a_tab_is_offered_rename_and_not_edit() {
 
   const menu = await openContextMenu(SvalPanel._rowElementFor(ids.tab));
   Assert.ok(
-    menu.querySelector('[data-command="edit"]').hidden,
+    menuItem({ popup: menu }, "edit").hidden,
     "Edit is hidden for a tab"
   );
   Assert.ok(
-    !menu.querySelector('[data-command="rename"]').hidden,
+    !menuItem({ popup: menu }, "rename").hidden,
     "and Rename is offered"
   );
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");

@@ -1031,6 +1031,11 @@ pref("widget.macos.native-context-menus", false);
 pref("widget.macos.native-anchored-menus", false);
 pref("widget.macos.allow-native-select", false);
 
+// Every popup a window opens stays inside it, this far in from each of its
+// edges (`popups-stay-in-window.patch`), as a popover keeps its content in
+// (`SvalStem`).
+pref("ui.popup.window_inset", 16);
+
 // A see-through window on Windows shows the Acrylic backdrop behind it, the
 // closest of the system's backdrops to the HUD material macOS shows. The
 // backdrop reaches a window only while its root carries `windowsmica`
