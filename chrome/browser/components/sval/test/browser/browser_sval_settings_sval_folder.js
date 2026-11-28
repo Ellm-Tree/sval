@@ -69,7 +69,7 @@ add_task(async function a_deleted_sval_folder_is_not_recreated_until_asked() {
     "the other device finds it unreachable too"
   );
 
-  outageWaitedOut();
+  outageRepeats();
   const ui = await openSvalSettings("storage");
   Assert.equal(ui.state, "folder-gone", "the card says Sval can't find it");
   Assert.equal(ui.els.folderPath.textContent, shared, "in the folder named");
@@ -137,7 +137,7 @@ add_task(async function a_chosen_folder_without_sval_waits_to_be_confirmed() {
   Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
   Assert.deepEqual(await IOUtils.getChildren(shared), [], "nothing written");
 
-  outageWaitedOut();
+  outageRepeats();
   const ui = await openSvalSettings("storage");
   Assert.equal(ui.state, "folder-gone", "the card says Sval can't find it");
   Assert.ok(ui.els.storageReuse, "Set up this folder again is offered");

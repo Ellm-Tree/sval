@@ -157,6 +157,19 @@ Object.assign(SvalPanel, {
     if (onRow) {
       return onRow();
     }
+    // The sync indicator's buttons that act on Settings › Sync: `change` and
+    // `choose` run the Sync card's Change… and Choose folder… there.
+    const settingsSection = {
+      openStorageSettings: "storage",
+      chooseSharedFolder: "storage",
+      changeLocation: "change",
+      chooseInUse: "choose",
+      openSyncSettings: "top",
+      pairAgain: "claim",
+    }[command];
+    if (settingsSection) {
+      return this.openSettingsPage(settingsSection);
+    }
     const selecting = {
       extendNext: () => this._extendSelection(1),
       extendPrevious: () => this._extendSelection(-1),
@@ -254,11 +267,6 @@ Object.assign(SvalPanel, {
         return this.switcher.open();
       case "openFavorites":
         return this.openFavorites();
-      case "openStorageSettings":
-      case "chooseSharedFolder":
-        return this.openSettingsPage("storage");
-      case "openSyncSettings":
-        return this.openSettingsPage("top");
       case "reopenCritical":
         return this._reopenCritical();
       case "toggleFeedback":
@@ -267,8 +275,10 @@ Object.assign(SvalPanel, {
         return window.openAboutDialog();
       case "retrySyncKey":
         return this._retrySyncKey();
-      case "pairAgain":
-        return this.openSettingsPage("claim");
+      case "syncNow":
+        // Waits for the folder, as Settings' Sync now does, so the indicator
+        // shows what the folder says now.
+        return this.syncWithFolder();
       case "dismissOtherWorkspaces":
         return this._modules.SvalFolderUpkeep.of(
           this._engine

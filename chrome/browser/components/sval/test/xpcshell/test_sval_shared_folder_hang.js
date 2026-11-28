@@ -170,8 +170,10 @@ add_task(
 
 /**
  * A step queued behind a helper the operating system will not let die waits
- * for its turn only until its own deadline, and then reports its folder
- * unreachable; once that helper has gone, the next step reaches the folder.
+ * for its turn only until its own deadline. The first such step asked the
+ * folder nothing and says so, and the second in a row reports the folder
+ * unreachable (decision 0032); once that helper has gone, the next step
+ * reaches the folder.
  */
 add_task(
   { skip_if: noFifo },
@@ -191,11 +193,17 @@ add_task(
       engine.sharedStepTimeoutMs = 1000;
       engine.setSharedRoot(b);
       const started = Date.now();
-      const late = await engine.sync(WORKSPACE, 2000);
+      const first = await engine.sync(WORKSPACE, 2000);
+      Assert.equal(
+        first.shared,
+        "unknown",
+        "a step whose turn never came asked the folder nothing"
+      );
+      const late = await engine.sync(WORKSPACE, 2100);
       Assert.equal(
         late.shared,
         "unreachable",
-        "a step whose turn never came is an unreachable folder"
+        "and a second in a row is an unreachable folder"
       );
       // The step waits for the stuck one before it, which has the longer
       // deadline, and then for its own turn for one second.

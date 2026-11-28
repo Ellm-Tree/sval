@@ -311,6 +311,13 @@ class SvalMemorySettings {
 
   set backupSaved(value) {}
 
+  /** A store with no sync folder has never synced with one. */
+  get lastSynced() {
+    return null;
+  }
+
+  set lastSynced(at) {}
+
   isDismissedOtherWorkspace() {
     return false;
   }

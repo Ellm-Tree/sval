@@ -88,3 +88,36 @@ add_task(async function a_code_looked_for_again_is_claimed_once() {
   await waitForCondition(() => heard.length, "the look's answer");
   Assert.deepEqual(heard, ["claimed"], "one claimed answer, so one join");
 });
+
+/**
+ * A folder that does not answer is counted claim by claim, so the page can
+ * tell a blip from an outage (decision 0032), and an answer starts the count
+ * again.
+ */
+add_task(async function a_folder_that_does_not_answer_is_counted() {
+  const look = new SvalPairingLook({ pollMs: 0 });
+  const heard = [];
+  const claims = heldClaims();
+  look.start(claims.claim, answer => heard.push(answer));
+  const answerNext = async (index, result) => {
+    await waitForCondition(
+      () => claims.held.length > index,
+      `claim ${index} is made`
+    );
+    claims.held[index].answer(result);
+    await waitForCondition(() => heard.length > index, `answer ${index}`);
+  };
+  await answerNext(0, { status: "waiting", problem: "offline" });
+  await answerNext(1, { status: "waiting", problem: "offline" });
+  await answerNext(2, { status: "waiting" });
+  look.stop();
+  Assert.deepEqual(
+    heard.map(({ problem, failures }) => [problem, failures]),
+    [
+      ["offline", 1],
+      ["offline", 2],
+      [null, 0],
+    ],
+    "two in a row, then the folder answered"
+  );
+});

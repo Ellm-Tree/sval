@@ -214,7 +214,7 @@ Object.assign(SvalPanel, {
       return {
         reached: false,
         unreachable: true,
-        message: this._folderNotYet(),
+        message: this._folderNotReached(),
       };
     }
     const answer = await this.syncWithFolder();
@@ -239,7 +239,7 @@ Object.assign(SvalPanel, {
       reached: false,
       unreachable: true,
       problem: this.syncState.folderProblem,
-      message: this._folderNotYet(),
+      message: this._folderNotReached(this.syncState.folderProblem),
     };
   },
 
@@ -276,12 +276,19 @@ Object.assign(SvalPanel, {
     };
   },
 
-  /** @returns {string} What a folder chosen and not reached yet says. */
-  _folderNotYet() {
-    return (
-      "Sval can't reach the folder yet. Sval syncs once the folder is " +
-      "reachable."
-    );
+  /**
+   * What a folder chosen and not reached says.
+   *
+   * @param {string|null} [problem] Why, as `SvalSharedFolder.folderProblem`
+   *   names it, when a step said.
+   * @returns {string}
+   */
+  _folderNotReached(problem = null) {
+    return problem === "gone"
+      ? "Sval can't find the folder. If the folder is on a drive, connect " +
+          "the drive."
+      : "Sval can't reach the folder. Sval syncs once the folder is " +
+          "reachable.";
   },
 
   /**
@@ -392,7 +399,8 @@ Object.assign(SvalPanel, {
       : {
           reached: false,
           unreachable: true,
-          message: "Sval still can't reach the sync folder.",
+          problem: this.syncState.folderProblem,
+          message: this._folderNotReached(this.syncState.folderProblem),
         };
   },
 

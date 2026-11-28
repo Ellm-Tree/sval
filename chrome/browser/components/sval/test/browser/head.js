@@ -3535,17 +3535,20 @@ function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
 }
 
 /**
- * Moves the start of the folder outage in progress back past the wait the
- * footer gives one before it shows (decision 0032), as three minutes of it
- * would, and has every window and page redraw for it.
+ * Counts the folder outage in progress as the steps in a row the footer
+ * waits for before it shows one (decision 0032), as a step retried in the
+ * background would, and has every window and page redraw for it.
  */
-function outageWaitedOut() {
-  const { FOLDER_UNAVAILABLE_AFTER_MS } = ChromeUtils.importESModule(
+function outageRepeats() {
+  const { FOLDER_UNAVAILABLE_AFTER_STEPS } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
   );
   const state = SvalPanel.syncState;
-  Assert.notEqual(state.unreachableSince, null, "the folder is away");
-  state.unreachableSince -= FOLDER_UNAVAILABLE_AFTER_MS;
+  Assert.greater(state.failedSteps, 0, "the folder is away");
+  state.failedSteps = Math.max(
+    state.failedSteps,
+    FOLDER_UNAVAILABLE_AFTER_STEPS
+  );
   SvalPanel._drawSyncState();
 }
 

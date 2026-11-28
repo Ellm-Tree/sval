@@ -62,13 +62,15 @@ add_task(async function sweep_removes_expired_offers_and_spares_live_ones() {
 });
 
 /**
- * An unreachable folder is "waiting", never "wrong code", and an offer whose
- * folder does not answer is neither there nor gone.
+ * An unreachable folder is "waiting", never "wrong code", with why the
+ * folder did not answer, and an offer whose folder does not answer is
+ * neither there nor gone.
  */
 add_task(async function an_unreachable_folder_is_waiting_not_wrong() {
   const missing = tempPath("sval-pair-missing");
   Assert.deepEqual(await SvalPairing.claim(missing, "ABCDEFGHJKMN"), {
     status: "waiting",
+    problem: "gone",
   });
   Assert.strictEqual(
     await SvalPairing.stillOffered(

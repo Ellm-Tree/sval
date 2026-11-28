@@ -3026,7 +3026,7 @@ export function pairingLine(result, platform, verb = "Join") {
     case "no-folder":
       return {
         ...failed("no-folder", "choose a sync folder first."),
-        action: { label: "Choose Folder…", command: "chooseSharedFolder" },
+        action: { label: "Choose folder…", command: "chooseSharedFolder" },
       };
     default:
       return {
@@ -3262,20 +3262,47 @@ export function lastSyncedText(lastSynced, now) {
   if (lastSynced === null) {
     return "Not synced yet";
   }
+  return `Synced ${syncedAgo(lastSynced, now)}`;
+}
+
+/**
+ * How long ago a sync was, as a phrase that follows "Synced" or "Last
+ * synced". Relative, because the time is kept across a restart, and a time of
+ * day from another day reads as today's.
+ *
+ * @param {number} lastSynced Milliseconds since the epoch.
+ * @param {number} now Milliseconds since the epoch.
+ * @returns {string} `"just now"`, `"5 minutes ago"` and so on.
+ */
+function syncedAgo(lastSynced, now) {
   const seconds = Math.max(0, Math.round((now - lastSynced) / 1000));
   if (seconds < 60) {
-    return "Synced just now";
+    return "just now";
   }
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) {
-    return `Synced ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
   }
   const hours = Math.round(minutes / 60);
   if (hours < 24) {
-    return `Synced ${hours} hour${hours === 1 ? "" : "s"} ago`;
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
   }
   const days = Math.round(hours / 24);
-  return `Synced ${days} day${days === 1 ? "" : "s"} ago`;
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/**
+ * The last sync time as a label, or null when this device has never synced
+ * with the folder.
+ *
+ * @param {number|null} lastSynced Milliseconds since the epoch, or null.
+ * @param {number} now Milliseconds since the epoch.
+ * @returns {string|null}
+ */
+export function lastSyncedLabel(lastSynced, now) {
+  return lastSynced === null
+    ? null
+    : `Last synced ${syncedAgo(lastSynced, now)}`;
 }
 
 /**
@@ -3363,61 +3390,55 @@ function cloudFolder(parts) {
 }
 
 /**
- * How long the shared folder may go unanswered, or missing, before the
- * footer's indicator says so (spec §3, decision 0032). Blips are normal on
- * every folder Sval supports, and a drive comes back or a share remounts.
+ * How many shared steps in a row must fail to reach a folder that is there
+ * before the footer's indicator says the folder is unreachable (spec §3,
+ * decision 0032). One failed reach is a blip, which the engine retries within
+ * seconds (`SvalEngine.SHARED_RETRY_MS`), and a second is an outage.
  */
-export const FOLDER_UNAVAILABLE_AFTER_MS = 3 * 60 * 1000;
+export const FOLDER_UNAVAILABLE_AFTER_STEPS = 2;
 
 /**
- * Whether an outage has lasted long enough for the indicator to show it.
+ * The helper's reasons for a chosen path that is not a folder at all
+ * (`SvalSharedFolder`'s reasons), apart from a folder without Sval's files.
+ */
+const FOLDER_MISSING_CAUSES = new Set(["missing", "not-a-directory"]);
+
+/**
+ * Whether the indicator shows what the folder last answered. A folder that
+ * is not there shows at once: a retry finds the same until someone connects
+ * the drive or chooses the folder again. A pass someone waited on shows its
+ * answer at once too, because they asked.
  *
- * A `now` before the outage began is a clock set back since, and shows it:
- * how long the folder has really been away is unknown then, and waiting for
- * the clock to catch up could hide an outage for as long as the clock moved.
- *
- * @param {number|null} unreachableSince When the outage began, or null.
- * @param {number} now Milliseconds since the epoch. Passed in because nothing
- *   in this module reads a clock.
+ * @param {object} folder As `syncIndicator`'s `folder`.
+ * @param {string|null} folder.problem
+ * @param {number} [folder.failures] Steps in a row that did not reach it.
+ * @param {boolean} [folder.asked] A pass someone waited on did not reach it.
  * @returns {boolean}
  */
-export function showsFolderNotice(unreachableSince, now) {
-  if (unreachableSince === null) {
+export function showsFolderNotice({ problem, failures = 0, asked = false }) {
+  if (problem === null || failures < 1) {
     return false;
   }
-  const away = now - unreachableSince;
-  return away < 0 || away >= FOLDER_UNAVAILABLE_AFTER_MS;
+  return (
+    asked || problem === "gone" || failures >= FOLDER_UNAVAILABLE_AFTER_STEPS
+  );
 }
 
 /**
- * How long saves to this device's own copy fail before the critical dialog
- * says so (messages spec §4): a pass that succeeds within it says nothing.
+ * How many passes in a row must fail to save this device's own copy before
+ * the critical dialog says so (messages spec §4). One failure is a blip that
+ * the next pass may clear, and a second is a fault.
  */
-export const SAVE_FAILING_MS = 60_000;
+export const SAVE_FAILURES_SHOWN = 2;
 
 /**
- * Whether saves have failed long enough for the critical dialog to say so.
+ * Whether saves have failed often enough for the critical dialog to say so.
  *
- * @param {number|null} failingSince When saves began failing, or null while
- *   they save.
- * @param {number} now Milliseconds since the epoch, on the same clock as
- *   `failingSince`. Passed in because nothing in this module reads a clock.
+ * @param {number} failures Passes in a row that failed to save.
  * @returns {boolean}
  */
-export function saveFailureDue(failingSince, now) {
-  return failingSince !== null && now - failingSince >= SAVE_FAILING_MS;
-}
-
-/**
- * A time of day in the user's own format.
- *
- * @param {number} when Milliseconds since the epoch.
- * @returns {string}
- */
-export function shortTime(when) {
-  return new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(
-    when
-  );
+export function saveFailureDue(failures) {
+  return failures >= SAVE_FAILURES_SHOWN;
 }
 
 /** Below this many free bytes, an unreadable profile file means a full disk. */
@@ -3564,6 +3585,35 @@ function indicator(
 }
 
 /**
+ * A state of the folder's, which says its name in the label and when it last
+ * synced under the label, in the footer as on Settings › Sync.
+ *
+ * @param {string} state
+ * @param {string} severity
+ * @param {string} icon
+ * @param {string} label
+ * @param {string|null} synced `lastSyncedLabel`'s answer.
+ * @param {object[]} actions
+ * @returns {object}
+ */
+function folderIndicator(state, severity, icon, label, synced, actions) {
+  const shown = indicator(
+    state,
+    severity,
+    icon,
+    label,
+    synced ? `${label}. ${synced}.` : label,
+    synced ?? "",
+    actions
+  );
+  shown.detailShown = !!synced;
+  return shown;
+}
+
+/** The act that runs a pass and shows what it found. */
+const SYNC_NOW = Object.freeze({ label: "Sync now", command: "syncNow" });
+
+/**
  * The one name of the act that takes a sync key from another device's code,
  * on the footer and in Settings alike.
  */
@@ -3607,8 +3657,11 @@ function unpairedDetail(computer) {
  * @param {"normal"|"private"|"automated"} state.window
  * @param {boolean} state.sharing A sync folder is chosen.
  * @param {boolean} state.firstPassDone
- * @param {{ problem: string|null, since: number|null }} state.folder The
- *   reason from `folderProblem`, and when the folder went away.
+ * @param {{ problem: string|null, cause?: string|null, failures?: number,
+ *   asked?: boolean }} state.folder What the folder last answered, as
+ *   `SvalSyncState` holds it: the reason from `folderProblem`, the helper's
+ *   own reason, the steps in a row that did not reach the folder, and
+ *   whether a pass someone waited on did not reach it.
  * @param {number|null} state.lastSynced
  * @param {string|null} state.keyState One of `SvalIdentity.SYNC_KEY_STATES`,
  *   compared by value: the sync worker loads this module, and
@@ -3617,6 +3670,8 @@ function unpairedDetail(computer) {
  *   key saved, as `SvalSyncState.keySealed`.
  * @param {string} state.platform `AppConstants.platform`.
  * @param {boolean} state.unpairedDevice And not dismissed.
+ * @param {string|null} [state.folderName] The sync folder's name, as
+ *   {@link friendlyFolderName} gives it.
  * @param {Array<string|null>} [state.newerSchema] The names of the other
  *   devices whose files this build skipped as too new, one entry each, null
  *   for one whose name has not arrived.
@@ -3630,7 +3685,6 @@ function unpairedDetail(computer) {
  *   is blamed.
  * @param {{ title: string }|null} state.critical
  * @param {number} state.now Milliseconds since the epoch.
- * @param {Function} state.formatTime Turns a timestamp into a time of day.
  * @returns {object|null} `{ state, severity, icon, label, tooltip, detail,
  *   actions, dismissible, detailShown }`, where `state` names the rule
  *   that held.
@@ -3645,13 +3699,13 @@ export function syncIndicator({
   keySealed = false,
   platform,
   unpairedDevice,
+  folderName = null,
   newerSchema = [],
   newerSchemaOwn = false,
   harmedByClock = [],
   hasReading = true,
   critical,
   now,
-  formatTime,
 }) {
   if (critical) {
     return indicator(
@@ -3678,8 +3732,16 @@ export function syncIndicator({
   }
 
   const problem = folder?.problem ?? null;
-  const waited = showsFolderNotice(folder?.since ?? null, now);
-  const choose = [{ label: "Choose Folder…", command: "chooseSharedFolder" }];
+  const waited = showsFolderNotice({ ...folder, problem });
+  // The folder's own name, as Settings › Sync names it, so the footer and
+  // the page say one thing.
+  const named = folderName ?? "the sync folder";
+  const synced = lastSyncedLabel(lastSynced, now);
+  // The Sync card's buttons for the same states, which the footer's run on
+  // the card.
+  const choose = [
+    { label: "Choose another folder…", command: "changeLocation" },
+  ];
   const computer = `this ${computerNoun(platform)}`;
 
   if ((keyState === "missing" || keyState === "different") && keySealed) {
@@ -3734,14 +3796,21 @@ export function syncIndicator({
     );
   }
   if (problem === "gone" && waited) {
-    return indicator(
-      "folder-gone",
+    // A path that is not there, as a drive unplugged or a folder moved
+    // leaves, apart from a folder that is there without Sval's files: only
+    // the second can be set up again.
+    const missing = FOLDER_MISSING_CAUSES.has(folder?.cause);
+    return folderIndicator(
+      missing ? "folder-missing" : "folder-gone",
       "warning",
       "moon-warning",
-      "Sync folder not found",
-      "Sync folder not found",
-      "",
-      choose
+      missing
+        ? `Can't find ${named}`
+        : `Sval's files are missing from ${named}`,
+      synced,
+      missing
+        ? [SYNC_NOW, { label: "Change…", command: "changeLocation" }]
+        : [{ label: "Choose folder…", command: "chooseInUse" }, SYNC_NOW]
     );
   }
   if (problem === "denied") {
@@ -3834,16 +3903,13 @@ export function syncIndicator({
     );
   }
   if (problem === "offline" && waited) {
-    const detail = "Can't reach your sync folder";
-    return indicator(
+    return folderIndicator(
       lastSynced === null ? "offline-never-synced" : "offline",
       "offline",
       "moon-offline",
-      lastSynced === null
-        ? "Not synced yet"
-        : `Last synced ${formatTime(lastSynced)}`,
-      detail,
-      detail
+      `Can't reach ${named}`,
+      synced,
+      [{ label: "Try again", command: "syncNow" }]
     );
   }
   if (!firstPassDone) {
@@ -3975,7 +4041,11 @@ function pageFor(input) {
     page.working = `Setting up sync with ${friendlyFolderName(working)}…`;
   }
   const computer = `this ${computerNoun(state.platform)}`;
-  const shown = syncIndicator({ ...state, window: "normal" });
+  const shown = syncIndicator({
+    ...state,
+    window: "normal",
+    folderName: sharedRoot ? friendlyFolderName(sharedRoot) : null,
+  });
   if (shown?.state === "critical") {
     return {
       ...page,
@@ -4038,6 +4108,9 @@ function pageFor(input) {
   const restore = act("Restore from a backup…", "restore");
   const chooseAnother = act("Choose another folder…", "changeLocation");
   const Computer = capitalized(computer);
+  // The sentence that opens a problem's detail, or "" before a first sync.
+  const synced = lastSyncedLabel(state.lastSynced, state.now);
+  const lastSyncedSentence = synced ? `${synced}. ` : "";
 
   switch (shown.state) {
     case "syncing":
@@ -4055,10 +4128,10 @@ function pageFor(input) {
       const stay = `Your Workspaces stay on ${computer}.`;
       Object.assign(page, {
         tone: "waiting",
-        title: `Can't reach ${name}`,
+        title: shown.label,
         detail:
           shown.state === "offline"
-            ? `Last synced ${state.formatTime(state.lastSynced)}. ${stay} ` +
+            ? `${lastSyncedSentence}${stay} ` +
               `Sval syncs again once ${name} is reachable.`
             : `${stay} Sval syncs once ${name} is reachable.`,
         reveal: false,
@@ -4066,18 +4139,29 @@ function pageFor(input) {
       });
       break;
     }
+    case "folder-missing":
+      Object.assign(page, {
+        tone: "problem",
+        title: shown.label,
+        detail:
+          lastSyncedSentence +
+          `Connect the drive that holds ${name}, or select Change… to ` +
+          `choose ${name} in the new place.`,
+        reveal: false,
+        primary: syncNow,
+      });
+      break;
     case "folder-gone":
       Object.assign(page, {
         tone: "problem",
-        title: `Sval can't find ${name}`,
+        title: shown.label,
         detail:
-          `Sval's files are missing from ${name}. If you moved ${name}, ` +
-          `choose the folder in the new place. Otherwise, set up ${name} ` +
-          "again.",
+          `${lastSyncedSentence}If you moved ${name}, choose the folder in ` +
+          `the new place. Otherwise, set up ${name} again.`,
         reveal: false,
         change: false,
         primary: act("Choose folder…", "chooseInUse"),
-        secondary: [act("Set up folder again", "useFolderAgain")],
+        secondary: [act("Set up folder again", "useFolderAgain"), syncNow],
       });
       break;
     case "folder-denied":
@@ -4204,7 +4288,9 @@ function pageFor(input) {
       });
     }
     const running = action =>
-      action.command === "syncNow" ? { ...action, disabled: true } : action;
+      action.command === "syncNow"
+        ? { ...action, disabled: true, busy: true }
+        : action;
     page.primary = page.primary && running(page.primary);
     page.secondary = page.secondary.map(running);
   }

@@ -282,6 +282,7 @@
             button.dataset.command = action.command;
             button.textContent = action.label;
             button.disabled = !!action.disabled || page.working !== null;
+            button.busy = !!action.busy;
             return button;
           })
         );

@@ -102,6 +102,14 @@ const KEY_COPY_MAX_BYTES = 4096;
 export const SHARED_INTERVAL_MS = 30000;
 
 /**
+ * How soon after a shared step that did not reach the folder the next one is
+ * due, once (decision 0032). One failed reach is often a blip, and a quick
+ * second try tells a blip from an outage in seconds. A second failure in a
+ * row is an outage, and the steps go back to {@link SHARED_INTERVAL_MS}.
+ */
+export const SHARED_RETRY_MS = 5000;
+
+/**
  * How long this device's own file in the shared folder stays unreadable
  * before it is set aside and written afresh (decision 1144): long enough for
  * a cloud client to finish downloading it.
@@ -313,6 +321,29 @@ export class SvalEngine extends SvalWorkerClient {
 
   #sharedStepTimeoutMs = SHARED_STEP_TIMEOUT_MS;
   #sharedIntervalMs = SHARED_INTERVAL_MS;
+  #sharedRetryMs = SHARED_RETRY_MS;
+
+  /**
+   * How many shared steps in a row have not reached the folder: 0 once one
+   * does, and while the folder answers with a fault of its own (too large,
+   * or this device's own file unreadable).
+   */
+  #sharedFailures = 0;
+
+  /**
+   * Whether the last shared step never had its turn at the helper ("busy")
+   * and so asked the folder nothing (see `#unreachable`).
+   */
+  #sharedNoTurn = false;
+
+  /**
+   * The helper's own reason for the last step that did not reach the folder,
+   * such as `"missing"` for a path that is not there; null when it reached.
+   * {@link folderProblem} groups the reasons by what a user can do, and a
+   * missing path and a folder without Sval's files share its group but have
+   * different remedies.
+   */
+  #sharedCause = null;
 
   /** The `now` of the last shared step's start, or null when one is due. */
   #sharedLastRun = null;
@@ -672,6 +703,8 @@ export class SvalEngine extends SvalWorkerClient {
    *   take. A test shortens it.
    * @param {number} [identity.sharedIntervalMs] How often a background pass
    *   runs a shared step.
+   * @param {number} [identity.sharedRetryMs] How soon a background pass runs
+   *   a shared step again after one that did not reach the folder.
    * @param {number} [identity.passRequestDelayMs] How long a requested pass
    *   waits for others to join it.
    * @param {Uint8Array} identity.localKey The 32 bytes this device's own copy
@@ -688,6 +721,7 @@ export class SvalEngine extends SvalWorkerClient {
     sharedRoot = null,
     sharedStepTimeoutMs = SHARED_STEP_TIMEOUT_MS,
     sharedIntervalMs = SHARED_INTERVAL_MS,
+    sharedRetryMs = SHARED_RETRY_MS,
     passRequestDelayMs = PASS_REQUEST_DELAY_MS,
     keyBytes = null,
     localKey = keyBytes,
@@ -699,6 +733,7 @@ export class SvalEngine extends SvalWorkerClient {
     this.#sharedRoot = sharedRoot;
     this.#sharedStepTimeoutMs = sharedStepTimeoutMs;
     this.#sharedIntervalMs = sharedIntervalMs;
+    this.#sharedRetryMs = sharedRetryMs;
     this.#localKey = checkedKey(localKey, "this engine was not made");
     this.#syncKey =
       syncKey === null ? null : checkedKey(syncKey, "this engine was not made");
@@ -843,6 +878,9 @@ export class SvalEngine extends SvalWorkerClient {
     this.#sharedLastRun = null;
     this.#sharedState = "unknown";
     this.#sharedReason = null;
+    this.#sharedFailures = 0;
+    this.#sharedNoTurn = false;
+    this.#sharedCause = null;
     this.#sharedProblems.clear();
     this.#ownUnreadSince.clear();
     if (path === null) {
@@ -1008,6 +1046,7 @@ export class SvalEngine extends SvalWorkerClient {
       sharedRoot: this.#sharedRoot,
       sharedStepTimeoutMs: this.#sharedStepTimeoutMs,
       sharedIntervalMs: this.#sharedIntervalMs,
+      sharedRetryMs: this.#sharedRetryMs,
       localKey: this.#localKey,
       syncKey: keyBytes,
       deviceId: this.#deviceId,
@@ -1278,7 +1317,9 @@ export class SvalEngine extends SvalWorkerClient {
    *   publishes this call's changes, whatever the interval: the one running,
    *   when it can, or a new one; `"background"` starts one if the interval
    *   has passed and none is running, without waiting for it; `"skip"` writes
-   *   the profile only.
+   *   the profile only. `"fresh"` is `"wait"` for someone who asked what the
+   *   folder says now: a step already running may have looked at the folder
+   *   before the question, so it is waited out and a new one runs.
    * @param {number} [options.idleWithinMs] For a pass with nothing of its own
    *   to publish, a window's idle poll: run nothing, and resolve null, when a
    *   pass for this document began less than this long before `now`, or when
@@ -1297,8 +1338,11 @@ export class SvalEngine extends SvalWorkerClient {
    *   `shared` is `"none"` (no shared folder, or it is the profile),
    *   `"reached"`, `"unreachable"`, `"too-large"` (the folder holds more
    *   than one step reads, decision 0032), or `"unknown"` (no shared step has
-   *   finished since the folder was set). `sharedRan` is whether this report
-   *   carries a shared step's outcome. `sharedWrote` is the engine-relative
+   *   finished since the folder was set). `sharedReason` is
+   *   {@link folderProblem}'s name for why the last step did not reach the
+   *   folder, `sharedCause` the helper's own reason, and `sharedFailures` how
+   *   many steps in a row have not reached it. `sharedRan` is whether this
+   *   report carries a shared step's outcome. `sharedWrote` is the engine-relative
    *   path written to the shared folder, or null. `unreadable` names files
    *   that could not be read at all, which never abort a pass; it,
    *   `errors` and `schemaTooNew` include the last shared step's per-file
@@ -1378,10 +1422,12 @@ export class SvalEngine extends SvalWorkerClient {
     this.#read.add(workspace);
     let report = local;
     if (!this.#sharesNowhere()) {
-      if (shared === "wait") {
+      if (shared === "wait" || shared === "fresh") {
         let step;
         try {
-          step = await this.#stepPublishing(changes, workspace, now);
+          step = await this.#stepPublishing(changes, workspace, now, {
+            fresh: shared === "fresh",
+          });
         } catch (err) {
           if (Object(err) === err) {
             this.#sharedStepFailures.add(err);
@@ -1433,15 +1479,18 @@ export class SvalEngine extends SvalWorkerClient {
    * @param {number} changes The change count when the caller began.
    * @param {string} workspace The document name.
    * @param {number} now Milliseconds since the epoch.
+   * @param {object} [options]
+   * @param {boolean} [options.fresh] Join no step already running.
    * @returns {Promise<object>} the step's report.
    */
-  async #stepPublishing(changes, workspace, now) {
+  async #stepPublishing(changes, workspace, now, { fresh = false } = {}) {
     for (;;) {
       const running = this.#sharedStep;
       if (!running) {
         return this.#startSharedStep(workspace, now);
       }
       if (
+        !fresh &&
         running.generation === this.#sharedGeneration &&
         running.workspace === workspace &&
         [...this.#extraDocuments.keys()].every(name =>
@@ -1456,9 +1505,11 @@ export class SvalEngine extends SvalWorkerClient {
   }
 
   /**
-   * Whether a background shared step is due at `now`. A `now` earlier than the
-   * last step's is a clock set back, and counts as due: otherwise shared steps
-   * would stop until the clock caught up again.
+   * Whether a background shared step is due at `now`: {@link SHARED_RETRY_MS}
+   * after the first step in a row that did not reach the folder, and the
+   * interval after any other. A `now` earlier than the last step's is a clock
+   * set back, and counts as due: otherwise shared steps would stop until the
+   * clock caught up again.
    *
    * @param {number} now Milliseconds since the epoch.
    * @returns {boolean}
@@ -1468,7 +1519,11 @@ export class SvalEngine extends SvalWorkerClient {
       return true;
     }
     const elapsed = now - this.#sharedLastRun;
-    return elapsed < 0 || elapsed >= this.#sharedIntervalMs;
+    const wait =
+      this.#sharedFailures === 1 || this.#sharedNoTurn
+        ? this.#sharedRetryMs
+        : this.#sharedIntervalMs;
+    return elapsed < 0 || elapsed >= wait;
   }
 
   /**
@@ -1709,6 +1764,8 @@ export class SvalEngine extends SvalWorkerClient {
       ],
       shared: none ? "none" : this.#sharedState,
       sharedReason: none ? null : this.#sharedReason,
+      sharedCause: none ? null : this.#sharedCause,
+      sharedFailures: none ? 0 : this.#sharedFailures,
       sharedRan: false,
       sharedWrote: null,
     };
@@ -1919,6 +1976,9 @@ export class SvalEngine extends SvalWorkerClient {
 
     this.#sharedState = "reached";
     this.#sharedReason = null;
+    this.#sharedFailures = 0;
+    this.#sharedNoTurn = false;
+    this.#sharedCause = null;
     for (const [name, { merged }] of outcomes) {
       this.#sharedProblems.set(name, {
         errors: merged.errors ?? [],
@@ -2111,8 +2171,29 @@ export class SvalEngine extends SvalWorkerClient {
    */
   async #unreachable(workspace, now, { reason, error }) {
     SvalLog.debug(`shared folder unreachable: ${reason}`);
+    // "busy" is a request whose turn at the helper never came, so the step
+    // asked the folder nothing: on a loaded machine the requests ahead of it
+    // can be slow while the folder is fine. With no outage under way it says
+    // nothing and is retried soon. A second in a row, or one during an
+    // outage, is the helper ahead stuck in the folder, and counts.
+    if (
+      reason === "busy" &&
+      this.#sharedFailures === 0 &&
+      !this.#sharedNoTurn
+    ) {
+      this.#sharedNoTurn = true;
+      return this.#localPasses(workspace, now);
+    }
+    this.#sharedNoTurn = false;
     this.#sharedState = reason === "too-large" ? "too-large" : "unreachable";
     this.#sharedReason = folderProblem(reason, error);
+    this.#sharedCause = reason;
+    // A folder too large, or one whose only fault is this device's own file,
+    // answered, and a step soon after would find the same.
+    this.#sharedFailures =
+      this.#sharedReason === "too-large" || this.#sharedReason === "own-file"
+        ? 0
+        : this.#sharedFailures + 1;
     return {
       ...(await this.#localPasses(workspace, now)),
       sharedRan: true,

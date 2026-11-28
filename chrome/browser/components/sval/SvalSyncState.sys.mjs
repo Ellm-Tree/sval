@@ -8,7 +8,8 @@ const states = new WeakMap();
 
 /**
  * What an engine's passes have found: the last report, what the shared
- * folder answered and since when, whether this device's copy is saving,
+ * folder answered and how many steps in a row it has not answered, when it
+ * last synced, whether this device's copy is saving,
  * the state of the sync key the engine shares under, and another key's
  * workspaces found in the folder.
  *
@@ -34,21 +35,38 @@ export class SvalSyncState {
    */
   folderProblem = null;
 
-  /** When the current outage began, or null while the folder answers. */
-  unreachableSince = null;
+  /**
+   * The helper's own reason for the last step that did not reach the folder,
+   * as the engine's report carries it (`sharedCause`), or null while the
+   * folder answers.
+   */
+  folderCause = null;
 
   /**
-   * When a step last reached the shared folder, in milliseconds since the
-   * epoch, or null. Always null with no shared folder: nothing is synced
-   * then.
+   * How many shared steps in a row have not reached the folder, as the
+   * engine counts them (`sharedFailures`). 0 while the folder answers.
    */
-  lastSynced = null;
+  failedSteps = 0;
 
   /**
-   * When passes began failing to save this device's copy, on the system
-   * clock, or null while they save.
+   * Whether a pass someone waited on (`SvalPanel.syncWithFolder`) found the
+   * folder unreachable. A person who asks what the folder says gets its
+   * answer, so the indicator shows the outage without waiting for a second
+   * step (decision 0032). Cleared once a step reaches the folder.
    */
-  saveFailingSince = null;
+  failureAsked = false;
+
+  /** How many passes in a row have failed to save this device's copy. */
+  saveFailures = 0;
+
+  /**
+   * The profile's `SvalLocalSettings` store, which keeps {@link lastSynced}
+   * across a restart, or null before {@link keepIn}.
+   */
+  #settings = null;
+
+  /** {@link lastSynced} for a state with no store to keep it in. */
+  #lastSynced = null;
 
   /**
    * The sync key's state, one of `SvalIdentity.SYNC_KEY_STATES`: `present`
@@ -103,17 +121,56 @@ export class SvalSyncState {
         : SvalIdentity.SYNC_KEY_STATES.none;
       states.set(engine, state);
       engine.addSharedListener(report => state.#heard(report));
+      // A pass that carries a shared step's outcome waited for that step:
+      // background steps report through the shared listener alone.
       engine.addPassListener(report => {
-        state.saveFailingSince = null;
-        state.#heard(report);
+        state.saveFailures = 0;
+        state.#heard(report, { waited: !!report?.sharedRan });
       });
-      // The pass's own `now` is corrected time (decision 1714), and how
-      // long saving has failed is measured on the system clock.
       engine.addFailureListener(() => {
-        state.saveFailingSince ??= Date.now();
+        state.saveFailures++;
       });
     }
     return state;
+  }
+
+  /**
+   * When a step last reached the shared folder chosen now, in milliseconds
+   * since the epoch, or null when none has. Kept in the profile's settings
+   * once {@link keepIn} has named them, so a launch knows when this device
+   * last synced before its first step answers. Always null with no shared
+   * folder: nothing is synced then.
+   *
+   * @returns {number|null}
+   */
+  get lastSynced() {
+    return this.#settings ? this.#settings.lastSynced : this.#lastSynced;
+  }
+
+  set lastSynced(at) {
+    if (!this.#settings) {
+      this.#lastSynced = at;
+      return;
+    }
+    this.#settings.lastSynced = at;
+    this.#settings.saveSoon();
+  }
+
+  /**
+   * Keeps {@link lastSynced} in `settings` from now on.
+   *
+   * @param {object} settings The profile's `SvalLocalSettings` store.
+   */
+  keepIn(settings) {
+    if (this.#settings === settings) {
+      return;
+    }
+    const heard = this.#lastSynced;
+    this.#settings = settings;
+    // A step heard before the store was named is newer than the store's.
+    if (heard !== null && heard > (settings.lastSynced ?? -Infinity)) {
+      this.lastSynced = heard;
+    }
   }
 
   /**
@@ -170,22 +227,37 @@ export class SvalSyncState {
    * Forgets what the folder answered: the profile chose another, or none.
    */
   leftFolder() {
+    this.#forgetAnswer();
+    this.lastSynced = null;
+  }
+
+  /** Forgets what the folder last answered, and keeps when it last synced. */
+  #forgetAnswer() {
     this.folderState = "none";
     this.folderProblem = null;
-    this.unreachableSince = null;
-    this.lastSynced = null;
+    this.folderCause = null;
+    this.failedSteps = 0;
+    this.failureAsked = false;
   }
 
   /**
    * Takes a pass's or a shared step's report.
    *
    * @param {object} report A `SvalEngine.sync()` result.
+   * @param {object} [options]
+   * @param {boolean} [options.waited] Someone waited on the report's step.
    */
-  #heard(report) {
+  #heard(report, { waited = false } = {}) {
     this.lastPass = report;
     const now = Date.now();
     if (report.shared === "none") {
-      this.leftFolder();
+      // The engine shares nowhere, which a key that is locked for now also
+      // makes it do. The folder is still the profile's choice, so when it
+      // last synced stays: choosing another or none is `leftFolder`.
+      this.#forgetAnswer();
+      if (!this.#settings) {
+        this.#lastSynced = null;
+      }
       return;
     }
     // A pass that ran no shared step reports the engine's last known state,
@@ -198,32 +270,39 @@ export class SvalSyncState {
         report.shared === "unreachable" ||
         report.shared === "too-large")
     ) {
-      this.folderState = report.shared;
-      this.folderProblem = report.sharedReason ?? null;
+      this.#took(report);
     }
     // A pass that ran no shared step, or whose step has not yet got an answer
     // from the folder, says nothing new about it.
     if (!report.sharedRan || report.shared === "unknown") {
       return;
     }
-    this.folderState = report.shared;
-    this.folderProblem = report.sharedReason ?? null;
+    this.#took(report);
     if (report.shared === "unreachable") {
       // A pass that could not read this device's own file heard from the
-      // folder, and Sval recovers that file (messages spec §8.2), so the
-      // folder's wait (decision 0032) does not start.
-      if (this.folderProblem === "own-file") {
-        this.unreachableSince = null;
-      } else {
-        this.unreachableSince ??= now;
+      // folder, and Sval recovers that file (messages spec §8.2).
+      if (waited && this.folderProblem !== "own-file") {
+        this.failureAsked = true;
       }
       return;
     }
-    this.unreachableSince = null;
+    this.failureAsked = false;
     // The folder answered, and nothing in it was synced.
     if (report.shared === "too-large") {
       return;
     }
     this.lastSynced = now;
+  }
+
+  /**
+   * Takes what `report` says the folder last answered.
+   *
+   * @param {object} report A `SvalEngine.sync()` result.
+   */
+  #took(report) {
+    this.folderState = report.shared;
+    this.folderProblem = report.sharedReason ?? null;
+    this.folderCause = report.sharedCause ?? null;
+    this.failedSteps = report.sharedFailures ?? 0;
   }
 }

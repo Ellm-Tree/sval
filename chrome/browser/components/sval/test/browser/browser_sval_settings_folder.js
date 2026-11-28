@@ -55,7 +55,11 @@ async function aFolderDenied() {
   );
 }
 
-add_task(async function choose_folder_opens_the_storage_settings() {
+/**
+ * The footer's Choose another folder… does what the Sync card's does: it
+ * opens the Change dialog in Settings › Sync.
+ */
+add_task(async function choose_another_folder_opens_the_change_dialog() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
   await panelOnAFolder("notice", { shared: true });
   // The panel brings an open settings tab forward instead of opening another,
@@ -67,7 +71,7 @@ add_task(async function choose_folder_opens_the_storage_settings() {
   }
   await aFolderDenied();
   const choose = SvalPanel._els.syncActions.querySelector(
-    '[data-command="chooseSharedFolder"]'
+    '[data-command="changeLocation"]'
   );
   Assert.ok(choose?.textContent, "the button is there");
   const opened = BrowserTestUtils.waitForNewTab(gBrowser, url =>
@@ -77,8 +81,14 @@ add_task(async function choose_folder_opens_the_storage_settings() {
   const tab = await within(opened, 10_000, "the folder's tab");
   registerCleanupFunction(() => BrowserTestUtils.removeTab(tab));
   Assert.ok(
-    tab.linkedBrowser.currentURI.spec.endsWith("#svalSync-storage"),
+    tab.linkedBrowser.currentURI.spec.endsWith("#svalSync-change"),
     "the page opens on the storage section"
+  );
+  await TestUtils.waitForCondition(
+    () =>
+      tab.linkedBrowser.contentDocument?.getElementById("sval-location-dialog")
+        ?.open,
+    "with the Change dialog open, as the Sync card's Change… opens it"
   );
 });
 
@@ -93,33 +103,44 @@ add_task(async function the_storage_section_follows_the_folder_while_open() {
 
   const away = `${shared}-away`;
   await IOUtils.move(shared, away);
-  // A background pass would run its shared step within thirty seconds; the
-  // test asks for one now.
-  await SvalPanel.syncWithFolder();
-  Assert.equal(SvalPanel.syncState.folderProblem, "gone");
-  Assert.equal(ui.state, "synced", "the page waits as the footer does");
-  outageWaitedOut();
-  await TestUtils.waitForCondition(
-    () => ui.state === "folder-gone" && ui.els.storageReuse,
-    "then offers the way back"
+  // The first background step after the folder went, as the poll runs one
+  // once the interval is up.
+  const { SHARED_INTERVAL_MS } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalEngine.sys.mjs"
   );
+  const { SYNC_DOCUMENT } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+  );
+  await SvalPanel.engine.sync(SYNC_DOCUMENT, Date.now() + SHARED_INTERVAL_MS, {
+    shared: "background",
+  });
+  await TestUtils.waitForCondition(
+    () => SvalPanel.syncState.failedSteps === 1,
+    "the step that found the folder missing"
+  );
+  Assert.equal(SvalPanel.syncState.folderCause, "missing");
+  await TestUtils.waitForCondition(
+    () => ui.state === "folder-missing",
+    "a missing folder shows on the first step"
+  );
+  Assert.ok(!ui.els.storageReuse, "with no folder to set up again");
   Assert.equal(
-    ui.command("chooseInUse"),
+    ui.command("syncNow"),
     ui.els.syncButtons.querySelector('[type="primary"]'),
-    "with choosing the folder again first"
+    "Sync now looks for the folder again"
   );
   Assert.ok(
-    BrowserTestUtils.isHidden(ui.els.storageChange) &&
-      BrowserTestUtils.isHidden(ui.els.folderReveal),
-    "and nothing else that would act on a folder that isn't there"
+    BrowserTestUtils.isVisible(ui.els.storageChange),
+    "and Change… chooses the folder in a new place"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(ui.els.folderReveal),
+    "with no Finder for a folder that isn't there"
   );
 
   await IOUtils.move(away, shared);
-  await SvalPanel.syncWithFolder();
-  await TestUtils.waitForCondition(
-    () => ui.state === "synced" && !ui.els.storageReuse,
-    "and withdraws it when the folder returns"
-  );
+  await syncFromSettings(ui);
+  Assert.equal(ui.state, "synced", "Sync now finds the folder back at once");
 });
 
 /**
@@ -193,11 +214,11 @@ add_task(async function stop_syncing_keeps_the_workspaces() {
 });
 
 /**
- * A Sync now that finds the folder gone says what the footer's indicator
- * says, which waits three minutes before it shows (messages spec §3), so
- * nothing at first.
+ * A Sync now that finds Sval's files gone from the folder says so at once,
+ * as the footer's indicator does: the person pressing it asked what the
+ * folder says (messages spec §3, decision 0032).
  */
-add_task(async function sync_now_leaves_a_gone_folder_to_the_indicator() {
+add_task(async function sync_now_answers_with_a_gone_folder() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
   const device = await panelOnAFolder("unavailable", { shared: true });
   const ui = await openSvalSettings();
@@ -214,8 +235,13 @@ add_task(async function sync_now_leaves_a_gone_folder_to_the_indicator() {
   });
   await syncFromSettings(ui);
   Assert.equal(SvalPanel.syncState.folderProblem, "gone", "the folder is gone");
-  Assert.equal(ui.state, "synced", "and nothing says so yet");
-  Assert.equal(ui.els.storageStatus.textContent, "", "anywhere on the card");
+  Assert.equal(ui.state, "folder-gone", "and the card says so at once");
+  Assert.equal(
+    SvalPanel.syncIndicator().state,
+    "folder-gone",
+    "as the footer does"
+  );
+  Assert.equal(ui.els.storageStatus.textContent, "", "with no line of its own");
 });
 
 /**
@@ -245,7 +271,7 @@ add_task(
     await SvalSharedFolder._whenIdle();
     Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
     Assert.deepEqual(await IOUtils.getChildren(later), [], "nothing written");
-    outageWaitedOut();
+    outageRepeats();
     await TestUtils.waitForCondition(
       () => ui.els.storageReuse,
       "Set up this folder again is offered once the footer says so too"
@@ -269,7 +295,7 @@ add_task(
     await keyCopyIn(reuse, "the step that reached the folder left the key");
     await IOUtils.remove(PathUtils.join(reuse, "sval"), { recursive: true });
     await SvalPanel.syncWithFolder();
-    outageWaitedOut();
+    outageRepeats();
     await TestUtils.waitForCondition(
       () => ui.els.storageReuse,
       "the gone folder offers to be set up again"

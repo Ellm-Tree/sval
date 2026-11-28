@@ -638,6 +638,26 @@
       const named = lazy.SvalPanelModel.friendlyFolderName(
         this._sharedRoot() ?? ""
       );
+      // A folder that does not answer is said as the sync indicator says it
+      // (decision 0032), and the look goes on, so the dialog moves on once
+      // the folder is back.
+      if (
+        lazy.SvalPanelModel.showsFolderNotice({
+          problem: answer.problem ?? null,
+          failures: answer.failures ?? 0,
+        })
+      ) {
+        const gone = answer.problem === "gone";
+        dialog.update({
+          state: gone ? "folder-missing" : "folder-unreachable",
+          warning: gone
+            ? `Sval can't find ${named}. If ${named} is on a drive, ` +
+              "connect the drive."
+            : `Sval can't reach ${named}. Sval keeps looking for the code ` +
+              `until ${named} is reachable.`,
+        });
+        return;
+      }
       dialog.update({
         state: "waiting",
         warning:

@@ -18,7 +18,8 @@ disk, and the one fault that loses work looks like the rest.
   label only when the state needs one, a button only when the user must act.
   The most severe state shows. With no sync folder chosen, the row is absent.
 - A folder that is unreachable shows the moon dimmed with the last-synced
-  time, "Last synced 3:42 PM", after three minutes. The time while healthy is
+  time, "Last synced 2 hours ago", once the outage is more than a blip
+  (decision 0032). The time while healthy is
   the icon's tooltip. Offline is a state of the indicator.
 - A problem that fixes itself says nothing. A file from another device that
   can't be read goes to the log.

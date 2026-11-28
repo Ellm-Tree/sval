@@ -267,6 +267,10 @@ do.
   keeps the sync key locked with an item in the Keychain, Windows Credential
   Manager or keyring. When that item is missing or belongs to another copy of
   Sval, Settings says Sval can't unlock the saved sync key.
+- **A sync folder that goes missing.** When the sync folder's drive isn't
+  connected or the folder moves, the sync indicator and Settings say **Can't
+  find** and the folder's name straight away. Under the folder's name, Sval
+  says how long ago Sval last synced and offers **Sync now**.
 - **Back up your sync key.** Sval offers to back up the sync key when Sval
   makes the key. If you lose every device, set up Sval on a new device.
   Choose "I use Sval on another device", then the sync folder, then "Restore

@@ -181,6 +181,58 @@ fn a_folder_that_is_not_there_or_not_mounted_says_so() {
     assert!(!f.at("sval").exists());
 }
 
+/// Only the system's "no such entry" or "not a directory" makes a folder
+/// missing. A look that fails any other way, as a loop of links or a slow
+/// disk's error does, is an I/O error, which the browser retries, and never
+/// reads as a folder that is not there.
+#[cfg(unix)]
+#[test]
+fn a_look_that_fails_is_never_a_missing_folder() {
+    use std::os::unix::fs::symlink;
+    let f = Fixture::new("look-fails");
+    let looped = f.root.join("looped");
+    symlink(&looped, &looped).unwrap();
+    let answer = f.ask(json!({ "op": "exists", "path": "sval", "root": looped.to_str().unwrap() }));
+    assert_eq!(answer["reachable"], false);
+    assert_eq!(
+        answer["reason"], "io-error",
+        "a loop of links is no absence"
+    );
+
+    f.put("file", b"x");
+    let below_a_file = f.at("file").join("folder");
+    assert_eq!(
+        f.ask(json!({ "op": "exists", "path": "sval", "root": below_a_file.to_str().unwrap() })),
+        json!({ "reachable": false, "reason": "not-a-directory" }),
+        "a path through a file is not a folder"
+    );
+}
+
+/// A top directory that fails to look up, other than by being absent, is that
+/// failure: it never reads as a folder without Sval's files.
+#[cfg(unix)]
+#[test]
+fn a_top_directory_that_fails_to_look_up_is_never_no_sval_dir() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fixture::new("top-fails");
+    // The link check passes the top directory over, so the look itself is
+    // what fails: a loop of links answers ELOOP.
+    f.folder.linked_dir = |_| Ok(false);
+    let top = f.at("sval");
+    symlink(&top, &top).unwrap();
+    let answer = f.ask(json!({ "op": "exists", "path": "sval", "requireTop": "sval" }));
+    assert_eq!(answer["reachable"], false);
+    assert_eq!(
+        answer["reason"], "io-error",
+        "a top directory that fails to look up is not a missing one"
+    );
+    assert_eq!(
+        f.ask(json!({ "op": "exists", "path": "x", "root": f.root(), "requireTop": "absent" })),
+        json!({ "reachable": false, "reason": "no-sval-dir" }),
+        "and one the system says is not there still is"
+    );
+}
+
 #[test]
 fn a_request_that_is_not_one_is_refused_whole() {
     let f = Fixture::new("invalid");

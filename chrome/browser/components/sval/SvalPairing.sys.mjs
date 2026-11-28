@@ -21,6 +21,7 @@
 import {
   SvalSharedFolder,
   SHARED_STEP_TIMEOUT_MS,
+  folderProblem,
 } from "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs";
 import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
@@ -340,7 +341,8 @@ export const SvalPairing = {
    *   - `{ status: "claimed", keyBytes, path }`: `code` opened the candidate
    *     at `path`, which is still in the folder.
    *   - `{ status: "waiting" }`: the folder holds no parseable candidate
-   *     that is not stale.
+   *     that is not stale. When the folder did not answer, `problem` says
+   *     why, as `SvalSharedFolder.folderProblem` names it.
    *   - `{ status: "no-match" }`: at least one candidate was tried and none
    *     opened under `code`.
    */
@@ -348,7 +350,10 @@ export const SvalPairing = {
     const read = await listOffers(root);
     if (!read.reachable) {
       // The next poll asks again.
-      return { status: "waiting" };
+      return {
+        status: "waiting",
+        problem: folderProblem(read.reason, read.error),
+      };
     }
     if (!read.entries.length) {
       return { status: "waiting" };
@@ -491,6 +496,9 @@ export class SvalPairingLook {
   #timer = null;
   #timers;
 
+  /** How many claims in a row the folder has not answered. */
+  #failures = 0;
+
   /** Milliseconds between claims while the answer is `waiting`. */
   pollMs;
 
@@ -520,8 +528,11 @@ export class SvalPairingLook {
    * @param {Function} claim `() => Promise<object>`: one claim of the code,
    *   answering as `SvalPairing.claim` does.
    * @param {Function} onAnswer `(answer) => void`, given each answer of this
-   *   look while it is current: `{ status: "waiting" }` for every answer that
-   *   leaves the look going, then the one that ends it: `claimed`, with
+   *   look while it is current: `{ status: "waiting", problem, failures }`
+   *   for every answer that leaves the look going, where `problem` is why the
+   *   folder last did not answer, or null when it did, and `failures` how
+   *   many claims in a row it has not answered; then the one that ends it:
+   *   `claimed`, with
    *   what the claim found, `no-match`, or `{ status: "failed", error }`
    *   when the claim threw. The look has ended before an ending answer is
    *   given, so the page may start another from it.
@@ -529,6 +540,7 @@ export class SvalPairingLook {
   start(claim, onAnswer) {
     this.stop();
     this.#looking = true;
+    this.#failures = 0;
     this.#claimFor(this.#run, claim, onAnswer);
   }
 
@@ -571,7 +583,9 @@ export class SvalPairingLook {
           this.#claimFor(run, claim, onAnswer);
         }
       }, this.pollMs);
-      onAnswer({ status: "waiting" });
+      const problem = answer?.problem ?? null;
+      this.#failures = problem ? this.#failures + 1 : 0;
+      onAnswer({ status: "waiting", problem, failures: this.#failures });
       return;
     }
     this.stop();

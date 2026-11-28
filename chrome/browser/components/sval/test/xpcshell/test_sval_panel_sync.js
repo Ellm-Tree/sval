@@ -45,20 +45,35 @@ add_task(function the_last_synced_time_can_say_never() {
 });
 
 /**
- * An outage shows after three minutes (messages spec §3, decision 0032).
+ * A folder that is there and does not answer shows on the second failed
+ * step in a row, a missing one on the first, and a failure someone waited
+ * on at once (messages spec §3, decision 0032).
  */
-add_task(function an_outage_shows_after_three_minutes() {
-  const { FOLDER_UNAVAILABLE_AFTER_MS, showsFolderNotice } = SvalPanelModel;
-  Assert.equal(FOLDER_UNAVAILABLE_AFTER_MS, 3 * 60 * 1000, "three minutes");
-  Assert.ok(!showsFolderNotice(null, 1e12), "not while the folder answers");
-  Assert.ok(!showsFolderNotice(1e12, 1e12 + 30 * 1000), "not after 30 seconds");
+add_task(function an_outage_shows_when_it_repeats() {
+  const { showsFolderNotice } = SvalPanelModel;
   Assert.ok(
-    showsFolderNotice(1e12, 1e12 + FOLDER_UNAVAILABLE_AFTER_MS),
-    "from three minutes on"
+    !showsFolderNotice({ problem: null, failures: 0 }),
+    "not while the folder answers"
   );
   Assert.ok(
-    showsFolderNotice(1e12, 1e12 - 60 * 60 * 1000),
-    "and when the clock was set back past the outage's start"
+    !showsFolderNotice({ problem: "offline", failures: 1 }),
+    "not after one blip"
+  );
+  Assert.ok(
+    showsFolderNotice({ problem: "offline", failures: 2 }),
+    "from the second failure on"
+  );
+  Assert.ok(
+    showsFolderNotice({ problem: "gone", failures: 1 }),
+    "a missing folder at once"
+  );
+  Assert.ok(
+    showsFolderNotice({ problem: "offline", failures: 1, asked: true }),
+    "and a failure someone waited on"
+  );
+  Assert.ok(
+    !showsFolderNotice({ problem: "own-file", failures: 0 }),
+    "never a folder that answered"
   );
 });
 

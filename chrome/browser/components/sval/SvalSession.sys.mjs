@@ -75,6 +75,7 @@ export const SvalSession = {
       deviceId,
     });
     const state = lazy.SvalSyncState.of(engine);
+    state.keepIn(settings);
     if (first) {
       state.setKeyState(sync.state);
     }

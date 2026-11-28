@@ -32,26 +32,19 @@ add_task(function local_cause_names_each_failure() {
 });
 
 /**
- * Messages spec §4: saves that fail say nothing for a minute, measured by
- * the failing pass's clock from the first failure, and a save between ends
- * the wait.
+ * Messages spec §4: one failed save says nothing, and a second in a row is
+ * a fault.
  */
-add_task(function a_save_failure_is_said_after_a_minute() {
-  const { SAVE_FAILING_MS, saveFailureDue } = SvalPanelModel;
-  const since = 1_700_000_000_000;
-  Assert.equal(SAVE_FAILING_MS, 60_000, "the wait is a minute");
-  Assert.ok(!saveFailureDue(since, since), "not at the first failure");
-  Assert.ok(!saveFailureDue(since, since + 59_000), "not at 59 seconds");
-  Assert.ok(saveFailureDue(since, since + 60_000), "at a minute");
-  Assert.ok(saveFailureDue(since, since + 65_000), "and past it");
-  Assert.ok(
-    !saveFailureDue(null, since + 65_000),
-    "a save that succeeded leaves nothing failing"
-  );
+add_task(function a_save_failure_is_said_when_it_repeats() {
+  const { SAVE_FAILURES_SHOWN, saveFailureDue } = SvalPanelModel;
+  Assert.equal(SAVE_FAILURES_SHOWN, 2, "a repeat is a fault");
+  Assert.ok(!saveFailureDue(0), "a save that succeeded leaves nothing");
+  Assert.ok(!saveFailureDue(1), "not at the first failure");
+  Assert.ok(saveFailureDue(2), "at the second in a row");
+  Assert.ok(saveFailureDue(5), "and past it");
 });
 
 const NOW = 1_700_000_000_000;
-const formatTime = ms => `t${ms}`;
 
 // A healthy, shared, normal window. A task overrides what it is about.
 function indicatorFor(overrides = {}) {
@@ -59,17 +52,20 @@ function indicatorFor(overrides = {}) {
     window: "normal",
     sharing: true,
     firstPassDone: true,
-    folder: { problem: null, since: null },
+    folder: { problem: null, failures: 0 },
     lastSynced: NOW - 5000,
     keyState: "present",
     platform: "macosx",
     unpairedDevice: false,
+    folderName: FOLDER_NAME,
     critical: null,
     now: NOW,
-    formatTime,
     ...overrides,
   });
 }
+
+/** The sync folder's name, which a folder's states say. */
+const FOLDER_NAME = "Folder Test";
 
 /**
  * What an indicator is in: the rule that held, how it is drawn, and the
@@ -127,7 +123,7 @@ add_task(function first_pass_syncs() {
 
 add_task(function folder_offline() {
   const got = indicatorFor({
-    folder: { problem: "offline", since: LONG_AGO },
+    folder: { problem: "offline", failures: 2 },
     lastSynced: LONG_AGO,
   });
   Assert.deepEqual(shape(got), {
@@ -135,81 +131,161 @@ add_task(function folder_offline() {
     severity: "offline",
     icon: "moon-offline",
     said: { label: true, tooltip: true, detail: true },
-    commands: [],
+    commands: ["syncNow"],
   });
-  Assert.stringContains(
-    got.label,
-    formatTime(LONG_AGO),
-    "the label gives the time of the last sync"
+  Assert.stringContains(got.label, FOLDER_NAME, "the label names the folder");
+  Assert.equal(
+    got.detail,
+    SvalPanelModel.lastSyncedLabel(LONG_AGO, NOW),
+    "and the line under it says how long ago the last sync was"
   );
-  Assert.equal(got.detail, got.tooltip);
+  Assert.ok(got.detailShown, "in the footer");
 });
 
 add_task(function offline_before_any_sync_says_so() {
   const got = indicatorFor({
-    folder: { problem: "offline", since: LONG_AGO },
+    folder: { problem: "offline", failures: 2 },
     lastSynced: null,
   });
   Assert.equal(got.severity, "offline");
   Assert.equal(got.state, "offline-never-synced");
-  Assert.ok(got.label, "the label says there has been no sync");
   Assert.equal(
-    got.tooltip,
-    indicatorFor({ folder: { problem: "offline", since: LONG_AGO } }).tooltip,
-    "the tooltip is the offline one"
+    got.label,
+    indicatorFor({ folder: { problem: "offline", failures: 2 } }).label,
+    "the label is the offline one"
+  );
+  Assert.equal(got.detail, "", "with no time, since there has been no sync");
+  Assert.ok(!got.detailShown);
+});
+
+/**
+ * Decision 0032: one step that fails to reach a folder that is there is a
+ * blip, and the second in a row shows.
+ */
+add_task(function offline_shows_on_the_second_failed_step() {
+  const { FOLDER_UNAVAILABLE_AFTER_STEPS } = SvalPanelModel;
+  Assert.equal(FOLDER_UNAVAILABLE_AFTER_STEPS, 2);
+  const once = { problem: "offline", failures: 1 };
+  Assert.equal(
+    indicatorFor({ folder: once }).severity,
+    "synced",
+    "one failed step is not shown"
+  );
+  Assert.equal(
+    indicatorFor({ folder: once, firstPassDone: false }).severity,
+    "syncing",
+    "nor on the first pass"
+  );
+  const twice = indicatorFor({
+    folder: { problem: "offline", failures: 2 },
+    lastSynced: 42,
+  });
+  Assert.equal(twice.severity, "offline", "the second is");
+  Assert.equal(twice.state, "offline");
+});
+
+add_task(function a_pass_someone_waited_on_shows_at_once() {
+  const got = indicatorFor({
+    folder: { problem: "offline", failures: 1, asked: true },
+  });
+  Assert.equal(
+    got.state,
+    "offline",
+    "the failure is the answer they asked for"
   );
 });
 
-add_task(function offline_waits_three_minutes() {
-  const { FOLDER_UNAVAILABLE_AFTER_MS } = SvalPanelModel;
-  Assert.equal(FOLDER_UNAVAILABLE_AFTER_MS, 180000);
-  for (const problem of ["offline", "gone"]) {
-    const before = indicatorFor({
-      folder: { problem, since: NOW - 179999 },
-    });
-    Assert.equal(before.severity, "synced", `${problem} is not yet shown`);
-    Assert.equal(
-      indicatorFor({
-        folder: { problem, since: NOW - 179999 },
-        firstPassDone: false,
-      }).severity,
-      "syncing",
-      `${problem} is not yet shown on the first pass`
-    );
-  }
-  const at = indicatorFor({
-    folder: { problem: "offline", since: NOW - 180000 },
-    lastSynced: 42,
+/** A missing folder is no blip: a retry finds the same. */
+add_task(function a_missing_folder_shows_on_the_first_step() {
+  const got = indicatorFor({
+    folder: { problem: "gone", cause: "missing", failures: 1 },
+    firstPassDone: false,
   });
-  Assert.equal(at.severity, "offline");
-  Assert.equal(at.state, "offline");
-  Assert.stringContains(at.label, formatTime(42));
+  Assert.deepEqual(shape(got), {
+    state: "folder-missing",
+    severity: "warning",
+    icon: "moon-warning",
+    said: { label: true, tooltip: true, detail: true },
+    commands: ["syncNow", "changeLocation"],
+  });
+  Assert.stringContains(got.label, FOLDER_NAME, "the label names the folder");
   Assert.equal(
-    indicatorFor({ folder: { problem: "gone", since: NOW - 180000 } }).severity,
-    "warning"
+    got.detail,
+    SvalPanelModel.lastSyncedLabel(NOW - 5000, NOW),
+    "and says when it last synced"
+  );
+  Assert.ok(got.detailShown, "under the label");
+  Assert.equal(
+    indicatorFor({
+      folder: { problem: "gone", cause: "missing", failures: 1 },
+      lastSynced: null,
+    }).detail,
+    "",
+    "a folder never synced gives no time"
+  );
+  Assert.equal(
+    indicatorFor({
+      folder: { problem: "gone", cause: "not-a-directory", failures: 1 },
+    }).state,
+    "folder-missing",
+    "as is a path that is no folder"
+  );
+  Assert.equal(
+    indicatorFor({ folder: { problem: "gone", cause: null, failures: 0 } })
+      .state,
+    "synced",
+    "and a folder that answers shows nothing"
   );
 });
 
 add_task(function folder_gone() {
-  const got = indicatorFor({ folder: { problem: "gone", since: LONG_AGO } });
+  const got = indicatorFor({
+    folder: { problem: "gone", cause: "no-sval-dir", failures: 1 },
+  });
   Assert.deepEqual(shape(got), {
     state: "folder-gone",
     severity: "warning",
     icon: "moon-warning",
-    said: { label: true, tooltip: true, detail: false },
-    commands: ["chooseSharedFolder"],
+    said: { label: true, tooltip: true, detail: true },
+    commands: ["chooseInUse", "syncNow"],
   });
-  Assert.equal(got.tooltip, got.label, "a state with no detail tips its label");
+  Assert.stringContains(got.label, FOLDER_NAME, "the label names the folder");
+  Assert.ok(got.detailShown, "with when it last synced under the label");
+});
+
+/**
+ * One state, one wording: the footer's label for a folder's state is the
+ * Sync card's title, with the same last-synced line.
+ */
+add_task(function the_footer_and_the_page_say_one_thing() {
+  for (const folder of [
+    { problem: "gone", cause: "missing", failures: 1 },
+    { problem: "gone", cause: "no-sval-dir", failures: 1 },
+    { problem: "offline", failures: 2 },
+  ]) {
+    const footer = indicatorFor({
+      folder,
+      folderName: SvalPanelModel.friendlyFolderName(LOCAL_ROOT),
+    });
+    const page = pageFor({ folder });
+    Assert.equal(page.state, footer.state, footer.state);
+    Assert.equal(page.title, footer.label, `${footer.state}: one wording`);
+    Assert.stringContains(
+      page.detail,
+      footer.detail,
+      `${footer.state}: one last-synced line`
+    );
+  }
 });
 
 add_task(function folder_denied_shows_at_once() {
-  const got = indicatorFor({ folder: { problem: "denied", since: NOW } });
+  const got = indicatorFor({ folder: { problem: "denied", failures: 1 } });
   Assert.deepEqual(shape(got), {
     state: "folder-denied",
     severity: "warning",
     icon: "moon-warning",
     said: { label: true, tooltip: true, detail: false },
-    commands: ["chooseSharedFolder"],
+    commands: ["changeLocation"],
   });
   Assert.equal(got.tooltip, got.label);
 });
@@ -337,7 +413,7 @@ add_task(function key_access_wording_follows_the_platform() {
 });
 
 add_task(function folder_too_large() {
-  const got = indicatorFor({ folder: { problem: "too-large", since: NOW } });
+  const got = indicatorFor({ folder: { problem: "too-large", failures: 1 } });
   Assert.deepEqual(shape(got), {
     state: "too-large",
     severity: "error",
@@ -460,7 +536,7 @@ add_task(function critical_dialog_dismissed() {
 });
 
 add_task(function the_most_severe_wins() {
-  const offline = { problem: "offline", since: LONG_AGO };
+  const offline = { problem: "offline", failures: 2 };
   const got = indicatorFor({ keyState: "missing", folder: offline });
   Assert.equal(got.severity, "error");
   Assert.equal(got.state, "key-gone");
@@ -488,7 +564,7 @@ add_task(function the_most_severe_wins() {
   const critical = { title: "critical dialog title" };
   for (const more of [
     { keyState: "missing" },
-    { folder: { problem: "too-large", since: NOW } },
+    { folder: { problem: "too-large", failures: 1 } },
     { window: "private" },
     { sharing: false },
   ]) {
@@ -622,14 +698,13 @@ function pageFor(indicator = {}, page = {}) {
       window: "normal",
       sharing: true,
       firstPassDone: true,
-      folder: { problem: null, since: null },
+      folder: { problem: null, failures: 0 },
       lastSynced: NOW - 5000,
       keyState: "present",
       platform: "macosx",
       unpairedDevice: false,
       critical: null,
       now: NOW,
-      formatTime,
       ...indicator,
     },
     privateOnly: false,
@@ -673,7 +748,7 @@ function pageShape(got) {
 }
 
 const ADVANCED = ["addDevice", "advanced"];
-const LONG_OFFLINE = { problem: "offline", since: LONG_AGO };
+const LONG_OFFLINE = { problem: "offline", failures: 2 };
 
 add_task(function sync_page_with_no_folder_offers_the_ways_to_sync() {
   for (const got of [
@@ -758,11 +833,32 @@ add_task(function sync_page_first_pass_and_sync_now() {
   const running = pageFor({}, { outcome: "syncing" });
   Assert.equal(running.tone, "syncing", "a pass asked for shows as running");
   Assert.ok(running.primary.disabled, "and its button waits for it");
+  Assert.ok(running.primary.busy, "and shows it is busy");
+});
+
+/**
+ * Sync now answers with what its pass found: synced, missing or
+ * unreachable, each straight away.
+ */
+add_task(function sync_now_answers_in_every_state() {
+  Assert.equal(pageFor({ lastSynced: NOW }).state, "synced", "synced");
+  Assert.equal(
+    pageFor({
+      folder: { problem: "gone", cause: "missing", failures: 1, asked: true },
+    }).state,
+    "folder-missing",
+    "missing"
+  );
+  Assert.equal(
+    pageFor({ folder: { problem: "offline", failures: 1, asked: true } }).state,
+    "offline",
+    "unreachable"
+  );
 });
 
 add_task(function sync_page_offline_waits_as_the_footer_does() {
   Assert.equal(
-    pageFor({ folder: { problem: "offline", since: NOW - 1000 } }).state,
+    pageFor({ folder: { problem: "offline", failures: 1 } }).state,
     "synced",
     "a blip says nothing, as the footer says nothing"
   );
@@ -799,7 +895,11 @@ add_task(function sync_page_offline_waits_as_the_footer_does() {
 
 add_task(function sync_page_folder_problems() {
   Assert.deepEqual(
-    pageShape(pageFor({ folder: { problem: "gone", since: LONG_AGO } })),
+    pageShape(
+      pageFor({
+        folder: { problem: "gone", cause: "no-sval-dir", failures: 1 },
+      })
+    ),
     {
       state: "folder-gone",
       tone: "problem",
@@ -807,11 +907,39 @@ add_task(function sync_page_folder_problems() {
       via: "folder",
       shows: ["stop", ...ADVANCED],
       primary: "chooseInUse",
-      secondary: ["useFolderAgain"],
+      secondary: ["useFolderAgain", "syncNow"],
     }
   );
+  const missing = {
+    folder: { problem: "gone", cause: "missing", failures: 1 },
+    lastSynced: NOW - 2 * 60 * 60 * 1000,
+  };
   Assert.deepEqual(
-    pageShape(pageFor({ folder: { problem: "denied", since: NOW } })),
+    pageShape(pageFor(missing)),
+    {
+      state: "folder-missing",
+      tone: "problem",
+      said: { title: true, detail: true },
+      via: "folder",
+      shows: ["change", "stop", ...ADVANCED],
+      primary: "syncNow",
+      secondary: [],
+    },
+    "a missing folder is found again with Change…, or retried with Sync now"
+  );
+  Assert.stringContains(
+    pageFor(missing).detail,
+    SvalPanelModel.lastSyncedLabel(missing.lastSynced, NOW),
+    "and says when the folder last synced"
+  );
+  Assert.ok(
+    !pageFor({ ...missing, lastSynced: null }).detail.includes(
+      SvalPanelModel.lastSyncedText(null, NOW)
+    ),
+    "a folder never synced says no time"
+  );
+  Assert.deepEqual(
+    pageShape(pageFor({ folder: { problem: "denied", failures: 1 } })),
     {
       state: "folder-denied",
       tone: "problem",
@@ -823,7 +951,7 @@ add_task(function sync_page_folder_problems() {
     }
   );
   Assert.deepEqual(
-    pageShape(pageFor({ folder: { problem: "too-large", since: NOW } })),
+    pageShape(pageFor({ folder: { problem: "too-large", failures: 1 } })),
     {
       state: "too-large",
       tone: "problem",
@@ -837,7 +965,7 @@ add_task(function sync_page_folder_problems() {
 });
 
 add_task(function sync_page_sign_in_is_fixed_where_it_is_kept() {
-  const signIn = { folder: { problem: "sign-in", since: NOW } };
+  const signIn = { folder: { problem: "sign-in", failures: 1 } };
   Assert.deepEqual(pageShape(pageFor(signIn, { sharedRoot: SMB_ROOT })), {
     state: "folder-sign-in",
     tone: "problem",

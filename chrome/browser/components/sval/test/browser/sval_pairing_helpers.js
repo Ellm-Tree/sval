@@ -106,16 +106,24 @@ async function thisDevice(label) {
     name: "Made on this device",
     now: Date.now(),
   });
-  await TestUtils.waitForCondition(
-    async () =>
-      (await SvalPanel.syncWithFolder()) === "reached" &&
-      SvalPanel.syncState.lastPass?.sharedWrote,
-    "this device's pass published its tree to the folder"
-  );
-  const ourDirectory = directoryOf(
-    root,
-    SvalPanel.syncState.lastPass.sharedWrote
-  );
+  // Whichever step publishes the change says where: a pass that asks the
+  // folder waits out a step already running, and that one may be the step
+  // that published it, leaving the pass's own step nothing to write.
+  let wrote = null;
+  const stop = device.engine.addSharedListener(report => {
+    if (report.shared === "reached" && report.sharedWrote) {
+      wrote = report.sharedWrote;
+    }
+  });
+  try {
+    await TestUtils.waitForCondition(
+      async () => (await SvalPanel.syncWithFolder()) === "reached" && wrote,
+      "this device's pass published its tree to the folder"
+    );
+  } finally {
+    stop();
+  }
+  const ourDirectory = directoryOf(root, wrote);
   return {
     root,
     engine: device.engine,

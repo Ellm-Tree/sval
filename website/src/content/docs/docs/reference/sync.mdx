@@ -50,7 +50,8 @@ fix. In the table, *folder* stands for the sync folder's name.
 | The Sync card says | Buttons |
 |---|---|
 | Can't reach *folder* | **Try again** |
-| Sval can't find *folder* | **Choose folder…**, **Set up folder again** |
+| Can't find *folder* | **Sync now**, **Change…** |
+| Sval's files are missing from *folder* | **Choose folder…**, **Set up folder again**, **Sync now** |
 | Sval can't open *folder* | **Choose another folder…** |
 | Sign in to Dropbox again | **Sign in to Dropbox…** |
 | The SMB server didn't accept the sign-in | **Edit connection…** |
@@ -123,12 +124,20 @@ these:
 
 - How long ago Sval last synced, in minutes, hours, or days.
 - **Syncing…** Sval is syncing for the first time since Sval started.
-- **Not synced yet**, or **Last synced** with a time. Sval can't reach the
-  sync folder.
-- **Sync folder not found.** The sync folder is gone. **Choose Folder…**
-  opens Settings.
+- **Can't reach** and the folder's name. Sval can't reach the sync folder
+  right now, and **Try again** syncs straight away.
+- **Can't find** and the folder's name. When the sync folder moved or the
+  drive that holds the folder isn't connected, **Sync now** looks for the
+  folder again and **Change…** opens the Change dialog in Settings.
+- **Sval's files are missing from** and the folder's name. When the sync
+  folder is there without Sval's files, **Choose folder…** opens a folder
+  picker and **Sync now** looks for Sval's files again.
+- Under **Can't reach**, **Can't find** or **Sval's files are missing
+  from**, **Last synced** says how long ago Sval last synced with the folder
+  once Sval has synced.
 - **Can't access sync folder.** Sval isn't allowed to change files in the
-  sync folder. **Choose Folder…** opens Settings.
+  sync folder. **Choose another folder…** opens the Change dialog in
+  Settings.
 - **Sync stopped.** The files in the sync folder are too large to sync.
 - **Sync is off.** The sync key on this computer is missing or doesn't match
   the sync folder's key. **Enter code…** opens the Enter code dialog in

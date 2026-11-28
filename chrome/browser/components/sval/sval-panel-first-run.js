@@ -758,7 +758,7 @@ Object.assign(SvalPanel, {
     if (result.status === "claimed") {
       join.claimed = result;
     }
-    return { status: result.status };
+    return { status: result.status, problem: result.problem ?? null };
   },
 
   /**

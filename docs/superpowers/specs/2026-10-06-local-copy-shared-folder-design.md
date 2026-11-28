@@ -15,9 +15,9 @@ share that drops, an iCloud folder whose files were evicted, a USB drive that is
 unplugged. Not reaching it is an expected state, and Sval treats it as one.
 
 **Success looks like:** with the shared folder unplugged, Sval launches with every
-workspace and tab, edits and quits without losing anything, and says nothing for
-the first three minutes. When the folder returns, the devices converge with
-nobody pressing anything.
+workspace and tab, edits and quits without losing anything, and says the folder
+is missing and when it last synced. When the folder returns, the devices
+converge with nobody pressing anything.
 
 ## 2. Rejected approaches
 
@@ -58,8 +58,9 @@ nobody pressing anything.
 - **The shared step has 20 seconds, runs every 30 seconds, and at most one
   helper is alive** (decisions 0032 and 0033). Local saves are immediate; only
   the exchange with the folder runs on the slower clock.
-- **Unreachable is silent for three minutes, then a neutral notice**
-  (decision 0032).
+- **One failed reach is retried within seconds and says nothing. A second
+  failure in a row is a neutral notice, and a folder that is not there is one
+  from the first step** (decision 0032).
 - **A shared folder Sval has used before counts as reachable only if its `sval/`
   directory is there.** An NFS mount point that is not mounted is an empty
   local directory. Without this rule Sval would write into it, report "synced",
@@ -151,14 +152,23 @@ Decision 0039 holds the rule.
 
 ### 4.6 What the user sees
 
-- **Unreachable for under three minutes:** nothing.
-- **Unreachable for three minutes or more:** the footer's sync indicator shows
-  its offline state: the moon dimmed, labelled with the last-synced time, and a
-  tooltip saying Sval can't reach the sync folder
-  (`2026-10-21-messages-design.md` §3). It is a state of the indicator with no
-  error styling and no `role="alert"`. It clears on the first pass that reaches
-  the folder. While the folder is reachable the last-synced time is the
-  indicator's tooltip and has no label (decision 0037).
+- **One step that did not reach a folder that is there:** nothing. The next
+  step runs 5 seconds later (decision 0032).
+- **Two such steps in a row, or one a person waited on (Sync now):** the
+  footer's sync indicator shows its offline state: the moon dimmed, labelled
+  with how long ago the last sync was, and a tooltip saying Sval can't reach
+  the sync folder (`2026-10-21-messages-design.md` §3). It is a state of the
+  indicator with no error styling and no `role="alert"`. It clears on the
+  first pass that reaches the folder. While the folder is reachable the
+  last-synced time is the indicator's tooltip and has no label (decision
+  0037).
+- **A chosen folder that is not there, or holds no `sval/`:** shown from the
+  first step that finds it so, because a retry finds the same until someone
+  acts. A path that is not there offers Sync now and Change…, with the last
+  sync. A folder without `sval/` offers the two actions below.
+- **The last-synced time survives a restart.** It is kept in the profile's
+  device-local settings with the folder it is about, and forgotten when the
+  profile chooses another folder or none.
 - **The indicator leads to settings.** There, the folder section says what Sval
   can see, that it can't find its files in the folder, and offers two actions:
   - **Use this folder again:** creates `sval/` and publishes this device's file,

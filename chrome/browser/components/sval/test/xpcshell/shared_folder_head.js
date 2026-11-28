@@ -364,7 +364,7 @@ function indicatorFor(report, now) {
     window: "normal",
     sharing: true,
     firstPassDone: true,
-    folder: { problem: report.sharedReason, since: null },
+    folder: { problem: report.sharedReason, failures: 0 },
     lastSynced: now,
     keyState: "present",
     platform: AppConstants.platform,
@@ -372,6 +372,5 @@ function indicatorFor(report, now) {
     newerSchema: !!report.schemaTooNew?.length,
     critical: null,
     now,
-    formatTime: String,
   });
 }

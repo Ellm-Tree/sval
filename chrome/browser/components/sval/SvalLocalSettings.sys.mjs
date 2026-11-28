@@ -99,6 +99,11 @@ class SvalLocalSettingsStore {
     // Whether the user saved or printed a backup of the current sync key, so
     // Settings stops saying no backup was saved.
     this._backupSaved = false;
+    // When a shared step last reached the shared folder, `{ folder, at }`,
+    // so a launch says when this device last synced before a step answers.
+    // It names the folder it is about, so a time from a folder since left is
+    // never shown for another.
+    this._lastSync = null;
     // Directories under the shared folder's `sval/ws/` that a replaced sync
     // key could read and that are not all removed yet (key-storage spec,
     // "Starting over with a new sync key").
@@ -216,6 +221,31 @@ class SvalLocalSettingsStore {
 
   set backupSaved(value) {
     this._backupSaved = value === true;
+  }
+
+  /**
+   * When a shared step last reached the shared folder chosen now, in
+   * milliseconds since the epoch, or null when none has.
+   *
+   * @returns {number|null}
+   */
+  get lastSynced() {
+    return this._lastSync && this._lastSync.folder === this._sharedFolder
+      ? this._lastSync.at
+      : null;
+  }
+
+  /**
+   * Records `at` as the last sync with the shared folder chosen now, or with
+   * null forgets it.
+   *
+   * @param {number|null} at Milliseconds since the epoch, or null.
+   */
+  set lastSynced(at) {
+    this._lastSync =
+      Number.isFinite(at) && this._sharedFolder !== null
+        ? { folder: this._sharedFolder, at }
+        : null;
   }
 
   /**
@@ -512,6 +542,7 @@ class SvalLocalSettingsStore {
         userHistory: Array.from(this._userHistory),
         dismissedOtherWorkspaces: Array.from(this._dismissedOtherWorkspaces),
         backupSaved: this._backupSaved,
+        lastSync: this._lastSync ?? undefined,
         oldKeyDirs: this._oldKeyDirs,
         // Kept until its workspaces are deleted, and then gone from the file.
         webDriverWorkspaces: this._leftWebDriverWorkspaces.length
@@ -685,6 +716,15 @@ export const SvalLocalSettings = {
         store._userHistory = new Set(stringsOf(stored.userHistory));
       }
       store._backupSaved = stored.backupSaved === true;
+      if (
+        typeof stored.lastSync?.folder === "string" &&
+        Number.isFinite(stored.lastSync.at)
+      ) {
+        store._lastSync = {
+          folder: stored.lastSync.folder,
+          at: stored.lastSync.at,
+        };
+      }
       if (Array.isArray(stored.oldKeyDirs)) {
         store.oldKeyDirs = stored.oldKeyDirs;
       }

@@ -202,11 +202,10 @@ add_task(
 );
 
 /**
- * Spec §6 test 8, as messages spec §3 draws it: a folder that is gone is
- * quiet at first, and clears the moment it answers. Its three minutes of
- * quiet, after which the indicator says so, lie past this file's time limit.
+ * Spec §6 test 8, as messages spec §3 draws it: a folder that is not there
+ * shows at once, and clears the moment it answers (decision 0032).
  */
-add_task(async function a_missing_folder_is_quiet_and_clears_when_back() {
+add_task(async function a_missing_folder_shows_and_clears_when_back() {
   const profile = await freshProfile();
   const win = await profile.open();
   const panel = win.SvalPanel;
@@ -229,11 +228,11 @@ add_task(async function a_missing_folder_is_quiet_and_clears_when_back() {
     "because it is not there"
   );
   Assert.equal(
-    indicator.dataset.severity,
-    "synced",
-    "a short outage shows nothing"
+    indicator.dataset.state,
+    "folder-missing",
+    "a folder that is not there shows at once"
   );
-  Assert.equal(syncLabel.textContent, "", "and no label");
+  Assert.ok(syncLabel.textContent, "with a label");
 
   // The folder comes back as the chosen one, holding `sval/`.
   await IOUtils.makeDirectory(PathUtils.join(missing, "sval"));

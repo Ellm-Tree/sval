@@ -164,8 +164,9 @@
      * principal, as Firefox's own `openPreferences` does.
      *
      * @param {string} [section] `"offer"`, `"claim"` or `"storage"`: which
-     *   category opens and where the caret goes. With none, the Sync and devices
-     *   category lands on its own title.
+     *   category opens and where the caret goes; `"change"` or `"choose"`
+     *   also runs the Sync card's Change… or Choose folder…. With none, the
+     *   Sync and devices category lands on its own title.
      * @returns {Element} the tab now showing the page.
      */
     openSettingsPage(section) {
@@ -183,10 +184,11 @@
         );
         return existing;
       }
-      const pane =
-        section === "offer" || section === "claim" || section === "storage"
-          ? `svalSync-${section}`
-          : "svalSync";
+      const pane = ["offer", "claim", "storage", "change", "choose"].includes(
+        section
+      )
+        ? `svalSync-${section}`
+        : "svalSync";
       const tab = window.gBrowser.addTrustedTab(`${SVAL_SETTINGS_URL}#${pane}`);
       window.gBrowser.selectedTab = tab;
       return tab;

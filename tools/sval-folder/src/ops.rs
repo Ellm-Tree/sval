@@ -250,10 +250,25 @@ fn children(dir: &Path) -> io::Result<Vec<(String, PathBuf)>> {
         .collect()
 }
 
-/// Whether anything is at `path`, following a link, as `nsIFile::Exists`
-/// answers: a failure to look counts as nothing there.
-fn exists(path: &Path) -> bool {
-    fs::metadata(path).is_ok()
+/// Whether anything is at `path`, following a link. Only the system's answer
+/// that nothing is there is "no": a look that fails any other way, as a slow
+/// or failing disk's does, is that failure, so it is never read as a folder
+/// or a file gone.
+fn exists(path: &Path) -> io::Result<bool> {
+    match fs::metadata(path) {
+        Ok(_) => Ok(true),
+        Err(err) if is_absent(&err) => Ok(false),
+        Err(err) => Err(err),
+    }
+}
+
+/// Whether `err` is the system saying nothing is at the path: no such entry,
+/// or a component of the path that is not a directory.
+fn is_absent(err: &io::Error) -> bool {
+    matches!(
+        err.kind(),
+        io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+    )
 }
 
 /// Whether the entry `meta` describes, read without following it, is removed
@@ -372,14 +387,19 @@ impl Folder {
         }
         let root = Path::new(request.root);
         match fs::metadata(root) {
+            // Only the system's answer that the path is not there makes the
+            // folder missing. Any other failure to look is an I/O error, which
+            // the browser retries before it says anything.
+            Err(err) if err.kind() == io::ErrorKind::NotADirectory => {
+                return unreachable("not-a-directory", None)
+            }
             Err(err) => {
-                let name = error_name(&err);
-                let reason = if name == "NotFoundError" {
+                let reason = if is_absent(&err) {
                     "missing"
                 } else {
                     "io-error"
                 };
-                return unreachable(reason, Some(name));
+                return unreachable(reason, Some(error_name(&err)));
             }
             Ok(meta) if !meta.is_dir() => return unreachable("not-a-directory", None),
             Ok(_) => {}
@@ -403,7 +423,7 @@ impl Folder {
             // chose it. A mount point that is not mounted is an empty local
             // directory, and writing into it would hide a file under the
             // mount when it returns.
-            if !exists(&join(root, &parts)) {
+            if !exists(&join(root, &parts))? {
                 return Ok(unreachable("no-sval-dir", None));
             }
         }
@@ -466,7 +486,7 @@ impl Folder {
                 if self.crosses_link(root, &parts)? {
                     return Ok(symlink());
                 }
-                Ok(json!({ "reachable": true, "exists": exists(&join(root, &parts)) }))
+                Ok(json!({ "reachable": true, "exists": exists(&join(root, &parts))? }))
             }
             Op::RemoveDir(path) => {
                 let parts: Vec<&str> = path.split('/').collect();
@@ -635,7 +655,7 @@ impl Folder {
         if self.crosses_link(root, &parts[..parts.len() - 1])? || is_link(&target)? {
             return Ok(symlink());
         }
-        if exists(&target) && fs::metadata(&target)?.is_dir() {
+        if exists(&target)? && fs::metadata(&target)?.is_dir() {
             return Ok(unreachable("io-error", Some("IsDirectory")));
         }
         let name = parts[parts.len() - 1];
@@ -673,7 +693,7 @@ impl Folder {
         {
             return Ok(symlink());
         }
-        if exists(&target) {
+        if exists(&target)? {
             return Ok(unreachable("io-error", Some("Exists")));
         }
         match fs::metadata(&source) {
@@ -838,7 +858,7 @@ fn list_names(target: &Path, holding: Option<&str>) -> Result<Value, Failure> {
     if let Some(holding) = holding {
         let mut holders = Vec::new();
         for (name, child) in &listed {
-            if !is_link(child)? && exists(&child.join(holding)) {
+            if !is_link(child)? && exists(&child.join(holding))? {
                 holders.push(name.as_str());
             }
         }

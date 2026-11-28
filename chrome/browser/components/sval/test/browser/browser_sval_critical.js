@@ -116,7 +116,7 @@ async function panelWithFailingSaves() {
 
 /**
  * Shows the dialog as `SvalPanel._saveFailed` does once saves have failed
- * for a minute (`SvalPanelModel.saveFailureDue`, whose minute
+ * twice in a row (`SvalPanelModel.saveFailureDue`, whose count
  * `test_sval_panel_model.js` checks), for a task about the dialog itself.
  * Its cause is the one a directory that refuses a new file gives.
  *
@@ -174,23 +174,18 @@ function buttonsOf(doc) {
 }
 
 /**
- * Spec §4: saves that fail say nothing at first. Once the minute is up
- * (`saveFailureDue`) the dialog says so, with the cause the error's name
+ * Spec §4: one save that fails says nothing. The second in a row
+ * (`saveFailureDue`) has the dialog say so, with the cause the error's name
  * gives.
  */
 add_task(async function a_save_failure_says_nothing_at_first() {
   const panel = await panelWithFailingSaves();
   await panel.fail();
-  Assert.notEqual(
-    SvalPanel.syncState.saveFailingSince,
-    null,
-    "the save failed"
-  );
-  await panel.fail();
-  Assert.ok(!gDialogBox.isOpen, "no dialog yet");
+  Assert.equal(SvalPanel.syncState.saveFailures, 1, "the save failed");
+  Assert.ok(!gDialogBox.isOpen, "no dialog for one failure");
   Assert.equal(SvalCritical.current(window), null, "and no critical state");
 
-  sayTheSaveFailed();
+  await panel.fail();
   const doc = await criticalDialog();
   assertCritical(doc, window, "save", "the dialog says saves are failing");
   assertCause(doc, window, "denied");
@@ -249,7 +244,7 @@ add_task(async function a_recovering_pass_closes_it() {
   );
 
   await panel.fail();
-  Assert.ok(!gDialogBox.isOpen, "a new failure waits its own minute");
+  Assert.ok(!gDialogBox.isOpen, "a new failure is counted from one again");
 });
 
 /**
@@ -428,7 +423,7 @@ add_task(async function a_failed_shared_step_is_not_a_failed_save() {
     null,
     "the pass failed in its shared step"
   );
-  Assert.equal(SvalPanel.syncState.saveFailingSince, null, "no save failed");
+  Assert.equal(SvalPanel.syncState.saveFailures, 0, "no save failed");
   Assert.equal(SvalCritical.current(window), null, "and nothing is critical");
   Assert.ok(!gDialogBox.isOpen, "so no dialog opens");
 });
@@ -459,9 +454,9 @@ add_task(async function every_window_hears_a_failed_save() {
   );
 
   await panel.fail();
-  Assert.notEqual(
-    SvalPanel.syncState.saveFailingSince,
-    null,
+  Assert.equal(
+    SvalPanel.syncState.saveFailures,
+    1,
     "this window's save failed"
   );
   Assert.equal(
@@ -473,8 +468,8 @@ add_task(async function every_window_hears_a_failed_save() {
   await panel.succeed();
   Assert.ok(await SvalPanel.syncNow(), "a pass saves");
   Assert.equal(
-    other.SvalPanel.syncState.saveFailingSince,
-    null,
+    other.SvalPanel.syncState.saveFailures,
+    0,
     "and the other window heard that too"
   );
 });

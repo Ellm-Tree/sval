@@ -90,18 +90,15 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * A pass could not save this device's copy. The dialog waits until saves
-   * have failed for `SvalPanelModel.SAVE_FAILING_MS`, and a pass that
-   * succeeds in that time cancels it.
+   * A pass could not save this device's copy. The dialog waits until
+   * `SvalPanelModel.SAVE_FAILURES_SHOWN` passes in a row have failed, and a
+   * pass that saves in between starts the count again.
    *
    * @param {Error} err What the pass rejected with.
    */
   _saveFailed(err) {
     if (
-      this._modules.SvalPanelModel.saveFailureDue(
-        this.syncState.saveFailingSince,
-        Date.now()
-      )
+      this._modules.SvalPanelModel.saveFailureDue(this.syncState.saveFailures)
     ) {
       this._modules.SvalCritical.show(window, {
         kind: "save",
@@ -236,7 +233,7 @@ Object.assign(SvalPanel, {
    *   merged it into the document by the time this returns.
    */
   async syncWithFolder() {
-    const report = await this._runPass({ interactive: true, shared: "wait" });
+    const report = await this._runPass({ interactive: true, shared: "fresh" });
     if (!report) {
       return null;
     }
@@ -392,7 +389,7 @@ Object.assign(SvalPanel, {
    * @returns {object}
    */
   indicatorState() {
-    const { AppConstants, SvalPanelModel } = this._modules;
+    const { AppConstants } = this._modules;
     const shared = this._inMemory ? null : this.sharedRootSetting();
     const sync = this.syncState;
     let kind = "normal";
@@ -406,13 +403,22 @@ Object.assign(SvalPanel, {
       // because this device holds no sync key, and so has no step to wait on.
       firstPassDone:
         sync.folderState !== "none" || sync.lastPass?.shared === "none",
-      folder: { problem: sync.folderProblem, since: sync.unreachableSince },
+      folder: {
+        problem: sync.folderProblem,
+        cause: sync.folderCause,
+        failures: sync.failedSteps,
+        asked: sync.failureAsked,
+      },
       lastSynced: sync.lastSynced,
       keyState: sync.keyState,
       keySealed: sync.keySealed,
       platform: AppConstants.platform,
       // Only what was found in the folder now chosen: a list from a folder
       // since left says nothing about this one.
+      folderName:
+        shared === null
+          ? null
+          : this._modules.SvalPanelModel.friendlyFolderName(shared),
       unpairedDevice:
         shared !== null &&
         sync.otherWorkspacesIn === shared &&
@@ -431,7 +437,6 @@ Object.assign(SvalPanel, {
       hasReading: this._modules.SvalClock.hasReading,
       critical: this._modules.SvalCritical.current(window),
       now: Date.now(),
-      formatTime: SvalPanelModel.shortTime,
     };
   },
 

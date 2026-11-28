@@ -1085,8 +1085,9 @@ nothing above the folder picked, uses that folder as `sval/` itself.
 
 Sval treats the chosen folder as volatile: a share that drops, a drive that is
 unplugged, a folder that is moved or deleted. Not reaching it is an expected
-state. It is silent for three minutes and then reported calmly, never as an
-error, and Sval never recreates the folder by itself. The last-synced time is
+state. One failed reach is retried within seconds and says nothing; a second
+in a row, or a folder that is not there at all, is reported calmly, never as
+an error (decision 0032), and Sval never recreates the folder by itself. The last-synced time is
 the sync indicator's tooltip, and its label only while the folder is
 unreachable (`2026-10-21-messages-design.md` §3). The profile copy is the same
 pass run against a second location, and it is what lets Sval launch, edit and

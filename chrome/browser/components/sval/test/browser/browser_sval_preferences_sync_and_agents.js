@@ -307,10 +307,10 @@ add_task(async function a_gone_key_offers_only_the_ways_back() {
 });
 
 /**
- * A folder that went away is said once, by the state, when the footer says
- * it: a Sync now that finds it gone adds no failure of its own.
+ * A folder that went away is said once, by the state, as soon as a Sync now
+ * finds it missing: the pass adds no failure of its own.
  */
-add_task(async function a_gone_folder_is_said_once() {
+add_task(async function a_missing_folder_is_said_once() {
   const shared = await makeTempDir("sval-shared");
   await panelWithFolder(shared);
   const away = `${shared}-away`;
@@ -329,20 +329,15 @@ add_task(async function a_gone_folder_is_said_once() {
   Assert.equal(status.textContent, "", "the pass adds no failure of its own");
   Assert.equal(
     ui.byId("sval-storage").dataset.state,
-    "synced",
-    "and the page waits as the footer does"
-  );
-
-  outageWaitedOut();
-  await TestUtils.waitForCondition(
-    () => ui.byId("sval-storage").dataset.state === "folder-gone",
-    "then says it once the footer does"
+    "folder-missing",
+    "and the page says the folder is missing at once"
   );
   assertOnlyPageControls(ui, {
-    primary: "chooseInUse",
-    secondary: ["useFolderAgain"],
+    primary: "syncNow",
+    secondary: [],
     shown: [
       "sval-folder-field",
+      "sval-storage-change",
       "sval-storage-stop",
       "sval-pairing-start",
       "sval-sync-advanced",
@@ -396,7 +391,7 @@ add_task(async function an_unreachable_folder_offers_to_try_again() {
     }
     await SvalPanel.syncWithFolder();
     Assert.equal(SvalPanel.syncState.folderProblem, "offline");
-    outageWaitedOut();
+    outageRepeats();
     const ui = await openSettings();
     // A server never reached has no last-synced time to give.
     Assert.equal(

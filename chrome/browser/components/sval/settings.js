@@ -75,6 +75,8 @@
     storage: "svalSync",
     offer: "svalSync",
     claim: "svalSync",
+    change: "svalSync",
+    choose: "svalSync",
     top: "svalSync",
   };
 
@@ -348,7 +350,9 @@
      *
      * @param {string} pane A friendly pane name, such as `svalSync`, or
      *   `privacy` for Sval's sections there.
-     * @param {?string} section `"offer"`, `"claim"`, `"storage"`, `"top"`,
+     * @param {?string} section `"offer"`, `"claim"`, `"storage"`, `"change"`
+     *   or `"choose"` (which run the Sync card's Change… or Choose folder…),
+     *   `"top"`,
      *   `"sites"`, `"tracking"`, `"secureDns"`, a site's page
      *   (`site?host=…`), an extension's (`extension?id=…`), an agent's
      *   (`agent?id=…`) or nothing.
@@ -387,10 +391,21 @@
         this._page?.primary?.command === "enterCode"
       ) {
         this.runSyncCommand("enterCode");
+      } else if (section === "change" && this._page?.location) {
+        // The footer's Change… and Choose another folder… do what the Sync
+        // card's do, in every state with a folder chosen.
+        this.runSyncCommand("changeLocation");
+      } else if (
+        section === "choose" &&
+        this._page?.primary?.command === "chooseInUse"
+      ) {
+        this.runSyncCommand("chooseInUse");
       } else if (
         section === "storage" ||
         section === "offer" ||
-        section === "claim"
+        section === "claim" ||
+        section === "change" ||
+        section === "choose"
       ) {
         // The state's own way forward, else the folder's.
         (

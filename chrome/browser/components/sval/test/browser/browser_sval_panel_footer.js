@@ -187,14 +187,14 @@ add_task(async function synced_shows_the_moon_alone() {
 });
 
 /**
- * Spec §3 and decision 0032: a folder that stops answering says nothing at
- * first, and one that answers again is synced at once. The dimmed moon three
- * minutes on is the model's (`folder_offline` in `test_sval_panel_model.js`),
- * since a browser test cannot wait out the three minutes.
+ * Spec §3 and decision 0032: a folder that is not there shows at once, and
+ * one that answers again is synced at once. A folder that is there and does
+ * not answer waits for a second failed step, which is the model's
+ * (`offline_shows_on_the_second_failed_step` in `test_sval_panel_model.js`).
  */
-add_task(async function an_away_folder_says_nothing_at_first() {
+add_task(async function a_missing_folder_shows_at_once() {
   const { shared } = await panelSharing();
-  const { indicator } = indicatorParts();
+  const { indicator, syncDetail } = indicatorParts();
   Assert.equal(indicator.dataset.severity, "synced", "it starts synced");
 
   const away = `${shared}-away`;
@@ -214,23 +214,108 @@ add_task(async function an_away_folder_says_nothing_at_first() {
     "unreachable",
     "the panel knows it"
   );
-  Assert.equal(indicator.dataset.severity, "synced", "and says nothing yet");
-
-  await IOUtils.move(away, shared);
-  Assert.equal(await SvalPanel.syncWithFolder(), "reached", "it is back");
   Assert.equal(
-    indicator.dataset.severity,
-    "synced",
+    indicator.dataset.state,
+    "folder-missing",
+    "and says the folder is missing at once"
+  );
+  Assert.equal(indicator.dataset.severity, "warning");
+  assertFolderFooter(["syncNow", "changeLocation"]);
+  Assert.ok(
+    BrowserTestUtils.isVisible(syncDetail),
+    "with when the folder last synced under the label"
+  );
+
+  // The footer's Sync now asks the folder again and shows its answer.
+  await IOUtils.move(away, shared);
+  footerButton("syncNow").click();
+  await TestUtils.waitForCondition(
+    () => indicator.dataset.severity === "synced",
     "a folder that answers again is synced at once"
+  );
+});
+
+/**
+ * The footer says a folder's state in the Sync card's words: the folder's
+ * name, the same last-synced line, and the card's buttons.
+ *
+ * @param {string[]} commands The footer's buttons, in order.
+ */
+function assertFolderFooter(commands) {
+  const { indicator, syncLabel } = indicatorParts();
+  const page = SvalPanelModel.syncPage({
+    indicator: SvalPanel.indicatorState(),
+    privateOnly: false,
+    sharedRoot: SvalPanel.sharedRootSetting(),
+    backupSaved: true,
+    keyInProfile: false,
+  });
+  Assert.equal(page.state, indicator.dataset.state, "the page's state");
+  Assert.equal(syncLabel.textContent, page.title, "in the page's words");
+  Assert.deepEqual(
+    [...indicatorParts().syncActions.querySelectorAll("button")].map(
+      button => button.dataset.command
+    ),
+    commands,
+    "with the page's buttons"
+  );
+}
+
+/**
+ * @param {string} command
+ * @returns {Element} The footer's button that runs `command`.
+ */
+function footerButton(command) {
+  return indicatorParts().syncActions.querySelector(
+    `button[data-command="${command}"]`
+  );
+}
+
+/** A folder that is there without Sval's files says so, by name, at once. */
+add_task(async function a_folder_without_svals_files_shows_at_once() {
+  const { shared } = await panelSharing();
+  await IOUtils.remove(PathUtils.join(shared, "sval"), { recursive: true });
+  Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
+  Assert.equal(indicatorParts().indicator.dataset.state, "folder-gone");
+  assertFolderFooter(["chooseInUse", "syncNow"]);
+});
+
+/**
+ * A folder that is there and does not answer shows once a pass someone
+ * waited on finds it so, with Try again, as the Sync card offers.
+ */
+add_task(async function an_unreachable_folder_offers_try_again() {
+  await panelSharing();
+  const { SvalSharedFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs"
+  );
+  const run = SvalSharedFolder._run;
+  SvalSharedFolder._run = async () => ({
+    reachable: false,
+    reason: "io-error",
+    error: "NetworkError",
+  });
+  atTaskEnd(() => {
+    SvalSharedFolder._run = run;
+  });
+  Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
+  Assert.equal(indicatorParts().indicator.dataset.state, "offline");
+  assertFolderFooter(["syncNow"]);
+
+  SvalSharedFolder._run = run;
+  footerButton("syncNow").click();
+  await TestUtils.waitForCondition(
+    () => indicatorParts().indicator.dataset.severity === "synced",
+    "Try again finds the folder back"
   );
 });
 
 /**
  * Messages spec §3 and §8.2: a pass that could not read this device's own
  * file in the folder heard from the folder, so the indicator stays synced and
- * the folder's three minutes do not start.
+ * no outage starts.
  */
-add_task(async function an_unreadable_own_file_starts_no_offline_wait() {
+add_task(async function an_unreadable_own_file_starts_no_outage() {
   const { shared, engine, ids } = await panelSharing();
   // A change, so the step publishes this device's file and names it.
   await engine.mutate({
@@ -250,11 +335,7 @@ add_task(async function an_unreadable_own_file_starts_no_offline_wait() {
     "unreachable",
     "the read was refused"
   );
-  Assert.equal(
-    SvalPanel.syncState.unreachableSince,
-    null,
-    "no offline wait starts"
-  );
+  Assert.equal(SvalPanel.syncState.failedSteps, 0, "no outage starts");
   Assert.equal(
     indicatorParts().indicator.dataset.severity,
     "synced",

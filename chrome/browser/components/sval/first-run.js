@@ -56,6 +56,7 @@ const {
   friendlyFolderName,
   cloudServiceOf,
   randomWorkspaceEmoji,
+  showsFolderNotice,
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
@@ -3355,10 +3356,8 @@ const SvalFirstRunPage = {
     this._problem = null;
     this._status("", STEPS.joinCode);
     const folder = this._answers.folder ?? "";
-    // Sval reads and writes an SMB or Dropbox folder itself, so no service
-    // on this computer has a copy to catch up.
-    const service = isRemoteRoot(folder) ? null : cloudServiceOf(folder);
-    this._joinLine(STRINGS.waitingFor(service), "waiting");
+    const service = this._folderService();
+    this._joinLine(this._waitingText(), "waiting");
     this._sync();
     this._noteTimer = window.setTimeout(() => {
       this._noteTimer = null;
@@ -3373,6 +3372,23 @@ const SvalFirstRunPage = {
     );
   },
 
+  /**
+   * The service that carries the chosen folder, or null. Sval reads and
+   * writes an SMB or Dropbox folder itself, so no service on this computer
+   * has a copy to catch up.
+   *
+   * @returns {string|null}
+   */
+  _folderService() {
+    const folder = this._answers.folder ?? "";
+    return isRemoteRoot(folder) ? null : cloudServiceOf(folder);
+  },
+
+  /** @returns {string} The join line while the look waits for the offer. */
+  _waitingText() {
+    return STRINGS.waitingFor(this._folderService());
+  },
+
   _stopLooking() {
     this._claims?.stop();
     if (this._noteTimer !== null) {
@@ -3383,7 +3399,22 @@ const SvalFirstRunPage = {
 
   /** @param {object} answer A `SvalPairingLook` answer. */
   async _answered(answer) {
-    if (this._gone || answer.status === "waiting") {
+    if (this._gone) {
+      return;
+    }
+    if (answer.status === "waiting") {
+      // A folder that does not answer is said as the sync indicator says it
+      // (decision 0032). The look goes on, and the line goes back to waiting
+      // once the folder answers.
+      const unreachable = showsFolderNotice({
+        problem: answer.problem ?? null,
+        failures: answer.failures ?? 0,
+      });
+      const problem = answer.problem === "gone" ? "gone" : "offline";
+      this._joinLine(
+        unreachable ? STRINGS.problems[problem].text : this._waitingText(),
+        unreachable ? problem : "waiting"
+      );
       return;
     }
     this._stopLooking();

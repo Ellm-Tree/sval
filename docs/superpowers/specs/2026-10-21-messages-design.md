@@ -22,7 +22,7 @@ Each message Sval gives the user has its own place:
 
 A user who never has a sync problem sees one small moon at the bottom of the
 panel and nothing else. A user whose sync folder is offline sees the moon dim
-and the last time it synced. A user whose disk is full cannot miss it.
+and how long ago it last synced. A user whose disk is full cannot miss it.
 
 ## 2. How a message is written
 
@@ -48,9 +48,10 @@ critical state, where it reopens the dialog.
 | No sync folder chosen | the footer row is absent | | | |
 | Synced | moon | none | | "Synced just now" (the time) |
 | First pass of this launch | moon and orbiting satellite | none | | "Syncing…" |
-| Folder unreachable for 3 min | moon at 50%, pause badge | Last synced 3:42 PM | | "Can't reach your sync folder" |
-| Folder gone, for 3 min | moon, warning badge | Sync folder not found | Choose Folder… | |
-| Folder access denied | moon, warning badge | Can't access sync folder | Choose Folder… | |
+| Folder unreachable, two steps in a row | moon at 50%, pause badge | Can't reach *folder*, with "Last synced 2 hours ago" under it | Try again | |
+| Folder missing, from the first step | moon, warning badge | Can't find *folder*, with the last sync under it | Sync now, Change… (opens the Change dialog) | |
+| Sval's files gone from the folder, from the first step | moon, warning badge | Sval's files are missing from *folder*, with the last sync under it | Choose folder… (opens the folder picker), Sync now | |
+| Folder access denied | moon, warning badge | Can't access sync folder | Choose another folder… (opens the Change dialog) | |
 | Another key's device in the folder | moon, warning badge | Pair your other device | Enter Code… and ✕ | "Your sync folder has Workspaces from a device that isn't syncing with this one. To sync them, choose "Sync with another device" on that device and enter the code it shows here." |
 | Another device on a newer Sval | moon, warning badge | Update Sval | Update | "A newer version of Sval is available. Update to keep syncing." |
 | Key store refused | moon, warning badge | Sync needs access | Allow Access (macOS, Linux), Try Again (Windows) | below |
@@ -98,8 +99,29 @@ with every failure, and the engine passes it up (§8.1):
 | `too-large` | Folder too large |
 | `own-file-unreadable` | none: §8.2 |
 
-Folder unreachable and folder gone both wait three minutes before they show,
-because a drive comes back and a network share remounts (decision 0032).
+A folder that is not there shows from the first step that finds it so: a
+retry finds the same until someone connects the drive or chooses the folder
+again. A folder that is there and does not answer shows from the second
+failed step in a row, because one failure is often a blip, and the engine
+retries the first within seconds. A pass someone waited on, as Settings'
+Sync now is, shows its answer at once. The first step that reaches the
+folder clears either (decision 0032).
+
+The footer and Settings › Sync say a folder's state in one wording: the
+footer's label is the Sync card's title, naming the folder, with the same
+last-synced line under it, and the footer's buttons are the card's. The
+footer's Sync now waits for the folder, as the card's does.
+
+The folder's two remedies are apart in Settings › Sync. A chosen path that
+is not there (`missing`, `not-a-directory`) says the folder can't be found,
+with the last sync, and offers Sync now and Change…. A folder that is there
+without Sval's files (`no-sval-dir`) offers to choose the folder again or set
+it up again.
+
+The last-synced time says how long ago the sync was, "2 hours ago", and is
+kept in the profile's device-local settings for the folder chosen, so a
+launch says when this device last synced before its first step answers.
+"Not synced yet" means this device has never synced with the folder.
 
 ## 4. The critical dialog
 
@@ -122,8 +144,10 @@ The cause:
 | Disk failing | `NotReadableError` with space available | There's a problem with your disk. |
 | Anything else | | none |
 
-The first dialog appears only after saves have failed for a minute; a pass
-that succeeds in that minute cancels it. The second appears when startup
+The first dialog appears when two passes in a row have failed to save; one
+failure is a blip, and a pass that saves starts the count again. A minute of
+failures would hide a fault that loses every change made in it. The second
+appears when startup
 throws. Both have a ✕, and Esc closes them; dismissing hands the state to
 the footer's critical line, and clicking that reopens the dialog.
 
@@ -215,7 +239,7 @@ says "pair": Agents uses the word for an agent's access.
 | Success | Joined. Your devices are syncing. | |
 | The folder wasn't written | Join failed: Sval can't reach your sync folder. | Try Again |
 | The key store refused the key | Join failed: Sval needs Keychain access. (Credential Manager, keyring) | Allow Access (macOS, Linux), Try Again (Windows) |
-| No sync folder | Join failed: choose a sync folder first. | Choose Folder… |
+| No sync folder | Join failed: choose a sync folder first. | Choose folder… |
 | This device's workspaces couldn't be read | Join failed: Sval can't read this device's workspaces. | Send Report |
 
 **Set Up Sync Again (Settings › Sync and devices).** It lives only here. Success:

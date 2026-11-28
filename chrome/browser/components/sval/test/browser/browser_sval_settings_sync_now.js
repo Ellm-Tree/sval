@@ -72,10 +72,11 @@ add_task(async function syncing_from_settings_updates_the_panels_timestamp() {
   const ui = await openSvalSettings();
 
   Assert.equal(
-    SvalPanel._els.indicator.title,
-    NOT_SYNCED,
-    "the panel has nothing to report before the pass under test"
+    SvalPanel._els.indicator.dataset.state,
+    "folder-missing",
+    "the panel says the chosen folder was missing before the pass under test"
   );
+  Assert.strictEqual(SvalPanel.syncState.lastSynced, null, "never synced");
 
   await syncFromSettings(ui);
 
@@ -136,9 +137,9 @@ add_task(async function a_background_pass_redraws_this_pages_timestamp() {
   await aFolderNotYetSynced(device);
   const ui = await openSvalSettings();
   Assert.equal(
-    ui.els.syncStatus.textContent,
-    NOT_SYNCED,
-    "the page has nothing to report before the pass under test"
+    ui.state,
+    "folder-missing",
+    "the page says the folder was missing before the pass under test"
   );
 
   // A pass the panel runs for itself, as the observer's poll does once the
@@ -337,10 +338,11 @@ add_task(async function settings_says_when_the_last_sync_finished() {
   await aFolderNotYetSynced(device);
   ui = await openSvalSettings();
   Assert.equal(
-    ui.els.syncStatus.textContent,
-    NOT_SYNCED,
-    "and has the same nothing to report as the panel when there is none"
+    ui.state,
+    SvalPanel.syncIndicator().state,
+    "and says what the panel says when the folder is missing"
   );
+  Assert.strictEqual(SvalPanel.syncState.lastSynced, null, "never synced");
 
   await syncFromSettings(ui);
 
