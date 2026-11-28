@@ -146,7 +146,7 @@ const steps = [];
   };
   const doc = () => gDialogBox.isOpen && gDialogBox.dialog?._frame?.contentDocument;
   const shown = () =>
-    [...(doc()?.querySelectorAll?.("main > section") ?? [])].find(s => !s.hidden);
+    [...(doc()?.querySelectorAll?.("sval-dialog > section") ?? [])].find(s => !s.hidden);
   await until("first run to show", () => shown());
   // The flow's last Continue closes its page, and another dialog can take
   // the box after it.
