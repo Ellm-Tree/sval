@@ -106,6 +106,28 @@ built_app() {
   echo "$1/dist/$(sed -n 's/^MOZ_MACBUNDLE_NAME = //p' "$1/config/autoconf.mk" 2>/dev/null)"
 }
 
+# dev_signed <app> <identity, or - for ad hoc>: whether <app> already carries
+# the dev identity under that signature, unchanged since it was signed.
+#
+# Signing rewrites the main executable (lib/macho-uuid.py) and the bundle's
+# signature. A dev build already running from the bundle then no longer
+# matches its code on disk, and the keychain refuses it the secret the build
+# reads (SvalSecretStore), so a second launch of one bundle must leave a
+# signed bundle as it is. A rebuild changes the sealed executable or
+# Info.plist, which fails the check and signs again. `--deep` and `--strict`
+# refuse an artifact build's bundle as signed, for its links into the objdir.
+dev_signed() {
+  local info
+  codesign --verify "$1" 2>/dev/null || return 1
+  info="$(codesign -dvv "$1" 2>&1)" || return 1
+  grep -qx "Identifier=app.sval.dev" <<<"$info" || return 1
+  if [[ "$2" == - ]]; then
+    grep -qx "Signature=adhoc" <<<"$info"
+  else
+    grep -qxF "Authority=$2" <<<"$info"
+  fi
+}
+
 # give_dev_identity <app>: sign_dev_bundle with the dev signing identity when
 # the keychain has it, and ad hoc when it does not or that signing fails.
 #
@@ -115,6 +137,7 @@ built_app() {
 give_dev_identity() {
   local identity
   identity="$(dev_signing_identity)" || identity=-
+  dev_signed "$1" "$identity" && return 0
   sign_dev_bundle "$1" "$identity" && return 0
   [[ "$identity" != - ]] && echo "could not sign as \"$identity\"; signing ad hoc" >&2
   sign_dev_bundle "$1" -
