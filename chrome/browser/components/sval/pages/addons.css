@@ -152,7 +152,7 @@ h2,
   button.tab-button[selected],
   button.tab-button[selected]:hover {
     border-block-color: transparent;
-    background: var(--sval-tint);
+    background: var(--sval-hover-tint);
     color: var(--sval-accent);
   }
 

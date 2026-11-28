@@ -156,33 +156,37 @@ async function pointAt(id) {
 add_task(async function the_selected_tabs_name_is_readable() {
   const { workspace, tabs, ids } = await fourTabs();
   const failing = [];
-  for (const dark of [0, 1]) {
-    await SpecialPowers.pushPrefEnv({
-      set: [["ui.systemUsesDarkTheme", dark]],
-    });
-    await TestUtils.waitForCondition(
-      () => matchMedia("(prefers-color-scheme: dark)").matches === !!dark,
-      "the theme changes"
-    );
-    for (const tint of [null, "blue", "yellow", "red"]) {
-      await setColor(workspace, tint);
-      await SvalPanel.refresh();
-      for (const name of ["looseA", "groupedA"]) {
-        const where = `${name}, ${tint ?? "no tint"}, ${dark ? "dark" : "light"}`;
-        const id = ids[name];
-        await pointAt();
-        await show(tabs[name], id);
-        if (nameContrast(id) < 4.5) {
-          failing.push(`${where}: ${nameContrast(id).toFixed(2)}:1`);
-        }
-        await pointAt(id);
-        if (nameContrast(id) < 4.5) {
-          failing.push(`${where}: hovered, ${nameContrast(id).toFixed(2)}:1`);
+  for (const see of [false, true]) {
+    await windowSeeThrough(see);
+    for (const dark of [0, 1]) {
+      await SpecialPowers.pushPrefEnv({
+        set: [["ui.systemUsesDarkTheme", dark]],
+      });
+      await TestUtils.waitForCondition(
+        () => matchMedia("(prefers-color-scheme: dark)").matches === !!dark,
+        "the theme changes"
+      );
+      for (const tint of [null, "blue", "yellow", "red"]) {
+        await setColor(workspace, tint);
+        await SvalPanel.refresh();
+        for (const name of ["looseA", "groupedA"]) {
+          const kind = see ? "see-through" : "solid";
+          const where = `${name}, ${tint ?? "no tint"}, ${kind}, ${dark ? "dark" : "light"}`;
+          const id = ids[name];
+          await pointAt();
+          await show(tabs[name], id);
+          if (nameContrast(id) < 4.5) {
+            failing.push(`${where}: ${nameContrast(id).toFixed(2)}:1`);
+          }
+          await pointAt(id);
+          if (nameContrast(id) < 4.5) {
+            failing.push(`${where}: hovered, ${nameContrast(id).toFixed(2)}:1`);
+          }
         }
       }
+      await pointAt();
+      await SpecialPowers.popPrefEnv();
     }
-    await pointAt();
-    await SpecialPowers.popPrefEnv();
   }
   await setColor(workspace, null);
   Assert.deepEqual(failing, [], "the selection is readable");

@@ -184,15 +184,6 @@ const SvalExportPage = {
       }
     });
     cancelButton.addEventListener("click", () => window.close());
-
-    // The dialog box holds nothing but the page, so it draws the page's
-    // card with its shadow, as the import page's does.
-    const { shapeDialogBox } = ChromeUtils.importESModule(
-      "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs"
-    );
-    shapeDialogBox(document.querySelector(".sval-im"), {
-      shadow: "0 24px 64px rgba(3, 5, 26, 0.55)",
-    });
     sync();
   },
 };

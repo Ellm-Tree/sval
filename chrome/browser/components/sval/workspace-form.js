@@ -80,10 +80,9 @@ const SvalWorkspaceForm = (() => {
             ),
             make(
               doc,
-              "button",
+              "sval-button",
               {
-                class: "sval-dialog-btn sval-nw-emoji",
-                type: "button",
+                class: "sval-nw-emoji",
                 "aria-labelledby": "sval-nw-emoji-label sval-nw-emoji-value",
               },
               make(doc, "span", {

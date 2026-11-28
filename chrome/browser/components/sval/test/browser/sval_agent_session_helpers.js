@@ -122,7 +122,9 @@ async function connectAgent({ launch = freshLaunch() } = {}) {
 }
 
 /**
- * The pairing alert open in any window, once it has drawn.
+ * The pairing alert open in any window, once it has loaded: `agent-pair.js`
+ * wires its buttons at `DOMContentLoaded`, which can come after the parser
+ * has drawn them.
  *
  * @returns {Promise<Document>}
  */
@@ -131,7 +133,7 @@ async function pairingAlert() {
   await TestUtils.waitForCondition(() => {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
       const d = w.gDialogBox?.dialog?._frame.contentDocument;
-      if (d?.querySelector(".sval-ap-allow")) {
+      if (d?.querySelector(".sval-ap-allow") && d.readyState === "complete") {
         doc = d;
         return true;
       }

@@ -401,7 +401,7 @@ add_task(async function a_site_is_added_and_removed_with_undo() {
   );
   const preview = () => editor().querySelector(".sval-agent-preview");
   const add = () =>
-    editor().querySelector(".sval-agent-adding .sval-button-primary");
+    editor().querySelector('.sval-agent-adding sval-button[type="primary"]');
 
   setValue(ui.page, input, "www.amazon.co.uk", "input");
   Assert.ok(add().disabled, "a site with a rule cannot be added twice");

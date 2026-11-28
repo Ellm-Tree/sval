@@ -727,10 +727,56 @@ function fieldStops(browser) {
   );
 }
 
+/**
+ * The colours a field of `stops` shows: each opaque stop, and each
+ * see-through stop, a Workspace's wash, over each opaque one, the sky it
+ * lies on.
+ *
+ * @param {string[]} stops
+ * @returns {object[]}
+ */
+function fieldColours(stops) {
+  const all = stops.map(rgbaOf);
+  const opaque = all.filter(c => c.a === 1);
+  const washes = all.filter(c => c.a > 0 && c.a < 1);
+  return [
+    ...opaque,
+    ...washes.flatMap(wash => opaque.map(sky => paintedOver(wash, sky))),
+  ];
+}
+
 add_task(async function the_row_and_its_switch_read_on_either_field() {
   const store = await taskFavorites();
   await someFavorites(store);
-  const tab = await homeTab(0);
+  // The window's own look is the page's field: Sval's own on a solid
+  // window, and a wash of the window's colour on a see-through one, which
+  // takes its colour from the window's theme.
+  for (const see of [false, true]) {
+    for (const windowDark of [0, 1]) {
+      await windowSeeThrough(see);
+      await SpecialPowers.pushPrefEnv({
+        set: [["ui.systemUsesDarkTheme", windowDark]],
+      });
+      await TestUtils.waitForCondition(
+        () =>
+          matchMedia("(prefers-color-scheme: dark)").matches === !!windowDark,
+        "the theme changes"
+      );
+      const where = `${see ? "see-through" : "solid"} ${windowDark ? "dark" : "light"} window`;
+      await readOnEitherField(await homeTab(0), where);
+      await SpecialPowers.popPrefEnv();
+    }
+  }
+});
+
+/**
+ * Checks the row's empty line, the switch and its focus ring on `tab`'s
+ * home page, in the page's dark and light schemes.
+ *
+ * @param {Tab} tab
+ * @param {string} where Which window it is, for the messages.
+ */
+async function readOnEitherField(tab, where) {
   const browser = tab.linkedBrowser;
   const context = browser.browsingContext;
   try {
@@ -771,29 +817,30 @@ add_task(async function the_row_and_its_switch_read_on_either_field() {
         `${scheme}: the field is a gradient`
       );
       Assert.equal(seen.checked, "true", "the switch is on");
-      for (const stop of stops) {
+      for (const shown of fieldColours(stops)) {
+        const at = `${where}, ${scheme} page: on ${JSON.stringify(shown)}`;
         Assert.greaterOrEqual(
-          contrastRatio(seen.hint, stop),
+          contrastRatio(seen.hint, shown),
           4.5,
-          `${scheme}: the empty line reads on ${stop}`
+          `${at}, the empty line reads`
         );
         Assert.greaterOrEqual(
-          contrastRatio(seen.ring, stop),
+          contrastRatio(seen.ring, shown),
           3,
-          `${scheme}: the focus ring shows on ${stop}`
+          `${at}, the focus ring shows`
         );
       }
       // The switch sits in the page's corner, on the field's edge.
       Assert.greaterOrEqual(
         contrastRatio(seen.on, stops.at(-1)),
         3,
-        `${scheme}: the switch's on state shows on the field's edge`
+        `${where}, ${scheme} page: the switch's on state shows on the field's edge`
       );
     }
   } finally {
     context.prefersColorSchemeOverride = "none";
   }
-});
+}
 
 add_task(async function the_switch_shows_its_state_in_forced_colours() {
   const store = await taskFavorites();

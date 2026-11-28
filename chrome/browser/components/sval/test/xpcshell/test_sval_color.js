@@ -32,9 +32,14 @@ function rgbOf(value) {
  */
 function failuresOf(look, more) {
   const R = SvalColor.requirements(more);
-  const { window, field, secondary } = look.surfaces;
+  const { window, field, secondary, popup, selected, selectedHover } =
+    look.surfaces;
   const checks = [
     ["title", look.strong, window, R.body],
+    ["selected row", look.strong, selected, R.body],
+    ["hovered selected row", look.strong, selectedHover, R.body],
+    ["on switch on the window", look.switchOn, window, R.line],
+    ["on switch on a popup", look.switchOn, popup, R.line],
     ["body", look.body, window, R.body],
     ["muted", look.muted, window, R.muted],
     ["line", look.line, window, R.line],

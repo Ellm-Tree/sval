@@ -123,6 +123,8 @@ function urlbarLook() {
   };
 }
 
+add_setup(solidWindows);
+
 add_task(async function the_address_bar_wears_its_workspaces_colours() {
   const { home, work } = pinsFixture;
   await colour(home, "green");

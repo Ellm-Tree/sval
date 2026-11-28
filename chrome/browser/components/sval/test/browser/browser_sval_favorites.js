@@ -359,7 +359,7 @@ async function svalDialog() {
   let doc;
   await TestUtils.waitForCondition(() => {
     doc = gDialogBox.dialog?._frame.contentDocument;
-    return doc?.querySelector(".sval-dialog-actions button");
+    return doc?.querySelector("sval-dialog sval-button");
   }, "the dialog has drawn");
   return doc;
 }

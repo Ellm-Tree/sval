@@ -616,7 +616,7 @@ add_task(
     const input = doc.querySelector(".sval-dialog-input");
     input.value = "Mine";
     input.dispatchEvent(new doc.defaultView.Event("input", { bubbles: true }));
-    doc.querySelector('.sval-dialog-actions [data-button="ok"]').click();
+    doc.querySelector('sval-dialog [data-button="ok"]').click();
     await TestUtils.waitForCondition(
       async () => (await label()) === "Mine",
       "the tab is named"

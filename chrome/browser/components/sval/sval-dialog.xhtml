@@ -18,64 +18,56 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title></title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
     <link
       rel="stylesheet"
       href="chrome://browser/content/sval/sval-dialog.css"
     />
-    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/sval-dialog.js"></script>
   </head>
   <body>
-    <form
-      class="sval-dialog"
-      role="dialog"
-      aria-labelledby="sval-dialog-title"
-      aria-describedby="sval-dialog-body"
-    >
-      <div class="sval-dialog-head">
-        <span
-          class="sval-dialog-icon"
-          aria-hidden="true"
+    <form>
+      <sval-dialog
+        role="dialog"
+        aria-labelledby="sval-dialog-title"
+        aria-describedby="sval-dialog-body"
+      >
+        <h1 slot="title" class="sval-dialog-title" id="sval-dialog-title"></h1>
+        <p
+          slot="body"
+          class="sval-dialog-body"
+          id="sval-dialog-body"
           hidden="hidden"
-        ></span>
-        <div class="sval-dialog-copy">
-          <h1 class="sval-dialog-title" id="sval-dialog-title"></h1>
-          <p class="sval-dialog-body" id="sval-dialog-body" hidden="hidden"></p>
-          <p
-            class="sval-dialog-warning"
-            id="sval-dialog-warning"
-            hidden="hidden"
-          ></p>
+        ></p>
+        <p
+          slot="warning"
+          class="sval-dialog-warning"
+          id="sval-dialog-warning"
+          hidden="hidden"
+        ></p>
+        <div class="sval-dialog-field" hidden="hidden">
+          <label class="sval-dialog-label" for="sval-dialog-input"></label>
+          <input
+            class="sval-dialog-input"
+            id="sval-dialog-input"
+            type="text"
+            autocomplete="off"
+          />
+          <span
+            class="sval-dialog-error"
+            id="sval-dialog-error"
+            aria-live="polite"
+          ></span>
         </div>
-        <button
-          class="sval-dialog-close"
-          type="button"
-          aria-label="Close"
-          title="Close"
-          hidden="hidden"
-        ></button>
-      </div>
-      <div class="sval-dialog-field" hidden="hidden">
-        <label class="sval-dialog-label" for="sval-dialog-input"></label>
-        <input
-          class="sval-dialog-input"
-          id="sval-dialog-input"
-          type="text"
-          autocomplete="off"
-        />
-        <span
-          class="sval-dialog-error"
-          id="sval-dialog-error"
-          aria-live="polite"
-        ></span>
-      </div>
-      <dl class="sval-dialog-details" hidden="hidden"></dl>
-      <label class="sval-dialog-check" hidden="hidden">
-        <input type="checkbox" />
-        <span class="sval-dialog-check-label"></span>
-      </label>
-      <div class="sval-dialog-actions"></div>
+        <dl class="sval-dialog-details" hidden="hidden"></dl>
+        <label class="sval-dialog-check" hidden="hidden">
+          <input type="checkbox" />
+          <span class="sval-dialog-check-label"></span>
+        </label>
+      </sval-dialog>
     </form>
   </body>
 </html>

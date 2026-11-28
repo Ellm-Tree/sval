@@ -40,10 +40,10 @@ add_setup(async function () {
  *   to include their history.
  */
 async function answerHandOver(ok, checked = false) {
-  const doc = await dialogIn(window, ".sval-dialog-actions button");
+  const doc = await dialogIn(window, "sval-dialog sval-button");
   const check = doc.querySelector(".sval-dialog-check");
   const asked = {
-    state: doc.querySelector(".sval-dialog").dataset.state,
+    state: doc.querySelector("sval-dialog").state,
     history: !check.hidden,
   };
   const box = check.querySelector("input");

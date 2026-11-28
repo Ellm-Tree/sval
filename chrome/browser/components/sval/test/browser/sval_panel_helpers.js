@@ -216,7 +216,7 @@ async function dialogGone(doc) {
  *   dialog showed, and what its field started with.
  */
 async function answerDialog({ value, button = "ok", meanwhile } = {}) {
-  const doc = await dialogDocument(".sval-dialog-actions button");
+  const doc = await dialogDocument("sval-dialog sval-button");
   const input = doc.querySelector(".sval-dialog-input");
   const shown = {
     title: doc.getElementById("sval-dialog-title").textContent,
@@ -228,10 +228,7 @@ async function answerDialog({ value, button = "ok", meanwhile } = {}) {
     input.value = value;
     input.dispatchEvent(new doc.defaultView.Event("input", { bubbles: true }));
   }
-  const target =
-    button === "extra"
-      ? doc.querySelector(".sval-dialog-extra")
-      : doc.querySelector(`.sval-dialog-actions [data-button="${button}"]`);
+  const target = doc.querySelector(`sval-dialog [data-button="${button}"]`);
   await TestUtils.waitForCondition(
     () => !target.disabled,
     `${button} is enabled`

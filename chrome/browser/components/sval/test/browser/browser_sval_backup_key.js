@@ -63,8 +63,9 @@ add_task(async function the_sheet_shows_the_key_and_how_to_keep_it() {
     doc.querySelector(".sval-backup-steps ol > li"),
     "and the steps to keep it in a password manager and restore it"
   );
-  Assert.ok(
-    doc.querySelector(".sval-backup-done").classList.contains("primary"),
+  Assert.equal(
+    doc.querySelector(".sval-backup-done").type,
+    "primary",
     "Done is the dialog's primary action, as in Sval's other dialogs"
   );
 

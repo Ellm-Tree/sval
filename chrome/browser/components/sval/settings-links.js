@@ -680,19 +680,18 @@
       }
       workspace.value = draft.workspace;
       const save = el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-button-primary sval-agent-small",
+          type: "primary",
+          className: "sval-agent-small",
           dataset: { svalKey: `${prefix}-save` },
         },
         isAdd ? "Add" : "Save"
       );
       const cancel = el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: `${prefix}-cancel` },
         },
         "Cancel"

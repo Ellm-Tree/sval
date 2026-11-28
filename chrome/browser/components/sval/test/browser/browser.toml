@@ -330,6 +330,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_blocking_url_classifier.js"]
 
+["browser_sval_button.js"]
+
 ["browser_sval_camera_prompt.js"]
 
 ["browser_sval_card.js"]
@@ -386,7 +388,21 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_devtools_defaults.js"]
 
+["browser_sval_dialog.js"]
+
 ["browser_sval_dialog_accessible_tree.js"]
+
+["browser_sval_dialog_fit.js"]
+
+["browser_sval_dialog_frosted.js"]
+
+["browser_sval_dialog_hold.js"]
+
+["browser_sval_dialog_pages.js"]
+
+["browser_sval_dialog_palette.js"]
+
+["browser_sval_dialog_sheets.js"]
 
 ["browser_sval_downloads_workspaces.js"]
 
@@ -445,6 +461,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_favorites_urlbar.js"]
 
 ["browser_sval_feedback_collector.js"]
+
+["browser_sval_feedback_dialog.js"]
 
 ["browser_sval_feedback_form.js"]
 
@@ -835,6 +853,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_settings.js"]
 
 ["browser_sval_settings_closed_while_loading.js"]
+
+["browser_sval_settings_dialogs.js"]
 
 ["browser_sval_settings_element_picker.js"]
 

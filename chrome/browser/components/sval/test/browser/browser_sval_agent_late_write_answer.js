@@ -180,7 +180,7 @@ add_task(async function always_allow_sends_the_sites_later_writes_unasked() {
   const { alerts, browser, store, agent } = setup;
   const late = requestsTo("/sval-late");
   const doc = await askedAboutALateWrite(setup);
-  const buttons = [...doc.querySelectorAll(".sval-aa-actions button")];
+  const buttons = [...doc.querySelectorAll("sval-dialog [data-choice]")];
   Assert.deepEqual(
     buttons.map(b => b.dataset.choice),
     ["allow", "allow_always", "deny_always", "deny"]

@@ -13,68 +13,71 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>An agent is asking</title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
     <link
       rel="stylesheet"
       href="chrome://browser/content/sval/sval-dialog.css"
     />
-    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/sval-dialog-hold.js"></script>
     <script src="chrome://browser/content/sval/agent-alert.js"></script>
   </head>
   <body>
-    <form
-      class="sval-dialog sval-aa"
-      role="alertdialog"
-      aria-labelledby="sval-aa-question"
-    >
-      <div class="sval-dialog-head">
-        <span
-          class="sval-dialog-icon"
-          data-icon="agent"
-          aria-hidden="true"
-        ></span>
-        <div class="sval-dialog-copy">
-          <h1 class="sval-dialog-title" id="sval-aa-question"></h1>
-          <p class="sval-dialog-body" id="sval-aa-detail" hidden="hidden"></p>
-        </div>
-      </div>
-      <ul class="sval-dialog-list" id="sval-aa-items" hidden="hidden"></ul>
-      <fieldset
-        class="sval-dialog-well sval-aa-options"
-        id="sval-aa-options"
-        hidden="hidden"
+    <form>
+      <sval-dialog
+        class="sval-aa"
+        icon="agent"
+        role="alertdialog"
+        aria-labelledby="sval-aa-question"
       >
-        <legend
-          class="sval-dialog-check-title"
-          id="sval-aa-options-label"
-        ></legend>
-      </fieldset>
-      <div class="sval-dialog-scope" id="sval-aa-scope" hidden="hidden">
-        <span class="sval-dialog-scope-label" id="sval-aa-scope-label"
-          >Remember for</span
+        <h1 slot="title" class="sval-dialog-title" id="sval-aa-question"></h1>
+        <p
+          slot="body"
+          class="sval-dialog-body"
+          id="sval-aa-detail"
+          hidden="hidden"
+        ></p>
+        <ul class="sval-dialog-list" id="sval-aa-items" hidden="hidden"></ul>
+        <fieldset
+          class="sval-dialog-well sval-aa-options"
+          id="sval-aa-options"
+          hidden="hidden"
         >
-        <button
-          type="button"
-          class="sval-dialog-scope-button"
-          id="sval-aa-scope-button"
-          aria-haspopup="listbox"
-          aria-expanded="false"
-          aria-controls="sval-aa-scope-menu"
-        >
-          <span class="sval-dialog-scope-value" id="sval-aa-scope-value"></span>
-          <span class="sval-dialog-scope-chevron" aria-hidden="true"></span>
-        </button>
-      </div>
-      <div
-        class="sval-dialog-scope-menu"
-        id="sval-aa-scope-menu"
-        role="listbox"
-        tabindex="0"
-        aria-labelledby="sval-aa-scope-label"
-        hidden="hidden"
-      ></div>
-      <div class="sval-dialog-actions sval-aa-actions"></div>
+          <legend
+            class="sval-dialog-check-title"
+            id="sval-aa-options-label"
+          ></legend>
+        </fieldset>
+        <div class="sval-dialog-scope" id="sval-aa-scope" hidden="hidden">
+          <span class="sval-dialog-scope-label" id="sval-aa-scope-label"
+            >Remember for</span
+          >
+          <button
+            type="button"
+            class="sval-dialog-scope-button"
+            id="sval-aa-scope-button"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="sval-aa-scope-menu"
+          >
+            <span
+              class="sval-dialog-scope-value"
+              id="sval-aa-scope-value"
+            ></span>
+            <span class="sval-dialog-scope-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div
+          class="sval-dialog-scope-menu"
+          id="sval-aa-scope-menu"
+          role="listbox"
+          tabindex="0"
+          aria-labelledby="sval-aa-scope-label"
+          hidden="hidden"
+        ></div>
+      </sval-dialog>
     </form>
   </body>
 </html>

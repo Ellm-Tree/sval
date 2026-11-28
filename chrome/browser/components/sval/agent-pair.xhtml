@@ -13,63 +13,65 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>Pair an agent</title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
     <link
       rel="stylesheet"
       href="chrome://browser/content/sval/sval-dialog.css"
     />
-    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/sval-dialog-hold.js"></script>
     <script src="chrome://browser/content/sval/agent-pair.js"></script>
   </head>
   <body>
-    <form
-      class="sval-dialog sval-ap"
-      role="alertdialog"
-      aria-labelledby="sval-ap-question"
-      tabindex="-1"
-    >
-      <div class="sval-dialog-head">
-        <span
-          class="sval-dialog-icon"
-          data-icon="agent"
-          aria-hidden="true"
-        ></span>
-        <div class="sval-dialog-copy">
-          <h1 class="sval-dialog-title" id="sval-ap-question"></h1>
-          <p class="sval-dialog-body" id="sval-ap-detail">
-            It gets its own window and Workspace, and it can browse there while
-            you watch.
-          </p>
+    <form>
+      <sval-dialog
+        class="sval-ap"
+        icon="agent"
+        role="alertdialog"
+        aria-labelledby="sval-ap-question"
+        tabindex="-1"
+      >
+        <h1 slot="title" class="sval-dialog-title" id="sval-ap-question"></h1>
+        <p slot="body" class="sval-dialog-body" id="sval-ap-detail">
+          It gets its own window and Workspace, and it can browse there while
+          you watch.
+        </p>
+        <ul class="sval-dialog-list" id="sval-ap-facts" hidden="hidden"></ul>
+        <div class="sval-dialog-well sval-ap-kind">
+          <div class="sval-ap-request">
+            <span id="sval-ap-request"></span>
+            <span
+              class="sval-dialog-iso-pill"
+              aria-hidden="true"
+              hidden="hidden"
+              >Isolated</span
+            >
+          </div>
+          <label class="sval-dialog-check sval-ap-override">
+            <input type="checkbox" />
+            <span id="sval-ap-override"></span>
+          </label>
         </div>
-      </div>
-      <ul class="sval-dialog-list" id="sval-ap-facts" hidden="hidden"></ul>
-      <div class="sval-dialog-well sval-ap-kind">
-        <div class="sval-ap-request">
-          <span id="sval-ap-request"></span>
-          <span class="sval-dialog-iso-pill" aria-hidden="true" hidden="hidden"
-            >Isolated</span
-          >
-        </div>
-        <label class="sval-dialog-check sval-ap-override">
-          <input type="checkbox" />
-          <span id="sval-ap-override"></span>
-        </label>
-      </div>
-      <div class="sval-dialog-actions">
-        <button class="sval-dialog-btn sval-ap-deny" type="button">Deny</button>
-        <!-- Pair starts disabled because the parser can yield before
-           - DOMContentLoaded runs `agent-pair.js`. An enabled Pair would
-           - then submit the form with no handler, which unloads the alert
-           - and so answers it as a deny. -->
-        <button
-          class="sval-dialog-btn sval-ap-allow primary"
-          type="submit"
+        <sval-button slot="actions" class="sval-ap-deny" data-button="cancel">
+          Deny
+        </sval-button>
+        <!-- Pair starts disabled, so it is no form's default button before
+           - `agent-pair.js` has put its handler on the form, and Enter cannot
+           - submit the form then, which would unload the alert and so answer
+           - it as a deny. -->
+        <sval-button
+          slot="actions"
+          class="sval-ap-allow"
+          data-button="ok"
+          type="primary"
+          submit="submit"
           disabled="disabled"
         >
           Pair
-        </button>
-      </div>
+        </sval-button>
+      </sval-dialog>
     </form>
   </body>
 </html>

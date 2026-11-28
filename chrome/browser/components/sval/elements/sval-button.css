@@ -1,0 +1,242 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * `sval-button`'s look. Every value a surface may change is a
+ * `--sval-button-*` token, read here with Settings' value as the fallback,
+ * and the fallbacks read the colour roles (`sval-roles.css`). Custom
+ * properties inherit into the shadow root, so a surface sets a token on any
+ * ancestor of the element, or on the element itself.
+ *
+ * Shape and type:
+ *   --sval-button-height          least block size (34px)
+ *   --sval-button-small-height    the same, at `size="small"` (30px)
+ *   --sval-button-block-size      block size (auto)
+ *   --sval-button-min-width       the element's least inline size (auto)
+ *   --sval-button-padding-block   (0)
+ *   --sval-button-padding-inline  (16px; each type may set its own)
+ *   --sval-button-padding-inline-start, -end  one side alone
+ *   --sval-button-radius          (999px)
+ *   --sval-button-border-width    (1px)
+ *   --sval-button-display         the inner button's display (inline-block);
+ *                                 `inline-flex` lays an icon beside the label
+ *   --sval-button-gap             the gap between them (normal)
+ *   --sval-button-font-family     (the surroundings')
+ *   --sval-button-font-size       (14px)
+ *   --sval-button-font-weight     (600)
+ *   --sval-button-line-height     (the surroundings')
+ *   --sval-button-transition      background and border fades
+ *
+ * Colours, for each type T of primary, secondary, danger and quiet:
+ *   --sval-button-T-fill, -T-ink, -T-border, -T-shadow
+ *   --sval-button-T-hover-fill, -T-hover-ink, -T-hover-border
+ *   --sval-button-T-press-fill       pressed with the pointer over it
+ *   --sval-button-T-press-idle-fill  pressed with the pointer elsewhere, as a
+ *                                    held Space is
+ *   --sval-button-T-padding-inline
+ *
+ * Disabled, for `disabled`:
+ *   --sval-button-disabled-fill (or -T-disabled-fill for one type),
+ *   --sval-button-disabled-ink, -disabled-border,
+ *   --sval-button-disabled-shadow   (the type's own)
+ *   --sval-button-disabled-opacity  (0.5)
+ *   --sval-button-soft-disabled-opacity  under `aria-disabled` (the above)
+ *
+ * Held, for `held`: --sval-button-hold-time, the sweep's length (0ms).
+ *
+ * Busy, for `busy`: the spinner takes the ink's colour.
+ *
+ * Focus: --sval-button-focus, the ring's colour (`--sval-focus`).
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-icons.css");
+
+:host {
+  display: inline-flex;
+  min-width: var(--sval-button-min-width, auto);
+}
+
+:host([hidden]) {
+  display: none;
+}
+
+button {
+  --_fill: var(--sval-button-secondary-fill, transparent);
+  --_ink: var(--sval-button-secondary-ink, var(--sval-ink));
+  --_border: var(--sval-button-secondary-border, var(--sval-border-strong));
+  --_shadow: var(--sval-button-secondary-shadow, none);
+  --_hover-fill: var(--sval-button-secondary-hover-fill, var(--sval-hover-tint));
+  --_hover-ink: var(--sval-button-secondary-hover-ink, var(--_ink));
+  --_hover-border: var(--sval-button-secondary-hover-border, var(--sval-accent));
+  --_press-fill: var(--sval-button-secondary-press-fill, var(--_hover-fill));
+  --_press-idle-fill: var(--sval-button-secondary-press-idle-fill, var(--_fill));
+  --_padding-inline: var(--sval-button-secondary-padding-inline, var(--sval-button-padding-inline, 16px));
+  --_disabled-fill: var(--sval-button-secondary-disabled-fill, var(--sval-button-disabled-fill, var(--_fill)));
+
+  appearance: none;
+  display: var(--sval-button-display, inline-block);
+  flex: auto;
+  align-items: center;
+  gap: var(--sval-button-gap, normal);
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--sval-button-height, 34px);
+  height: var(--sval-button-block-size, auto);
+  margin: 0;
+  padding-block: var(--sval-button-padding-block, 0);
+  padding-inline-start: var(--sval-button-padding-inline-start, var(--_padding-inline));
+  padding-inline-end: var(--sval-button-padding-inline-end, var(--_padding-inline));
+  border: var(--sval-button-border-width, 1px) solid var(--_border);
+  border-radius: var(--sval-button-radius, 999px);
+  background-color: var(--_fill);
+  box-shadow: var(--_shadow);
+  color: var(--_ink);
+  font: inherit;
+  font-family: var(--sval-button-font-family, inherit);
+  font-size: var(--sval-button-font-size, 14px);
+  font-weight: var(--sval-button-font-weight, 600);
+  line-height: var(--sval-button-line-height, inherit);
+  cursor: pointer;
+  transition: var(--sval-button-transition, background-color var(--sval-dur) var(--sval-ease), border-color var(--sval-dur) var(--sval-ease));
+}
+
+:host([type="primary"]) button {
+  --_fill: var(--sval-button-primary-fill, var(--sval-action));
+  --_ink: var(--sval-button-primary-ink, var(--sval-action-text));
+  --_border: var(--sval-button-primary-border, var(--sval-action));
+  --_shadow: var(--sval-button-primary-shadow, none);
+  --_hover-fill: var(--sval-button-primary-hover-fill, var(--sval-action-hover));
+  --_hover-ink: var(--sval-button-primary-hover-ink, var(--_ink));
+  --_hover-border: var(--sval-button-primary-hover-border, var(--sval-action-hover));
+  --_press-fill: var(--sval-button-primary-press-fill, var(--sval-action-press));
+  --_press-idle-fill: var(--sval-button-primary-press-idle-fill, var(--sval-action-press));
+  --_padding-inline: var(--sval-button-primary-padding-inline, var(--sval-button-padding-inline, 16px));
+  --_disabled-fill: var(--sval-button-primary-disabled-fill, var(--sval-button-disabled-fill, var(--_fill)));
+}
+
+:host([type="danger"]) button {
+  --_fill: var(--sval-button-danger-fill, var(--sval-problem));
+  --_ink: var(--sval-button-danger-ink, var(--sval-inverse));
+  --_border: var(--sval-button-danger-border, transparent);
+  --_shadow: var(--sval-button-danger-shadow, none);
+  --_hover-fill: var(--sval-button-danger-hover-fill, color-mix(in srgb, var(--sval-problem) 86%, var(--sval-ink)));
+  --_hover-ink: var(--sval-button-danger-hover-ink, var(--_ink));
+  --_hover-border: var(--sval-button-danger-hover-border, transparent);
+  --_press-fill: var(--sval-button-danger-press-fill, var(--_hover-fill));
+  --_press-idle-fill: var(--sval-button-danger-press-idle-fill, var(--_fill));
+  --_padding-inline: var(--sval-button-danger-padding-inline, 20px);
+  --_disabled-fill: var(--sval-button-danger-disabled-fill, var(--sval-button-disabled-fill, var(--_fill)));
+}
+
+:host([type="quiet"]) button {
+  --_fill: var(--sval-button-quiet-fill, transparent);
+  --_ink: var(--sval-button-quiet-ink, var(--sval-ink-muted));
+  --_border: var(--sval-button-quiet-border, transparent);
+  --_shadow: var(--sval-button-quiet-shadow, none);
+  --_hover-fill: var(--sval-button-quiet-hover-fill, var(--sval-hover-tint));
+  --_hover-ink: var(--sval-button-quiet-hover-ink, var(--_ink));
+  --_hover-border: var(--sval-button-quiet-hover-border, var(--sval-accent));
+  --_press-fill: var(--sval-button-quiet-press-fill, var(--_hover-fill));
+  --_press-idle-fill: var(--sval-button-quiet-press-idle-fill, var(--_fill));
+  --_padding-inline: var(--sval-button-quiet-padding-inline, var(--sval-button-padding-inline, 16px));
+  --_disabled-fill: var(--sval-button-quiet-disabled-fill, var(--sval-button-disabled-fill, var(--_fill)));
+}
+
+:host([size="small"]) button {
+  min-height: var(--sval-button-small-height, 30px);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--_hover-border);
+  background-color: var(--_hover-fill);
+  color: var(--_hover-ink);
+}
+
+button:active:hover:not(:disabled) {
+  background-color: var(--_press-fill);
+}
+
+button:active:not(:hover, :disabled) {
+  background-color: var(--_press-idle-fill);
+}
+
+button:disabled,
+button[aria-disabled="true"] {
+  cursor: default;
+}
+
+button:disabled {
+  border-color: var(--sval-button-disabled-border, var(--_border));
+  background-color: var(--_disabled-fill);
+  box-shadow: var(--sval-button-disabled-shadow, var(--_shadow));
+  color: var(--sval-button-disabled-ink, var(--_ink));
+  opacity: var(--sval-button-disabled-opacity, 0.5);
+}
+
+button[aria-disabled="true"] {
+  opacity: var(--sval-button-soft-disabled-opacity, var(--sval-button-disabled-opacity, 0.5));
+}
+
+/* `held`: the disabled look, with the type's fill sweeping across it from
+ * the start edge over the hold. */
+@keyframes sval-button-hold {
+  from {
+    background-size: 0% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (not (forced-colors: active)) {
+  :host([held]) button:disabled {
+    background-image: linear-gradient(var(--_fill), var(--_fill));
+    background-position: left;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    animation: sval-button-hold var(--sval-button-hold-time, 0ms) linear;
+
+    &:dir(rtl) {
+      background-position: right;
+    }
+  }
+}
+
+button:focus-visible {
+  outline: 2px solid var(--sval-button-focus, var(--sval-focus));
+  outline-offset: 2px;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+/* `busy`: a spinner where the icon would be. */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+  background: var(--sval-icon-loading) center / contain no-repeat;
+  -moz-context-properties: fill;
+  fill: currentColor;
+  animation: sval-button-spin 1s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes sval-button-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+button[aria-busy="true"] {
+  cursor: default;
+}

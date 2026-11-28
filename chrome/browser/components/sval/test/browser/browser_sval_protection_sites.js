@@ -112,7 +112,7 @@ add_task(async function a_row_says_what_differs_and_holds_no_choices() {
       !row.querySelector("select, input"),
       `${site}'s row has no menu or switch`
     );
-    const controls = [...row.querySelectorAll("a, button")];
+    const controls = [...row.querySelectorAll("a, button, sval-button")];
     Assert.deepEqual(
       controls.map(el =>
         ["sval-sites-link", "sval-sites-reset"].find(c =>
@@ -451,7 +451,9 @@ add_task(async function the_keyboard_keeps_its_place_in_the_sites() {
   const resetButton = rowFor(ui, "example.net").querySelector(
     ".sval-sites-reset"
   );
-  const acc = await accessibleOf(resetButton);
+  const acc = await accessibleOf(
+    resetButton.shadowRoot.querySelector("button")
+  );
   Assert.equal(acc.name, "Reset example.net", "Reset names its site");
 
   resetButton.focus();

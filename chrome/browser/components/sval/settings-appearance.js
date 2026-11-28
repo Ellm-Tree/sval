@@ -438,9 +438,8 @@
       const writeOrder = next =>
         Services.prefs.setCharPref(lazy.LAUNCHER_PREFS.order, next.join(","));
       const button = (key, role, l10nId, write) => {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "sval-button sval-agent-small";
+        const el = document.createElement("sval-button");
+        el.className = "sval-agent-small";
         el.dataset.key = key;
         el.dataset.role = role;
         document.l10n.setAttributes(el, l10nId, { section: names.get(key) });

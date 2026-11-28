@@ -283,7 +283,7 @@ async function lookEnded(ui, asked) {
     () =>
       landed.dataset.outcome ||
       card.dataset.joinOutcome ||
-      LOOK_ENDED.includes(asked.form.dataset.state),
+      LOOK_ENDED.includes(asked.card.state),
     "the look for the code ended",
     250,
     120
@@ -293,7 +293,7 @@ async function lookEnded(ui, asked) {
   }
   return {
     outcome: card.dataset.joinOutcome,
-    said: asked.form.dataset.state,
+    said: asked.card.state,
   };
 }
 

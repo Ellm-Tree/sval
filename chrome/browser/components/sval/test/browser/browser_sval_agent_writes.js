@@ -42,7 +42,7 @@ add_task(async function deny_cancels_a_fetch_the_click_sent() {
   Assert.deepEqual(heldRequests(doc), [
     { method: "POST", target: "example.com", path: "/sval-fetch" },
   ]);
-  const buttons = [...doc.querySelectorAll(".sval-aa-actions button")];
+  const buttons = [...doc.querySelectorAll("sval-dialog [data-choice]")];
   Assert.deepEqual(
     buttons.map(b => b.dataset.choice),
     ["allow", "allow_always", "deny_always", "deny"],

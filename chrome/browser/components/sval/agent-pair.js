@@ -71,22 +71,24 @@ const SvalAgentPair = {
     const allow = document.querySelector(".sval-ap-allow");
     // The description is what the user decides on: what pairing gives, who
     // is asking and what kind of workspace it asked for.
-    const form = document.querySelector(".sval-ap");
-    form.ariaDescribedByElements = [
+    const card = document.querySelector("sval-dialog");
+    const form = card.closest("form");
+    card.ariaDescribedByElements = [
       document.getElementById("sval-ap-detail"),
       list,
       document.getElementById("sval-ap-request"),
     ].filter(el => !el.hidden);
     // Until Pair can take focus the alert itself holds it, so a screen
     // reader reads the alert.
-    const placeFocus = () => (allow.disabled ? form : allow).focus();
+    card.defaultFocus = card;
     const onHold = held => {
+      card.defaultFocus = held ? card : allow;
       // Pair takes focus as it enables, unless the user has moved to another
       // control meanwhile.
       const focused = document.activeElement;
       if (
         !held &&
-        (!focused || focused === document.body || focused === form)
+        (!focused || focused === document.body || focused === card)
       ) {
         allow.focus();
       }
@@ -109,10 +111,7 @@ const SvalAgentPair = {
       }
     });
     this._hold = window.svalHoldGrants([allow], onHold);
-    // `SubDialog.focus` calls this when the dialog opens, in place of its own
-    // move to the first focusable element.
-    document.subDialogSetDefaultFocus = placeFocus;
-    placeFocus();
+    card.focusDefault();
   },
 };
 

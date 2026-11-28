@@ -7,7 +7,7 @@
    because the page loads nothing from outside the browser (spec §10.9). */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
-@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-roles.css");
 @import url("chrome://browser/content/sval/sval-palette.css");
 @import url("chrome://browser/content/sval/sval-launcher-rows.css");
 @import url("chrome://browser/content/sval/sval-icons.css");

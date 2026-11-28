@@ -10,6 +10,18 @@
  * three as one shape (`sval-stem.css`). The tab and the shape take no
  * pointer, so the button under the tab still closes the popover.
  *
+ * The box is Sval's dialog card (`sval-dialog`) with `sval-button`s for its
+ * answers, in the dialog's tokens, set here from the window's popover
+ * colours, as `sval-dialog.css` sets them for a dialog's page. Over a
+ * window that shows what is behind it, the popover is `frosted`
+ * (`SvalFeedbackForm.frost`): it carries the colours `SvalColor` solves for
+ * the `blur` material's look as the `--sval-tint-*` properties, the shape
+ * wears `--sval-feedback-frost`, and a layer clipped to the shape, the tab,
+ * the stem and the card as one, blurs what lies under it by
+ * `--sval-feedback-blur`. A filter makes an element the root its
+ * descendants' backdrop filters read from, so the frosted popover drops the
+ * shape's shadow filter, which would leave the layer nothing to blur.
+ *
  * `SvalFeedbackForm.place` sets, in px: `--sval-feedback-tab` the tab's
  * size, `--sval-feedback-start` from the window's edge on the panel's side
  * to the tab's outer end,
@@ -21,9 +33,38 @@
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 .sval-feedback {
-  --sval-feedback-surface: var(--panel-background-color);
   --sval-feedback-ok: #5ee08a;
   --sval-feedback-warn: #ffb224;
+
+  /* The dialog's tokens (`sval-dialog.css`), from the window's popover
+     colours, which a tinted window's `--sval-tint-*` solve. */
+  --sval-dialog-card: var(--panel-background-color);
+  --sval-dialog-text: var(--sval-text);
+  --sval-dialog-body: var(--sval-tint-body, var(--sval-text));
+  --sval-dialog-muted: var(--sval-muted);
+  --sval-dialog-focus: var(--sval-focus);
+  --sval-dialog-secondary-hover: var(--sval-wash-strong);
+  --sval-dialog-shadow: none;
+  --sval-button-height: 0;
+  --sval-button-block-size: 40px;
+  --sval-button-small-height: 0;
+  --sval-button-min-width: 0;
+  --sval-button-padding-inline: 18px;
+  --sval-button-border-width: 0;
+  --sval-button-font-family: var(--sval-font);
+  --sval-button-font-size: 14px;
+  --sval-button-font-weight: 600;
+  --sval-button-line-height: normal;
+  --sval-button-transition: none;
+  --sval-button-focus: var(--sval-focus);
+  --sval-button-secondary-fill: var(--sval-tint-secondary, var(--sval-wash));
+  --sval-button-secondary-ink: var(--sval-tint-secondary-ink, var(--sval-text));
+  --sval-button-secondary-hover-fill: var(--sval-wash-strong);
+  --sval-button-primary-padding-inline: 20px;
+  --sval-button-primary-fill: var(--sval-action);
+  --sval-button-primary-ink: #ffffff;
+  --sval-button-primary-shadow: 0 6px 20px color-mix(in srgb, var(--sval-action) 35%, transparent);
+  --sval-button-disabled-shadow: none;
 
   position: fixed;
   bottom: var(--sval-feedback-bottom);
@@ -43,6 +84,44 @@
     left: auto;
     right: var(--sval-feedback-start);
   }
+}
+
+/* Frosted: the text and fields take the colours solved on the frosted look,
+   as `sval-header.css` maps a tinted window's. */
+.sval-feedback[frosted] {
+  --sval-text: var(--sval-tint-strong);
+  --sval-muted: var(--sval-tint-muted);
+  --sval-focus: var(--sval-tint-focus);
+  --sval-pill-bg: var(--sval-tint-field);
+  --sval-dialog-card: var(--sval-feedback-frost);
+  filter: none;
+
+  > .sval-stem-outline {
+    fill: var(--sval-feedback-frost);
+  }
+
+  > .sval-feedback-frost {
+    display: block;
+  }
+
+  /* With no shape drawn, the card frosts alone. */
+  &:not([sval-stem="placed"]) > .sval-feedback-box {
+    backdrop-filter: blur(var(--sval-feedback-blur));
+    background: var(--sval-feedback-frost);
+  }
+}
+
+.sval-feedback-frost {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  backdrop-filter: blur(var(--sval-feedback-blur));
+}
+
+.sval-feedback:not([sval-stem="placed"]) > .sval-feedback-frost {
+  display: none;
 }
 
 @media not (forced-colors) {
@@ -90,19 +169,17 @@
   }
 }
 
+/* The card, square on the corner its stem leaves from. The shape draws its
+   fill and edge (`sval-stem.css`). */
 .sval-feedback-box {
-  box-sizing: border-box;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   width: 840px;
+  min-width: 0;
   max-width: var(--sval-feedback-room);
   max-height: calc(100vh - 24px);
   margin-left: var(--sval-feedback-reach);
-  padding: 20px 24px 24px;
+  border: 0;
   border-radius: 20px 20px 20px 0;
-  background: var(--sval-feedback-surface);
   pointer-events: auto;
   overflow: hidden;
 
@@ -117,17 +194,7 @@
   }
 }
 
-.sval-feedback-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .sval-feedback-title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-
   [data-state="sent"] & {
     display: flex;
     align-items: center;
@@ -145,7 +212,6 @@
   }
 }
 
-.sval-feedback-context,
 .sval-feedback-note,
 .sval-feedback-part-description,
 .sval-feedback-part-note,
@@ -155,7 +221,6 @@
   color: var(--sval-muted);
 }
 
-.sval-feedback-context,
 .sval-feedback-note {
   font-size: 13px;
   line-height: 1.45;
@@ -207,12 +272,13 @@
 
 .sval-feedback-message,
 .sval-feedback-email {
+  appearance: none;
   box-sizing: border-box;
   margin: 0;
   border: 1px solid var(--sval-pill-border);
-  background: var(--sval-wash);
-  color: inherit;
-  font: inherit;
+  background: var(--sval-pill-bg);
+  color: var(--sval-tint-field-ink, var(--sval-text));
+  font: 400 15px var(--sval-font);
 
   &::placeholder {
     color: var(--sval-muted);
@@ -297,8 +363,37 @@
   }
 }
 
+/* The dialog's checkbox (`sval-dialog.css`). */
 .sval-feedback-tick {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
   margin: 2px 0 0;
+  border: 1.5px solid var(--sval-pill-border);
+  border-radius: 5px;
+  background: var(--sval-pill-bg);
+
+  &:checked {
+    border-color: var(--sval-action);
+    background: var(--sval-action);
+
+    &::before {
+      content: "";
+      width: 12px;
+      height: 12px;
+      background: var(--sval-icon-dialog-check) center / contain no-repeat;
+      -moz-context-properties: fill;
+      fill: #ffffff;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
 
   &:disabled {
     opacity: 0.4;
@@ -358,61 +453,27 @@
   line-height: 20px;
 }
 
+/* A row's View, the viewer's Back and Try Again: small buttons. */
 .sval-feedback-view,
 .sval-feedback-back,
-.sval-feedback-action {
-  appearance: none;
-  margin: 0;
-  border: none;
-  border-radius: 999px;
-  background: var(--sval-wash);
-  color: inherit;
-  font: inherit;
-  font-weight: 600;
-
-  &:hover:not(:disabled) {
-    background: var(--sval-wash-strong);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--sval-focus);
-    outline-offset: 2px;
-  }
-
-  &[hidden] {
-    display: none;
-  }
+.sval-feedback-retry {
+  --sval-button-block-size: 28px;
+  --sval-button-padding-inline: 12px;
+  --sval-button-font-size: 12px;
+  flex: none;
 }
 
-.sval-feedback-view {
-  height: 24px;
-  padding: 0 10px;
-  font-size: 12px;
+.sval-feedback-back {
+  --sval-button-block-size: 32px;
+  --sval-button-padding-inline-start: 10px;
+  --sval-button-display: inline-flex;
+  --sval-button-font-size: 13px;
 }
 
 .sval-feedback-viewer-head {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.sval-feedback-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  height: 32px;
-  padding: 0 14px 0 10px;
-  font-size: 13px;
-
-  &::before {
-    content: "";
-    width: 16px;
-    height: 16px;
-    background: var(--sval-icon-previous) center / contain no-repeat;
-    -moz-context-properties: fill;
-    fill: currentColor;
-  }
 }
 
 .sval-feedback-viewer-titles {
@@ -544,55 +605,6 @@
 .sval-feedback-failure-body {
   font-size: 13px;
   line-height: 1.45;
-}
-
-.sval-feedback-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.sval-feedback-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 18px;
-  font-size: 14px;
-
-  &:disabled {
-    opacity: 0.4;
-  }
-}
-
-.sval-feedback-primary {
-  background: var(--sval-action);
-  color: #ffffff;
-
-  &:hover:not(:disabled) {
-    background: var(--sval-action);
-    filter: brightness(1.1);
-  }
-
-  &[busy]::before {
-    content: "";
-    width: 16px;
-    height: 16px;
-    background: var(--sval-icon-loading) center / contain no-repeat;
-    -moz-context-properties: fill;
-    fill: currentColor;
-    animation: sval-feedback-spin 1s linear infinite;
-
-    @media (prefers-reduced-motion: reduce) {
-      animation: none;
-    }
-  }
-}
-
-@keyframes sval-feedback-spin {
-  to {
-    rotate: 1turn;
-  }
 }
 
 /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */

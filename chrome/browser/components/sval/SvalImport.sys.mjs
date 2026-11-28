@@ -12,6 +12,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
 import { SvalClock } from "moz-src:///browser/components/sval/SvalClock.sys.mjs";
 import {
   BOOKMARKS_TO,
@@ -135,11 +136,8 @@ export async function askImport(win, { run, plan = null, roots } = {}) {
     sendReport: context => {
       reportContext = context;
     },
-    // Read by `gDialogBox.open` while the window is in a modal state; see
-    // `SvalAgentAlerts.askToPair`.
-    getProperty: name => name === "async",
   };
-  await win.gDialogBox?.open(DIALOG_URL, args);
+  await openSvalDialogPage(win, DIALOG_URL, args);
   if (reportContext) {
     lazy.SvalFeedbackForm.open(win, { context: reportContext });
   }

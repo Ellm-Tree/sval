@@ -106,6 +106,12 @@ function readable(glyph, chip, what) {
   );
 }
 
+// A window's own colours differ when it is see-through, as Sval's default
+// window is where the system allows it.
+const LOOKS = [false, true].flatMap(see =>
+  [false, true].map(dark => ({ see, dark }))
+);
+
 add_task(async function the_headers_pressed_buttons_and_the_open_shield() {
   Services.prefs.setStringPref(
     PINS_PREF,
@@ -126,8 +132,9 @@ add_task(async function the_headers_pressed_buttons_and_the_open_shield() {
         : button.setAttribute("aria-pressed", String(on));
     const shield = document.getElementById("sval-protection-button");
     const panel = document.getElementById("sval-protection-panel");
-    for (const dark of [false, true]) {
-      const theme = dark ? "dark" : "light";
+    for (const { see, dark } of LOOKS) {
+      const theme = `${see ? "see-through" : "solid"} ${dark ? "dark" : "light"}`;
+      await windowSeeThrough(see);
       await inTheme(window, dark);
       for (const id of ids) {
         const button = document.getElementById(id);
@@ -169,8 +176,9 @@ add_task(async function the_site_menus_pins_segments_and_switch() {
       10_000,
       "the site controls reading the page"
     );
-    for (const dark of [false, true]) {
-      const theme = dark ? "dark" : "light";
+    for (const { see, dark } of LOOKS) {
+      const theme = `${see ? "see-through" : "solid"} ${dark ? "dark" : "light"}`;
+      await windowSeeThrough(see);
       await inTheme(window, dark);
       const shown = BrowserTestUtils.waitForEvent(menu, "popupshown");
       button.click();

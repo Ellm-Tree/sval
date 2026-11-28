@@ -110,7 +110,7 @@ add_task(async function the_sync_readout_says_one_state() {
   const state = ui.byId("sval-sync-state");
   const syncNow = () =>
     ui.page.document.querySelector(
-      '#sval-sync-buttons button[data-command="syncNow"]'
+      '#sval-sync-buttons sval-button[data-command="syncNow"]'
     );
   const status = ui.byId("sval-storage-status");
   Assert.equal(state.dataset.state, "synced");
@@ -180,7 +180,7 @@ add_task(async function an_unreadable_own_file_shows_no_fault() {
   atTaskEnd(() => SvalTestDeny.allow(own));
   const ui = await openSettings();
   ui.page.document
-    .querySelector('#sval-sync-buttons button[data-command="syncNow"]')
+    .querySelector('#sval-sync-buttons sval-button[data-command="syncNow"]')
     .click();
   await TestUtils.waitForCondition(
     () => !ui.settings._syncOutcome,
@@ -250,7 +250,7 @@ add_task(async function a_gone_key_offers_only_the_ways_back() {
   );
   ui.settings._drawSyncPage();
   const primary = () =>
-    ui.page.document.querySelector("#sval-sync-buttons .sval-button-primary");
+    ui.page.document.querySelector('#sval-sync-buttons [type="primary"]');
   Assert.equal(ui.byId("sval-storage").dataset.state, "key-gone");
   Assert.equal(
     primary()?.textContent,
@@ -282,7 +282,7 @@ add_task(async function a_gone_key_offers_only_the_ways_back() {
 
   // Restore from a backup… is one dialog too.
   ui.page.document
-    .querySelector('#sval-sync-buttons button[data-command="restore"]')
+    .querySelector('#sval-sync-buttons sval-button[data-command="restore"]')
     .click();
   asked = await svalDialogAsking(win, "restore");
   Assert.equal(asked.doc.activeElement, asked.input, "with its field focused");
@@ -300,7 +300,7 @@ add_task(async function a_gone_key_offers_only_the_ways_back() {
   );
   Assert.ok(
     !ui.page.document.querySelector(
-      '#sval-sync-buttons button[data-command="enterCode"]'
+      '#sval-sync-buttons sval-button[data-command="enterCode"]'
     ),
     "with no way back left to offer"
   );
@@ -319,7 +319,7 @@ add_task(async function a_gone_folder_is_said_once() {
   const ui = await openSettings();
   const status = ui.byId("sval-storage-status");
   ui.page.document
-    .querySelector('#sval-sync-buttons button[data-command="syncNow"]')
+    .querySelector('#sval-sync-buttons sval-button[data-command="syncNow"]')
     .click();
   await TestUtils.waitForCondition(
     () => !ui.settings._syncOutcome,
@@ -487,7 +487,7 @@ add_task(async function the_device_flow_shows_only_the_chosen_path() {
   Assert.equal(focused(), open, "with the caret on the button that opened it");
   Assert.ok(
     !ui.page.document.querySelector(
-      '#sval-sync-buttons button[data-command="enterCode"]'
+      '#sval-sync-buttons sval-button[data-command="enterCode"]'
     ),
     "and a device that syncs is offered no code to enter"
   );
@@ -512,7 +512,7 @@ add_task(async function the_sync_card_holds_the_folder_and_its_state() {
   );
   const card = ui.byId("sval-storage");
   const syncNow = ui.page.document.querySelector(
-    '#sval-sync-buttons button[data-command="syncNow"]'
+    '#sval-sync-buttons sval-button[data-command="syncNow"]'
   );
   for (const el of [
     ui.byId("sval-folder-field"),

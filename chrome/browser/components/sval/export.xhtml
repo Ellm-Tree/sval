@@ -19,65 +19,90 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>Export to another browser</title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
     <link rel="stylesheet" href="chrome://browser/content/sval/import.css" />
     <link rel="stylesheet" href="chrome://browser/content/sval/export.css" />
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/import-picker.js"></script>
     <script src="chrome://browser/content/sval/export.js"></script>
   </head>
 
-  <body aria-labelledby="sval-ex-title">
-    <form class="sval-im sval-ex" aria-labelledby="sval-ex-title">
-      <h2 class="sval-im-title" id="sval-ex-title">
-        Export to another browser
-      </h2>
-      <div class="sval-ex-body">
-        <p class="sval-ex-lede">
-          Each Workspace becomes a folder of bookmarks, and Favorites go to the
-          new browser's favorites bar.
-        </p>
-        <div class="sval-im-section">
-          <span class="sval-im-label" id="sval-ex-targets-label"
-            >The browser you're moving to</span
-          >
-          <ul
-            class="sval-im-sources sval-ex-targets"
-            role="radiogroup"
-            aria-labelledby="sval-ex-targets-label"
-          ></ul>
+  <body>
+    <form class="sval-ex">
+      <sval-dialog
+        class="sval-im"
+        role="dialog"
+        aria-labelledby="sval-ex-title"
+      >
+        <h2 slot="title" class="sval-im-title" id="sval-ex-title">
+          Export to another browser
+        </h2>
+        <div class="sval-ex-body">
+          <p class="sval-ex-lede">
+            Each Workspace becomes a folder of bookmarks, and Favorites go to
+            the new browser's favorites bar.
+          </p>
+          <div class="sval-im-section">
+            <span class="sval-im-label" id="sval-ex-targets-label"
+              >The browser you're moving to</span
+            >
+            <ul
+              class="sval-im-sources sval-ex-targets"
+              role="radiogroup"
+              aria-labelledby="sval-ex-targets-label"
+            ></ul>
+          </div>
+          <div class="sval-im-section sval-ex-choices">
+            <span class="sval-im-label" id="sval-ex-choices-label"
+              >What to export</span
+            >
+            <ul
+              class="sval-im-windows sval-ex-workspaces"
+              aria-label="Workspaces"
+            ></ul>
+            <label class="sval-im-check">
+              <input
+                type="checkbox"
+                class="sval-ex-favorites"
+                checked="checked"
+              />
+              Favorites
+            </label>
+            <label class="sval-im-check sval-ex-history-row">
+              <input
+                type="checkbox"
+                class="sval-ex-history"
+                checked="checked"
+              />
+              History
+            </label>
+          </div>
+          <p class="sval-ex-complete" hidden="hidden">
+            The file holds everything Sval keeps on this device, decrypted to
+            plain JSON: Workspaces, Favorites, history, and settings. It doesn't
+            include any key.
+          </p>
         </div>
-        <div class="sval-im-section sval-ex-choices">
-          <span class="sval-im-label" id="sval-ex-choices-label"
-            >What to export</span
-          >
-          <ul
-            class="sval-im-windows sval-ex-workspaces"
-            aria-label="Workspaces"
-          ></ul>
-          <label class="sval-im-check">
-            <input
-              type="checkbox"
-              class="sval-ex-favorites"
-              checked="checked"
-            />
-            Favorites
-          </label>
-          <label class="sval-im-check sval-ex-history-row">
-            <input type="checkbox" class="sval-ex-history" checked="checked" />
-            History
-          </label>
-        </div>
-        <p class="sval-ex-complete" hidden="hidden">
-          The file holds everything Sval keeps on this device, decrypted to
-          plain JSON: Workspaces, Favorites, history, and settings. It doesn't
-          include any key.
-        </p>
-      </div>
-      <div class="sval-ex-notice" role="status" hidden="hidden"></div>
-      <div class="sval-im-actions">
-        <button class="sval-ex-cancel" type="button">Cancel</button>
-        <button class="sval-ex-export primary" type="submit">Export…</button>
-      </div>
+        <div class="sval-ex-notice" role="status" hidden="hidden"></div>
+        <sval-button slot="actions" class="sval-ex-cancel" data-button="cancel">
+          Cancel
+        </sval-button>
+        <sval-button
+          slot="actions"
+          class="sval-ex-export"
+          data-button="ok"
+          type="primary"
+          submit="submit"
+        >
+          Export…
+        </sval-button>
+      </sval-dialog>
     </form>
   </body>
 </html>

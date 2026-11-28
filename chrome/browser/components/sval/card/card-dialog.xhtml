@@ -6,7 +6,7 @@
 
 <!--
   The user's card (`SvalCard`), shown by `SvalCardArt.openCardDialog` in the
-  window's dialog box, in Sval's dialog frame. `card-dialog.js` draws the
+  window's dialog box, on Sval's dialog card. `card-dialog.js` draws the
   card and fills in its dates.
 -->
 
@@ -19,7 +19,6 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>Your Sval Card</title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
     <link
       rel="stylesheet"
       href="chrome://browser/content/sval/sval-dialog.css"
@@ -29,19 +28,22 @@
       rel="stylesheet"
       href="chrome://browser/content/sval/card/card-dialog.css"
     />
-    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/card/card-dialog.js"></script>
   </head>
 
   <body>
-    <div
-      class="sval-dialog sval-card-dialog"
+    <sval-dialog
+      class="sval-card-dialog"
       role="dialog"
       aria-labelledby="sval-card-dialog-title"
     >
       <div class="sval-card-dialog-holder"></div>
       <div class="sval-card-dialog-about">
-        <h1 class="sval-dialog-title" id="sval-card-dialog-title"></h1>
+        <h1 class="sval-card-dialog-title" id="sval-card-dialog-title"></h1>
         <dl class="sval-card-dialog-facts">
           <div data-fact="arc" hidden="hidden">
             <dt>On Arc since</dt>
@@ -89,19 +91,20 @@
           </div>
         </dl>
         <p class="sval-card-dialog-status" role="status" aria-live="polite"></p>
-        <div class="sval-dialog-actions">
-          <button class="sval-dialog-btn sval-card-dialog-save" type="button">
+        <div class="sval-card-dialog-actions">
+          <sval-button class="sval-card-dialog-save" data-button="save">
             Save image
-          </button>
-          <button
-            class="sval-dialog-btn sval-card-dialog-done primary"
-            type="button"
+          </sval-button>
+          <sval-button
+            class="sval-card-dialog-done"
+            data-button="ok"
+            type="primary"
             autofocus="autofocus"
           >
             Done
-          </button>
+          </sval-button>
         </div>
       </div>
-    </div>
+    </sval-dialog>
   </body>
 </html>

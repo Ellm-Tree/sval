@@ -107,13 +107,13 @@
                 placeholder="One rule per line, like ||ads.example.com^ or example.com##.banner"
               ></textarea>
               <div class="sval-code-row">
-                <button
+                <sval-button
                   id="sval-my-filters-save"
-                  class="sval-button sval-button-primary sval-agent-small"
-                  type="button"
+                  class="sval-agent-small"
+                  type="primary"
                 >
                   Save
-                </button>
+                </sval-button>
               </div>
               <p
                 id="sval-my-filters-status"
@@ -172,42 +172,34 @@
            allowing a synced trusted list, to allow it untrusted. -->
       <dialog
         id="sval-blocking-dialog"
-        class="sval-modal"
         aria-labelledby="sval-blocking-dialog-title"
         aria-describedby="sval-blocking-dialog-body sval-blocking-dialog-more"
       >
-        <span id="sval-blocking-dialog-tile" class="sval-modal-tile" hidden>
-          <span class="sval-glyph sval-glyph-trash-2" aria-hidden="true"></span>
-        </span>
-        <h2 id="sval-blocking-dialog-title" class="sval-modal-title"></h2>
-        <p id="sval-blocking-dialog-body" class="sval-modal-body"></p>
-        <div
-          id="sval-blocking-dialog-more"
-          class="sval-modal-more"
-          hidden="hidden"
-        ></div>
-        <div class="sval-modal-actions">
-          <button
+        <sval-dialog id="sval-blocking-dialog-card">
+          <h2 slot="title" id="sval-blocking-dialog-title"></h2>
+          <p slot="body" id="sval-blocking-dialog-body"></p>
+          <div id="sval-blocking-dialog-more" hidden="hidden"></div>
+          <sval-button
+            slot="actions"
             id="sval-blocking-dialog-cancel"
-            class="sval-button"
-            type="button"
+            data-button="cancel"
             autofocus="autofocus"
           >
             Cancel
-          </button>
-          <button
+          </sval-button>
+          <sval-button
+            slot="actions"
             id="sval-blocking-dialog-alt"
-            class="sval-button"
-            type="button"
+            data-button="alt"
             hidden="hidden"
-          ></button>
-          <button
+          ></sval-button>
+          <sval-button
+            slot="actions"
             id="sval-blocking-dialog-confirm"
-            class="sval-button"
-            data-tone="primary"
-            type="button"
-          ></button>
-        </div>
+            data-button="ok"
+            type="primary"
+          ></sval-button>
+        </sval-dialog>
       </dialog>
     </section>
 
@@ -265,9 +257,9 @@
 
         <div class="sval-fp-toolbar">
           <span class="sval-fp-spacer"></span>
-          <button id="sval-fp-restore" class="sval-button" type="button">
+          <sval-button id="sval-fp-restore">
             Restore Sval's defaults
-          </button>
+          </sval-button>
         </div>
 
         <p id="sval-fp-message" class="sval-agents-done" role="status"></p>
@@ -554,12 +546,12 @@
           </span>
           <span class="sval-sync-row-actions">
             <span id="sval-sync-buttons" class="sval-actions"></span>
-            <button
+            <sval-button
               id="sval-storage-stop"
-              class="sval-button sval-button-danger"
+              type="danger"
               data-command="stop"
               hidden="hidden"
-            ></button>
+            ></sval-button>
           </span>
         </div>
 
@@ -617,20 +609,18 @@
             <span id="sval-folder-path" class="sval-folder-path"></span>
           </span>
           <span class="sval-actions">
-            <button
+            <sval-button
               id="sval-folder-reveal"
-              class="sval-button"
               data-command="reveal"
               hidden="hidden"
-            ></button>
-            <button
+            ></sval-button>
+            <sval-button
               id="sval-storage-change"
-              class="sval-button"
               data-command="changeLocation"
               hidden="hidden"
             >
               Change…
-            </button>
+            </sval-button>
           </span>
         </div>
 
@@ -654,9 +644,7 @@
           hidden="hidden"
         >
           <p class="sval-meta">You haven't saved a backup of your sync key.</p>
-          <button class="sval-button" data-command="saveBackup">
-            Save a backup…
-          </button>
+          <sval-button data-command="saveBackup">Save a backup…</sval-button>
         </div>
 
         <!-- The result of the last act on this card or its Advanced. -->
@@ -676,74 +664,77 @@
         <!-- Stopping always confirms, as removing an extension does. -->
         <dialog
           id="sval-stop-dialog"
-          class="sval-modal"
           aria-labelledby="sval-stop-dialog-title"
           aria-describedby="sval-stop-dialog-body"
         >
-          <!-- Named for the folder in use (`SvalPanelModel.syncPage`). -->
-          <h2 id="sval-stop-dialog-title" class="sval-modal-title"></h2>
-          <p id="sval-stop-dialog-body" class="sval-modal-body"></p>
-          <div class="sval-modal-actions">
-            <button
+          <sval-dialog>
+            <!-- Named for the folder in use (`SvalPanelModel.syncPage`). -->
+            <h2 slot="title" id="sval-stop-dialog-title"></h2>
+            <p slot="body" id="sval-stop-dialog-body"></p>
+            <sval-button
+              slot="actions"
               id="sval-stop-dialog-cancel"
-              class="sval-button"
-              type="button"
+              data-button="cancel"
               autofocus="autofocus"
             >
               Cancel
-            </button>
-            <button
+            </sval-button>
+            <sval-button
+              slot="actions"
               id="sval-stop-dialog-confirm"
-              class="sval-button sval-button-danger"
-              type="button"
+              data-button="ok"
+              type="danger"
             >
               Stop syncing
-            </button>
-          </div>
+            </sval-button>
+          </sval-dialog>
         </dialog>
 
         <!-- Change…: the three ways to sync. The way in use opens filled in
              with the folder in use. -->
         <dialog
           id="sval-location-dialog"
-          class="sval-modal"
           aria-labelledby="sval-location-dialog-title"
         >
-          <h2 id="sval-location-dialog-title" class="sval-modal-title">
-            Where should Sval sync?
-          </h2>
-          <div
-            class="sval-choices"
-            role="group"
-            aria-labelledby="sval-location-dialog-title"
-          >
-            <button class="sval-choice" data-command="chooseLocal">
-              <span class="sval-choice-title">A folder on this computer…</span>
-            </button>
-            <button class="sval-choice" data-command="chooseSmb">
-              <span class="sval-choice-title">A folder on an SMB server…</span>
-            </button>
-            <button class="sval-choice" data-command="chooseDropbox">
-              <span class="sval-choice-title">
-                <img
-                  class="sval-button-brand"
-                  src="chrome://browser/content/sval/sync-services/dropbox.svg"
-                  alt=""
-                />
-                A folder in Dropbox…
-              </span>
-            </button>
-          </div>
-          <div class="sval-modal-actions">
-            <button
+          <sval-dialog>
+            <h2 slot="title" id="sval-location-dialog-title">
+              Where should Sval sync?
+            </h2>
+            <div
+              class="sval-choices"
+              role="group"
+              aria-labelledby="sval-location-dialog-title"
+            >
+              <button class="sval-choice" data-command="chooseLocal">
+                <span class="sval-choice-title"
+                  >A folder on this computer…</span
+                >
+              </button>
+              <button class="sval-choice" data-command="chooseSmb">
+                <span class="sval-choice-title"
+                  >A folder on an SMB server…</span
+                >
+              </button>
+              <button class="sval-choice" data-command="chooseDropbox">
+                <span class="sval-choice-title">
+                  <img
+                    class="sval-button-brand"
+                    src="chrome://browser/content/sval/sync-services/dropbox.svg"
+                    alt=""
+                  />
+                  A folder in Dropbox…
+                </span>
+              </button>
+            </div>
+            <sval-button
+              slot="actions"
               id="sval-location-dialog-cancel"
-              class="sval-button"
-              type="button"
+              data-button="cancel"
               autofocus="autofocus"
             >
               Cancel
-            </button>
-          </div>
+            </sval-button>
+          </sval-dialog>
         </dialog>
 
         <!-- Sval's own folder browser: no system picker sees a Dropbox. The
@@ -751,49 +742,52 @@
              a Mac asks for the Keychain then, and the note says so first. -->
         <dialog
           id="sval-dropbox-dialog"
-          class="sval-modal"
           aria-labelledby="sval-dropbox-dialog-title"
         >
-          <h2 id="sval-dropbox-dialog-title" class="sval-modal-title">
-            Choose a Dropbox folder
-          </h2>
-          <div class="sval-dropbox-browser">
-            <div class="sval-dropbox-where">
-              <button id="sval-dropbox-up" class="sval-button" type="button">
-                Up a folder
-              </button>
-              <span id="sval-dropbox-place" class="sval-dropbox-place"></span>
+          <sval-dialog>
+            <h2 slot="title" id="sval-dropbox-dialog-title">
+              Choose a Dropbox folder
+            </h2>
+            <div class="sval-dropbox-browser">
+              <div class="sval-dropbox-where">
+                <sval-button id="sval-dropbox-up" autofocus="autofocus">
+                  Up a folder
+                </sval-button>
+                <span id="sval-dropbox-place" class="sval-dropbox-place"></span>
+              </div>
+              <ul
+                id="sval-dropbox-folders"
+                class="sval-dropbox-folders"
+                aria-labelledby="sval-dropbox-place"
+              ></ul>
+              <p
+                id="sval-dropbox-status"
+                class="sval-dropbox-status"
+                role="status"
+              ></p>
+              <moz-message-bar
+                id="sval-dropbox-keychain"
+                class="sval-smb-note"
+                type="warning"
+                hidden="hidden"
+              ></moz-message-bar>
             </div>
-            <ul
-              id="sval-dropbox-folders"
-              class="sval-dropbox-folders"
-              aria-labelledby="sval-dropbox-place"
-            ></ul>
-            <p
-              id="sval-dropbox-status"
-              class="sval-dropbox-status"
-              role="status"
-            ></p>
-            <moz-message-bar
-              id="sval-dropbox-keychain"
-              class="sval-smb-note"
-              type="warning"
-              hidden="hidden"
-            ></moz-message-bar>
-          </div>
-          <div class="sval-modal-actions">
-            <button id="sval-dropbox-cancel" class="sval-button" type="button">
+            <sval-button
+              slot="actions"
+              id="sval-dropbox-cancel"
+              data-button="cancel"
+            >
               Cancel
-            </button>
-            <button
+            </sval-button>
+            <sval-button
+              slot="actions"
               id="sval-dropbox-use"
-              class="sval-button"
-              data-tone="primary"
-              type="button"
+              data-button="ok"
+              type="primary"
             >
               Choose folder
-            </button>
-          </div>
+            </sval-button>
+          </sval-dialog>
         </dialog>
 
         <!-- The password is kept with the sync key (`SvalRemoteFolder`), so a
@@ -801,88 +795,92 @@
              before that, on a Mac alone. -->
         <dialog
           id="sval-server-dialog"
-          class="sval-modal"
           aria-labelledby="sval-server-dialog-title"
         >
-          <h2 id="sval-server-dialog-title" class="sval-modal-title">
-            Connect to an SMB server
-          </h2>
           <form id="sval-server-form" method="dialog">
-            <div class="sval-smb-fields">
-              <label class="sval-step-label" for="sval-server-host"
-                >Server address</label
+            <sval-dialog>
+              <h2 slot="title" id="sval-server-dialog-title">
+                Connect to an SMB server
+              </h2>
+              <div class="sval-smb-fields">
+                <label class="sval-step-label" for="sval-server-host"
+                  >Server address</label
+                >
+                <input
+                  id="sval-server-host"
+                  class="sval-field"
+                  type="text"
+                  required="required"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="nas.local"
+                />
+                <label class="sval-step-label" for="sval-server-share"
+                  >Share</label
+                >
+                <input
+                  id="sval-server-share"
+                  class="sval-field"
+                  type="text"
+                  required="required"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Shared"
+                />
+                <label class="sval-step-label" for="sval-server-folder"
+                  >Folder in the share (optional)</label
+                >
+                <input
+                  id="sval-server-folder"
+                  class="sval-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Sval"
+                />
+                <label class="sval-step-label" for="sval-server-user"
+                  >Username</label
+                >
+                <input
+                  id="sval-server-user"
+                  class="sval-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+                <label class="sval-step-label" for="sval-server-password"
+                  >Password</label
+                >
+                <input
+                  id="sval-server-password"
+                  class="sval-field"
+                  type="password"
+                  autocomplete="off"
+                />
+                <moz-message-bar
+                  id="sval-smb-keychain"
+                  class="sval-smb-note"
+                  type="warning"
+                  hidden="hidden"
+                ></moz-message-bar>
+              </div>
+              <sval-button
+                slot="actions"
+                id="sval-server-cancel"
+                data-button="cancel"
               >
-              <input
-                id="sval-server-host"
-                class="sval-field"
-                type="text"
-                required="required"
-                spellcheck="false"
-                autocomplete="off"
-                placeholder="nas.local"
-              />
-              <label class="sval-step-label" for="sval-server-share"
-                >Share</label
-              >
-              <input
-                id="sval-server-share"
-                class="sval-field"
-                type="text"
-                required="required"
-                spellcheck="false"
-                autocomplete="off"
-                placeholder="Shared"
-              />
-              <label class="sval-step-label" for="sval-server-folder"
-                >Folder in the share (optional)</label
-              >
-              <input
-                id="sval-server-folder"
-                class="sval-field"
-                type="text"
-                spellcheck="false"
-                autocomplete="off"
-                placeholder="Sval"
-              />
-              <label class="sval-step-label" for="sval-server-user"
-                >Username</label
-              >
-              <input
-                id="sval-server-user"
-                class="sval-field"
-                type="text"
-                spellcheck="false"
-                autocomplete="off"
-              />
-              <label class="sval-step-label" for="sval-server-password"
-                >Password</label
-              >
-              <input
-                id="sval-server-password"
-                class="sval-field"
-                type="password"
-                autocomplete="off"
-              />
-              <moz-message-bar
-                id="sval-smb-keychain"
-                class="sval-smb-note"
-                type="warning"
-                hidden="hidden"
-              ></moz-message-bar>
-            </div>
-            <div class="sval-modal-actions">
-              <button id="sval-server-cancel" class="sval-button" type="button">
                 Cancel
-              </button>
-              <button
+              </sval-button>
+              <sval-button
+                slot="actions"
                 id="sval-server-connect"
-                class="sval-button"
-                data-tone="primary"
-                type="submit"
+                data-button="ok"
+                type="primary"
+                submit="submit"
               >
                 Connect
-              </button>
-            </div>
+              </sval-button>
+            </sval-dialog>
           </form>
         </dialog>
       </section>
@@ -936,14 +934,13 @@
           <div id="sval-pairing-start" class="sval-card-group" hidden="hidden">
             <p id="sval-offer-folder" class="sval-lead"></p>
             <div class="sval-actions">
-              <button
+              <sval-button
                 id="sval-pairing-open"
-                class="sval-button"
                 aria-expanded="false"
                 aria-controls="sval-path-offer-steps"
               >
                 Add a device…
-              </button>
+              </sval-button>
             </div>
           </div>
 
@@ -971,7 +968,7 @@
                   spellcheck="false"
                   aria-label="One-time code"
                 />
-                <button id="sval-offer-copy" class="sval-button">Copy</button>
+                <sval-button id="sval-offer-copy">Copy</sval-button>
               </div>
               <!-- `role="timer"` is a live region whose implicit `aria-live` is
                    `off`: readable on demand, never announced each second. -->
@@ -990,9 +987,9 @@
                 your Workspaces.
               </p>
               <div class="sval-actions">
-                <button id="sval-offer-withdraw" class="sval-button">
+                <sval-button id="sval-offer-withdraw">
                   Cancel code
-                </button>
+                </sval-button>
               </div>
             </div>
           </div>
@@ -1030,20 +1027,12 @@
           >
             <h3 id="sval-key-heading">Sync key</h3>
             <div class="sval-actions">
-              <button
-                id="sval-backup-save"
-                class="sval-button"
-                data-command="saveBackup"
-              >
+              <sval-button id="sval-backup-save" data-command="saveBackup">
                 Save a backup…
-              </button>
-              <button
-                id="sval-set-up-again"
-                class="sval-button"
-                data-command="startOver"
-              >
+              </sval-button>
+              <sval-button id="sval-set-up-again" data-command="startOver">
                 Start over with a new sync key…
-              </button>
+              </sval-button>
             </div>
             <!-- Shown on a machine with no keyring, where the sync key is kept
                  in the profile (key-storage spec, "What each system store
@@ -1635,9 +1624,9 @@
               the ones these settings don't show. A wrong value can stop Sval
               from working as it should.
             </p>
-            <button id="sval-advanced-open" class="sval-button" type="button">
+            <sval-button id="sval-advanced-open">
               Open about:config
-            </button>
+            </sval-button>
           </section>
         </div>
       </details>
@@ -1748,13 +1737,13 @@
           aria-labelledby="sval-password-manager-heading"
         ></div>
         <div class="sval-code-row">
-          <button
+          <sval-button
             id="sval-password-manager-save"
-            class="sval-button sval-button-primary sval-agent-small"
-            type="button"
+            class="sval-agent-small"
+            type="primary"
           >
             Save
-          </button>
+          </sval-button>
         </div>
         <p
           id="sval-password-manager-status"
@@ -1776,9 +1765,9 @@
           Set a hardware security key's PIN, see and remove the passkeys it
           holds, and add fingerprints.
         </p>
-        <button id="sval-security-keys-open" class="sval-button" type="button">
+        <sval-button id="sval-security-keys-open">
           Manage security keys
-        </button>
+        </sval-button>
       </section>
     </section>
 
@@ -1824,14 +1813,9 @@
           role="status"
           aria-live="polite"
         ></p>
-        <button
-          id="sval-kagi-sign-in"
-          class="sval-button sval-button-primary"
-          type="button"
-          hidden="hidden"
-        >
+        <sval-button id="sval-kagi-sign-in" type="primary" hidden="hidden">
           Sign in to Kagi
-        </button>
+        </sval-button>
         <!-- Says how private windows sign in, never with what. -->
         <p
           id="sval-kagi-privacy-pass"
@@ -1839,14 +1823,9 @@
           role="status"
           aria-live="polite"
         ></p>
-        <button
-          id="sval-kagi-check-again"
-          class="sval-button sval-button-quiet"
-          type="button"
-          hidden="hidden"
-        >
+        <sval-button id="sval-kagi-check-again" type="quiet" hidden="hidden">
           Check again
-        </button>
+        </sval-button>
         <div id="sval-kagi-session-link" class="sval-card-group">
           <p class="sval-lead">
             If your Kagi plan has no Privacy Pass, paste your Session Link to
@@ -1867,20 +1846,12 @@
                 placeholder="https://kagi.com/search?token=…"
                 aria-describedby="sval-kagi-status"
               />
-              <button
-                id="sval-kagi-save"
-                class="sval-button sval-button-primary"
-                type="submit"
-              >
+              <sval-button id="sval-kagi-save" type="primary" submit="">
                 Save
-              </button>
-              <button
-                id="sval-kagi-clear"
-                class="sval-button sval-button-quiet"
-                type="button"
-              >
+              </sval-button>
+              <sval-button id="sval-kagi-clear" type="quiet">
                 Clear
-              </button>
+              </sval-button>
             </div>
           </form>
           <!-- Says whether a token is stored, never what it is. -->
@@ -1997,15 +1968,14 @@
         <div class="sval-blocking-head">
           <h2 id="sval-link-rules-heading">Link Docking</h2>
           <span class="sval-fp-spacer"></span>
-          <button
+          <sval-button
             id="sval-link-rules-add"
-            class="sval-button sval-agent-small sval-links-add"
-            type="button"
+            class="sval-agent-small sval-links-add"
             data-sval-key="add-rule"
           >
             <span class="sval-glyph sval-glyph-plus" aria-hidden="true"></span
             >Add rule
-          </button>
+          </sval-button>
         </div>
         <p class="sval-agents-note">
           Links from other apps that match a rule dock in the rule's Workspace
@@ -2095,9 +2065,9 @@
       </div>
       <div id="sval-keys-list" class="sval-keys-list"></div>
       <div class="sval-keys-foot">
-        <button id="sval-keys-reset-all" class="sval-button" type="button">
+        <sval-button id="sval-keys-reset-all">
           Reset all shortcuts
-        </button>
+        </sval-button>
       </div>
       <!-- Extensions' commands, drawn by `settings-extensions.js`. They
            change in each extension's page, which checks a key against
@@ -2190,13 +2160,9 @@
         ></p>
         <div id="sval-extensions-list" class="sval-agents-list"></div>
         <div class="sval-extensions-foot">
-          <button
-            id="sval-extensions-install"
-            class="sval-button"
-            type="button"
-          >
+          <sval-button id="sval-extensions-install">
             Install from file…
-          </button>
+          </sval-button>
           <button id="sval-extensions-find" class="sval-link" type="button">
             Find more extensions
           </button>
@@ -2211,29 +2177,29 @@
       <!-- Removing always confirms, as unpairing an agent does. -->
       <dialog
         id="sval-extension-dialog"
-        class="sval-modal"
         aria-labelledby="sval-extension-dialog-title"
         aria-describedby="sval-extension-dialog-body"
       >
-        <h2 id="sval-extension-dialog-title" class="sval-modal-title"></h2>
-        <p id="sval-extension-dialog-body" class="sval-modal-body"></p>
-        <div class="sval-modal-actions">
-          <button
+        <sval-dialog>
+          <h2 slot="title" id="sval-extension-dialog-title"></h2>
+          <p slot="body" id="sval-extension-dialog-body"></p>
+          <sval-button
+            slot="actions"
             id="sval-extension-dialog-cancel"
-            class="sval-button"
-            type="button"
+            data-button="cancel"
             autofocus="autofocus"
           >
             Cancel
-          </button>
-          <button
+          </sval-button>
+          <sval-button
+            slot="actions"
             id="sval-extension-dialog-confirm"
-            class="sval-button sval-button-danger"
-            type="button"
+            data-button="ok"
+            type="danger"
           >
             Remove
-          </button>
-        </div>
+          </sval-button>
+        </sval-dialog>
       </dialog>
     </section>
 
@@ -2438,13 +2404,12 @@
             spellcheck="false"
             aria-label="sval-mcp's path"
           />
-          <button
+          <sval-button
             id="sval-agent-clients-copy-path"
-            class="sval-button sval-agent-small"
-            type="button"
+            class="sval-agent-small"
           >
             Copy
-          </button>
+          </sval-button>
         </div>
         <textarea
           id="sval-agent-clients-json"
@@ -2455,13 +2420,12 @@
           aria-label="MCP configuration for Sval"
         ></textarea>
         <div class="sval-code-row">
-          <button
+          <sval-button
             id="sval-agent-clients-copy-json"
-            class="sval-button sval-agent-small"
-            type="button"
+            class="sval-agent-small"
           >
             Copy JSON
-          </button>
+          </sval-button>
         </div>
       </section>
 
@@ -2550,35 +2514,35 @@
            click on the dimmed page cancel. -->
       <dialog
         id="sval-unpair-dialog"
-        class="sval-modal"
         aria-labelledby="sval-unpair-title"
         aria-describedby="sval-unpair-body"
       >
-        <h2 id="sval-unpair-title" class="sval-modal-title"></h2>
-        <p id="sval-unpair-body" class="sval-modal-body"></p>
-        <!-- Shown when the agent has workspaces. Checked each time the
-             dialog opens (`askToUnpair`). -->
-        <label id="sval-unpair-workspaces" class="sval-modal-check">
-          <input id="sval-unpair-delete-workspaces" type="checkbox" />
-          <span id="sval-unpair-workspaces-label"></span>
-        </label>
-        <div class="sval-modal-actions">
-          <button
+        <sval-dialog>
+          <h2 slot="title" id="sval-unpair-title"></h2>
+          <p slot="body" id="sval-unpair-body"></p>
+          <!-- Shown when the agent has workspaces. Checked each time the
+               dialog opens (`askToUnpair`). -->
+          <label id="sval-unpair-workspaces">
+            <input id="sval-unpair-delete-workspaces" type="checkbox" />
+            <span id="sval-unpair-workspaces-label"></span>
+          </label>
+          <sval-button
+            slot="actions"
             id="sval-unpair-cancel"
-            class="sval-button"
-            type="button"
+            data-button="cancel"
             autofocus="autofocus"
           >
             Cancel
-          </button>
-          <button
+          </sval-button>
+          <sval-button
+            slot="actions"
             id="sval-unpair-confirm"
-            class="sval-button sval-button-danger"
-            type="button"
+            data-button="ok"
+            type="danger"
           >
             Unpair
-          </button>
-        </div>
+          </sval-button>
+        </sval-dialog>
       </dialog>
     </section>
   </body>

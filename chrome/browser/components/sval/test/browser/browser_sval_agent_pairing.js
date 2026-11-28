@@ -132,7 +132,7 @@ add_task(async function the_alert_follows_its_card_as_it_resizes() {
   );
   const doc = await dialogDocument();
   const dialog = gDialogBox.dialog;
-  const card = doc.querySelector(".sval-dialog");
+  const card = doc.querySelector("sval-dialog");
   const cardHeight = () => Math.ceil(card.getBoundingClientRect().height);
   const fits = () =>
     cardHeight() === dialog._frame.clientHeight &&
@@ -178,13 +178,13 @@ add_task(async function allow_waits_out_the_dialog_delay() {
   Assert.ok(allow.disabled, "Pair starts disabled");
   Assert.ok(!doc.querySelector(".sval-ap-deny").disabled, "Deny does not");
   await TestUtils.waitForCondition(
-    () => allow.hasAttribute("data-hold"),
+    () => allow.held,
     "Pair is held once the alert is in front"
   );
   allow.click();
   Assert.ok(gDialogBox.isOpen, "a click on Pair does nothing yet");
   await TestUtils.waitForCondition(() => !allow.disabled, "Pair enables");
-  Assert.ok(!allow.hasAttribute("data-hold"), "and no longer held");
+  Assert.ok(!allow.held, "and no longer held");
   allow.click();
   Assert.deepEqual(await answerOf(answer), {
     action: "allow",
@@ -234,10 +234,10 @@ add_task(async function pair_is_the_focused_primary_button() {
     () => !allow.disabled && doc.activeElement === allow,
     "Pair is enabled and focused"
   );
-  Assert.ok(allow.classList.contains("primary"), "Pair is the primary button");
-  Assert.ok(!deny.classList.contains("primary"), "Deny is not");
-  Assert.equal(allow.type, "submit", "Pair is the form's default button");
-  Assert.equal(deny.type, "button", "Deny is not");
+  Assert.equal(allow.type, "primary", "Pair is the primary button");
+  Assert.equal(deny.type, "secondary", "Deny is not");
+  Assert.ok(allow.submit, "Pair is the form's default button");
+  Assert.ok(!deny.submit, "Deny is not");
   deny.click();
   Assert.deepEqual(await answerOf(answer), { action: "deny" });
 });

@@ -5,13 +5,14 @@
  * The import picker (`import-picker.js`) and Sval's import page, in the Sval
  * browser design system's visual language, as `first-run.css` is. The picker
  * is drawn in the system's semantic tokens, defined here for light and dark,
- * so the page follows the browser's theme and first run's always-dark sheet
- * gets the dark values. The values are the system's own, under its names,
- * because they are Sval's brand rather than Firefox's design tokens.
+ * so first run's always-dark sheet gets the dark values. The values are the
+ * system's own, under its names, because they are Sval's brand rather than
+ * Firefox's design tokens. The import and export pages give the tokens the
+ * window's dialog palette on their card (`.sval-im`).
  */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
-@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-roles.css");
 @import url("chrome://browser/content/sval/sval-type.css");
 @import url("chrome://browser/content/sval/sval-icons.css");
 
@@ -44,32 +45,49 @@
 
 /* ---------------------------------------------------------------- page */
 
-html,
-body {
-  margin: 0;
-  background: var(--surface-raised);
-}
-
 /* Once the dialog is sized (`import.js`), the page fills it, and a window
  * too short for it shortens the page rather than cutting it off. */
 html[data-sized] {
   max-height: 100vh;
 
   > body,
+  form,
   .sval-im {
     height: 100%;
   }
 }
 
+/* The import and export pages' card (`sval-dialog`): edge to edge, so the
+ * picker's lists scroll to the card's sides, with the title and the answers
+ * inset. The card wears the window's palette, as every dialog in a window's
+ * box does (`sval-dialog.css`, `SvalDialogBox`), so the picker's tokens take
+ * the palette's colours inside it, solid or frosted. First run draws the
+ * picker on its own card, in the tokens' own values above. */
 .sval-im {
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  width: 600px;
+  --surface-raised: var(--sval-dialog-card);
+  --surface-sunken: var(--sval-dialog-well);
+  --surface-card: var(--sval-dialog-well);
+  --surface-card-hover: var(--sval-dialog-secondary-hover);
+  --surface-glass: var(--sval-dialog-field);
+  --border-subtle: var(--sval-dialog-well-border);
+  --border-default: var(--sval-dialog-border);
+  --border-strong: var(--sval-dialog-field-border);
+  --border-field: var(--sval-dialog-field-border);
+  --text-strong: var(--sval-dialog-text);
+  --text-body: var(--sval-dialog-body);
+  --text-muted: var(--sval-dialog-muted);
+  --text-accent: var(--sval-dialog-focus);
+  --action-primary: var(--sval-dialog-primary);
+  --action-primary-hover: var(--sval-dialog-primary-hover);
+  --action-primary-press: var(--sval-dialog-primary-hover);
+  --focus-ring: var(--sval-dialog-focus);
+  --result-error: var(--sval-dialog-error);
+  --sval-dialog-width: 600px;
+  --sval-dialog-padding: 0;
+  --sval-dialog-gap: 0;
+  --sval-dialog-radius: 16px;
+  --sval-dialog-shadow: 0 24px 64px rgba(3, 5, 26, 0.55);
   max-height: 700px;
-  border: 1px solid var(--border-default);
-  border-radius: 16px;
-  background: var(--surface-raised);
   color: var(--text-body);
   font: 400 15px/1.4 var(--sval-font);
   -moz-osx-font-smoothing: grayscale;
@@ -84,68 +102,24 @@ html[data-sized] {
   &:has(.sval-im-card:not([hidden])) {
     max-height: none;
   }
+
+  &::part(head) {
+    flex: none;
+    padding: 22px 24px 0;
+  }
+
+  &::part(actions) {
+    flex: none;
+    align-items: center;
+    padding: 16px 24px 20px;
+  }
 }
 
 .sval-im-title {
-  flex: none;
-  margin: 0;
-  padding: 22px 24px 0;
   color: var(--text-strong);
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.01em;
-}
-
-.sval-im-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px 20px;
-}
-
-.sval-im-actions > button {
-  appearance: none;
-  height: 36px;
-  min-height: 0;
-  margin: 0;
-  padding: 0 18px;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-strong);
-  font: 700 14px var(--sval-font);
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--surface-card-hover);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.45;
-  }
-
-  &.primary {
-    padding: 0 20px;
-    border-color: transparent;
-    background: var(--action-primary);
-    color: var(--action-primary-text);
-
-    &:hover:not(:disabled) {
-      background: var(--action-primary-hover);
-    }
-
-    &:hover:active:not(:disabled) {
-      background: var(--action-primary-press);
-    }
-  }
 }
 
 /* ---------------------------------------------------------------- picker */
@@ -1124,7 +1098,6 @@ html[data-sized] {
     outline: 1px solid Highlight;
   }
 
-  .sval-im-actions > button,
   .sval-im-result-actions > button,
   .sval-im-picker button,
   .sval-im-handoff button {
@@ -1138,21 +1111,6 @@ html[data-sized] {
     &:disabled {
       opacity: 1;
       border-color: GrayText;
-      color: GrayText;
-    }
-  }
-
-  .sval-im-actions > button.primary {
-    border-color: ButtonText;
-    color: ButtonFace;
-
-    &:hover:not(:disabled) {
-      color: SelectedItemText;
-    }
-
-    &:disabled {
-      border-color: GrayText;
-      background: ButtonFace;
       color: GrayText;
     }
   }

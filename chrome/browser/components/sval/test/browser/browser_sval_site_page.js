@@ -281,11 +281,9 @@ add_task(async function the_sites_row_reset_says_what_stays() {
     );
   await until(button, "the row's Reset");
   ok(button().textContent, "its label");
-  Assert.stringContains(
-    button().getAttribute("aria-label"),
-    SITE,
-    "its name names the site"
-  );
+  await button().updateComplete;
+  const acc = await accessibleOf(button().shadowRoot.querySelector("button"));
+  Assert.stringContains(acc.name, SITE, "its name names the site");
   ok(button().title, "its tooltip says what stays");
 });
 

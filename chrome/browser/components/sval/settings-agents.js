@@ -275,12 +275,10 @@
           word = "Fix";
         }
         const button = this._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: connected
-              ? "sval-button sval-agent-small"
-              : "sval-button sval-button-primary sval-agent-small",
+            type: connected ? "secondary" : "primary",
+            className: "sval-agent-small",
             ariaLabel: `${word} ${client.label}`,
             dataset: { svalKey: `client:${client.id}` },
           },

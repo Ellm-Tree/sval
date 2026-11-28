@@ -313,7 +313,7 @@ add_task(async function extensions_shortcuts_are_in_keyboard_shortcuts() {
     row.querySelector(".sval-keys-shortcut").textContent.endsWith("9"),
     "with its key"
   );
-  Assert.ok(!row.querySelector("button"), "read-only");
+  Assert.ok(!row.querySelector("button, sval-button"), "read-only");
 
   card.querySelector(`[data-sval-key="keys-change:${ID}"]`).click();
   const editable = await TestUtils.waitForCondition(

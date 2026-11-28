@@ -70,7 +70,10 @@ add_task(async function the_data_card_lists_without_buttons() {
     "shared",
     "in the shared jar"
   );
-  ok(!card().querySelector("button"), "no Clear, Clear everywhere or links");
+  ok(
+    !card().querySelector("button, sval-button"),
+    "no Clear, Clear everywhere or links"
+  );
 });
 
 add_task(async function there_is_no_forget_card() {
@@ -102,7 +105,10 @@ add_task(async function the_hidden_card_lists_without_buttons() {
     () => card()?.querySelectorAll(".sval-sites-hidden-row").length === 3,
     "every line listed"
   );
-  ok(!card().querySelector("button"), "no Show again and no My filters link");
+  ok(
+    !card().querySelector("button, sval-button"),
+    "no Show again and no My filters link"
+  );
 });
 
 add_task(async function the_permissions_card_shows_values_as_text() {
@@ -122,6 +128,6 @@ add_task(async function the_permissions_card_shows_values_as_text() {
   await until(value, "the subdomain's camera row");
   const card = ui.doc.querySelector('[data-site-card="permissions"]');
   ok(!card.querySelector("select, sval-choice-pill"), "no choices");
-  ok(!card.querySelector("button"), "no ×");
+  ok(!card.querySelector("button, sval-button"), "no ×");
   is(value().dataset.value, String(SitePermissions.ALLOW), "the value as text");
 });

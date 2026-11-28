@@ -20,9 +20,9 @@
     --card-separator-color: var(--sval-border-subtle);
     --button-background-color: transparent;
     --button-color: var(--sval-ink);
-    --button-hover-background-color: var(--sval-tint);
+    --button-hover-background-color: var(--sval-hover-tint);
     --category-text-selected: var(--sval-accent);
-    --sidebar-background-hover: var(--sval-tint);
+    --sidebar-background-hover: var(--sval-hover-tint);
     --primary-button-background-color: var(--sval-action);
     --primary-button-color: var(--sval-action-text);
     --primary-button-hover-background-color: var(--sval-action-hover);

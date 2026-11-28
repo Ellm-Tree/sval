@@ -2,15 +2,15 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /*
- * The backup of the sync key, in Sval's dialog frame (`sval-dialog.css`),
- * whose palette variables it takes.
+ * The backup of the sync key, on Sval's dialog card (`sval-dialog`), with
+ * the palette variables `sval-dialog.css` gives the page.
  */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
-/* `SubDialog.resizeHorizontally` sizes the box to the page's width at load,
- * and the code wraps between its groups (`backup-key.js`) to fit it. */
+/* The card fits the box to this width, and the code wraps between its
+ * groups (`backup-key.js`) to fit it. */
 .sval-backup {
-  width: 480px;
+  --sval-dialog-width: 480px;
 }
 
 .sval-backup p {
@@ -37,10 +37,10 @@
 }
 
 .sval-backup-copy {
+  --sval-button-block-size: 32px;
+  --sval-button-padding-inline: 14px;
+  --sval-button-font-size: 13px;
   flex: none;
-  height: 32px;
-  padding: 0 14px;
-  font-size: 13px;
 }
 
 .sval-backup-fingerprint,
@@ -80,8 +80,8 @@
 }
 
 @media print {
-  .sval-dialog-icon,
-  .sval-dialog-actions,
+  .sval-backup::part(icon),
+  .sval-backup::part(actions),
   .sval-backup-status,
   .sval-backup-copy {
     display: none;

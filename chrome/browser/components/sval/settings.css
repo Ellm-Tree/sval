@@ -330,7 +330,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 }
 
 /* A lone button keeps its own width, as it does in a row. */
-.sval-card > button {
+.sval-card > :is(button, sval-button) {
   align-self: flex-start;
 }
 
@@ -415,7 +415,14 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   line-height: 1.5;
 }
 
-/* Buttons: pills. Primary is Sval Blue; the rest are outlined. */
+/* Buttons are `sval-button`s, whose own sheet draws Settings' pills. The
+ * page's in-content sheets give every native button a least size of their
+ * own (`html|button` in each platform's `common.css`, `button` in
+ * `common-shared.css`); Sval's native buttons size themselves. */
+.sval-pane button {
+  min-width: 0;
+  min-height: 0;
+}
 
 .sval-actions,
 .sval-code-row {
@@ -425,53 +432,19 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   gap: 8px;
 }
 
-.sval-pane button.sval-button {
-  appearance: none;
-  min-height: var(--sval-button-height);
-  margin: 0;
-  padding: 0 16px;
-  border: 1px solid var(--sval-border-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--sval-ink);
-  font: inherit;
-  font-size: var(--sval-button-font-size);
-  font-weight: var(--sval-button-font-weight);
-  cursor: pointer;
-  transition:
-    background-color var(--sval-dur) var(--sval-ease),
-    border-color var(--sval-dur) var(--sval-ease);
-}
-
-.sval-pane button.sval-button:hover:not(:disabled) {
-  border-color: var(--sval-accent);
-  background: var(--sval-tint);
-}
-
-.sval-pane button:is(.sval-button-primary, [data-tone="primary"]) {
-  border-color: var(--sval-action);
-  background: var(--sval-action);
-  color: var(--sval-action-text);
-}
-
-.sval-pane button:is(.sval-button-primary, [data-tone="primary"]):hover:not(:disabled) {
-  border-color: var(--sval-action-hover);
-  background: var(--sval-action-hover);
-}
-
-.sval-pane button:is(.sval-button-primary, [data-tone="primary"]):active:not(:disabled) {
-  background: var(--sval-action-press);
-}
-
-.sval-pane button.sval-button-quiet {
-  border-color: transparent;
-  color: var(--sval-ink-muted);
-}
-
 .sval-pane button:disabled,
-.sval-pane input:disabled {
+.sval-pane input:disabled,
+.sval-pane select:disabled,
+.sval-pane textarea:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Settings sets their ink and size itself, since the page's come from the
+ * in-content sheet. */
+.sval-pane input:is([type="radio"], [type="checkbox"]) {
+  color: var(--sval-ink-body);
+  font-size: var(--settings-text-size);
 }
 
 .sval-pane button:focus-visible,
@@ -486,6 +459,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 
 .sval-pane input.sval-code,
 .sval-pane input.sval-field {
+  box-sizing: border-box;
   min-height: var(--sval-button-height);
   margin: 0;
   padding: 0 16px;
@@ -630,7 +604,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background-color: var(--sval-tint);
+  background-color: var(--sval-hover-tint);
   color: var(--sval-accent);
   transition:
     background-color var(--sval-dur) var(--sval-ease),
@@ -1299,6 +1273,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   background: var(--sval-sunken);
   color: var(--sval-ink);
   font: inherit;
+  font-size: var(--settings-text-size);
   text-align: start;
   cursor: pointer;
   transition:
@@ -1311,9 +1286,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   border-color: var(--sval-accent);
 }
 
-.sval-pane button.sval-choice:hover:not(:disabled) {
+.sval-pane button.sval-choice:is(:hover, :hover:active):not(:disabled) {
   border-color: var(--sval-accent);
-  background: var(--sval-tint);
+  background: var(--sval-hover-tint);
+  color: var(--sval-ink);
 }
 
 .sval-choice-title {
@@ -1345,6 +1321,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+
+  &:hover:active:not(:disabled) {
+    background: transparent;
+    color: var(--sval-accent);
+  }
 }
 
 .sval-pane button.sval-back::before {
@@ -1432,6 +1413,35 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 /* Some of what it turns on is on: the knob halfway, the track half lit. */
 .sval-pane button.sval-switch[aria-checked="mixed"] {
   background: radial-gradient(circle at 50% 50%, #ffffff 9px, transparent 9.5px), color-mix(in srgb, var(--sval-action) 55%, var(--sval-control-edge));
+}
+
+/* Pressed, a switch keeps its track: the in-content sheet's pressed fill
+ * (`html|button:enabled:hover:active`) is no part of it. */
+.sval-pane button.sval-switch:hover:active:not(:disabled) {
+  background-color: var(--sval-control-edge);
+
+  &[aria-checked="true"] {
+    background-color: var(--sval-action);
+  }
+
+  &[aria-checked="mixed"] {
+    background-color: color-mix(in srgb, var(--sval-action) 55%, var(--sval-control-edge));
+  }
+
+  @media (forced-colors) {
+    border-color: ButtonText;
+    background-color: ButtonFace;
+
+    &[aria-checked="true"] {
+      border-color: Highlight;
+      background-color: Highlight;
+    }
+
+    &[aria-checked="mixed"] {
+      border-color: Highlight;
+      background-color: ButtonFace;
+    }
+  }
 }
 
 /* Forced colours drop the track's colour and the knob's gradient, which are
@@ -1819,8 +1829,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   color: var(--sval-problem);
 }
 
-.sval-pane button.sval-agent-unpair:hover {
+.sval-pane button.sval-agent-unpair:is(:hover, :hover:active:not(:disabled)) {
+  border-color: var(--sval-problem);
   background: color-mix(in srgb, var(--sval-problem) 14%, transparent);
+  color: var(--sval-problem);
 }
 
 .sval-agent-editor {
@@ -1964,6 +1976,13 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   opacity: 0.45;
 }
 
+/* Pressed, it keeps its hover's look over the in-content sheet's. */
+.sval-pane button.sval-agent-add:hover:active:not(:disabled) {
+  border-color: var(--sval-border-strong);
+  background: var(--sval-card-hover);
+  color: var(--sval-ink);
+}
+
 .sval-agent-adding {
   display: flex;
   flex-direction: column;
@@ -2024,17 +2043,19 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   resize: vertical;
 }
 
-.sval-pane button.sval-agent-small {
-  min-height: var(--sval-button-height);
-  border-color: var(--sval-border);
+/* The in-content sheet gives a hovered or pressed select its own border,
+ * fill and ink (`html|select:not([size], [multiple]):enabled:hover`); a
+ * select keeps its own, whichever ink its value gives it. */
+.sval-pane select.sval-agent-select:is(:hover, :hover:active):enabled {
+  border-color: var(--sval-control-edge);
+  background-color: var(--sval-glass);
+  color: var(--sval-select-ink, var(--sval-ink));
 }
 
-.sval-pane button.sval-agent-small.sval-button-primary {
-  border-color: transparent;
-}
-
-.sval-pane button.sval-agent-small:disabled {
-  opacity: 0.45;
+.sval-pane .sval-agent-small {
+  --sval-button-secondary-border: var(--sval-border);
+  --sval-button-primary-border: transparent;
+  --sval-button-disabled-opacity: 0.45;
 }
 
 .sval-agent-preview {
@@ -2166,11 +2187,13 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 
 .sval-pane select.sval-agent-file[data-value=""],
 .sval-pane select.sval-agent-tool-site[data-value=""] {
+  --sval-select-ink: var(--sval-ink-muted);
   color: var(--sval-ink-muted);
 }
 
 .sval-pane select.sval-agent-file[data-value="deny"],
 .sval-pane select.sval-agent-tool-site[data-value="deny"] {
+  --sval-select-ink: var(--sval-problem);
   color: var(--sval-problem);
 }
 
@@ -2208,14 +2231,16 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: inherit;
+  color: var(--sval-ink-body);
   font: inherit;
+  font-size: var(--settings-text-size);
   text-align: start;
   cursor: pointer;
 }
 
-.sval-pane button.sval-agent-rule-toggle:hover {
+.sval-pane button.sval-agent-rule-toggle:is(:hover, :hover:active:not(:disabled)) {
   background: var(--sval-card-hover);
+  color: var(--sval-ink-body);
 }
 
 .sval-agent-rule-toggle[aria-expanded="true"] {
@@ -2394,8 +2419,9 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   cursor: pointer;
 }
 
-.sval-pane button.sval-agent-chip-remove:hover {
+.sval-pane button.sval-agent-chip-remove:is(:hover, :hover:active:not(:disabled)) {
   background: var(--sval-card-hover);
+  color: var(--sval-ink-muted);
 }
 
 /* A chip's own control: an app's answer, an upload folder's scope. */
@@ -2439,8 +2465,9 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   cursor: pointer;
 }
 
-.sval-pane button.sval-agent-remove:hover {
+.sval-pane button.sval-agent-remove:is(:hover, :hover:active:not(:disabled)) {
   background: var(--sval-card);
+  color: var(--sval-ink-muted);
 }
 
 .sval-agent-remove .sval-glyph {
@@ -2468,12 +2495,18 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 999px;
   background: none;
   color: var(--sval-accent);
   font: inherit;
   font-size: var(--settings-note-size);
   font-weight: 600;
   cursor: pointer;
+
+  &:hover:active:not(:disabled) {
+    background: none;
+    color: var(--sval-accent);
+  }
 }
 
 .sval-pane button.sval-agent-more {
@@ -2487,29 +2520,33 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   background: var(--sval-card);
 }
 
-/* The unpair confirmation: Sval's settings dialog, narrower than a picker. */
+/* Settings' confirmations: a native `<dialog>`, which makes the page under it
+   inert and closes on Escape, holding the card `sval-dialog` draws. */
 
-.sval-modal {
+dialog:has(sval-dialog) {
   box-sizing: border-box;
-  width: 480px;
   max-width: calc(100vw - 32px);
   margin: 56px auto auto;
   padding: 0;
-  border: 1px solid var(--sval-border);
-  border-radius: 16px;
-  background: var(--sval-raised);
-  box-shadow: var(--sval-modal-shadow);
+  border: none;
+  background: transparent;
   color: var(--sval-ink-body);
+  overflow: visible;
+
+  sval-dialog {
+    --sval-dialog-width: 480px;
+    --sval-dialog-max-width: 100%;
+  }
 }
 
-.sval-modal::backdrop {
+dialog:has(sval-dialog)::backdrop {
   background: var(--sval-modal-dim);
 }
 
 /* Firefox's dialogs (`SubDialog`) are cards in Sval's dialog frame, as in a
    browser window's box, whose template has no title bar and no frame
-   margin. `sval-dialog-frame.js` makes the box clear and gives it the
-   card's corners and shadow, so the card must fill it: a title bar or a
+   margin. `SvalDialogBox.fitFrame` gives the box the card's fill, corners
+   and shadow, so the card must fill it: a title bar or a
    margin left in the box shows the page through. */
 @media not ((forced-colors) or (prefers-contrast)) {
   .dialogBox {
@@ -2535,25 +2572,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   }
 }
 
-.sval-pane .sval-modal-title {
-  padding: 22px 24px 0;
-  color: var(--sval-ink);
-  font-size: var(--settings-heading-size);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.sval-pane .sval-modal-body {
-  padding: 10px 24px 0;
-  font-size: var(--settings-text-size);
-  line-height: 1.5;
-}
-
-.sval-pane .sval-modal-check {
+/* Unpair's "Delete its Workspaces" row. */
+#sval-unpair-workspaces {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 24px 0;
   font-size: 15px;
 
   &[hidden] {
@@ -2565,12 +2588,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   }
 }
 
-/* The SMB dialog's fields, one column the width of the dialog, inset as its
-   title is. */
+/* The SMB dialog's fields, one column the width of the dialog. */
 .sval-pane .sval-smb-fields {
   display: flex;
   flex-direction: column;
-  padding: 16px 24px 0;
 
   > .sval-step-label {
     margin-block: 14px 6px;
@@ -2609,7 +2630,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 
 /* A service's mark before its name, as the password managers' are in first
    run. */
-.sval-pane button.sval-button:has(> .sval-button-brand),
+.sval-pane sval-button:has(> .sval-button-brand) {
+  --sval-button-display: inline-flex;
+  --sval-button-gap: 8px;
+}
+
 .sval-pane .sval-choice-title:has(> .sval-button-brand) {
   display: inline-flex;
   align-items: center;
@@ -2622,12 +2647,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 }
 
 /* The Dropbox folder browser: where it is, then the folders there, one per
-   row, inset as the dialog's title is. */
+   row. */
 .sval-pane .sval-dropbox-browser {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px 24px 0;
   min-width: min(420px, 80vw);
 }
 
@@ -2674,7 +2698,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   cursor: pointer;
 
   &:hover {
-    background: var(--sval-tint);
+    background: var(--sval-hover-tint);
   }
 
   > .sval-icon {
@@ -2693,66 +2717,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   }
 }
 
-.sval-modal-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 20px 24px;
-}
-
-.sval-pane button:is(.sval-button-danger, [data-tone="danger"]) {
-  padding: 0 20px;
-  border-color: transparent;
-  background: var(--sval-problem);
-  color: var(--sval-inverse);
-}
-
-.sval-pane button:is(.sval-button-danger, [data-tone="danger"]):hover:not(:disabled) {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--sval-problem) 86%, var(--sval-ink));
-}
-
-/* The tile of the confirmation that deletes something. */
-.sval-modal-tile {
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  width: 40px;
-  height: 40px;
-  margin: 22px 24px 0;
-  border-radius: 12px;
-  background: var(--sval-problem-tint);
-  color: var(--sval-problem);
-}
-
-.sval-modal-tile[hidden] {
-  display: none;
-}
-
-.sval-modal-tile .sval-glyph {
-  width: 20px;
-  height: 20px;
-}
-
-.sval-pane .sval-modal-tile:not([hidden]) + .sval-modal-title {
-  padding-top: 14px;
-}
-
 @media (forced-colors) {
-  .sval-modal {
-    border: 2px solid CanvasText;
-  }
-
-  .sval-modal-tile {
-    border: 1px solid CanvasText;
-    background: Canvas;
-    color: CanvasText;
-  }
-
-  .sval-pane button:is(.sval-button-danger, [data-tone="danger"]) {
-    background: Highlight;
-    color: HighlightText;
+  .sval-pane {
+    --sval-button-danger-fill: Highlight;
+    --sval-button-danger-ink: HighlightText;
   }
 }
 
@@ -2834,14 +2802,16 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: inherit;
+  color: var(--sval-ink-body);
   font: inherit;
+  font-size: var(--settings-text-size);
   text-align: start;
   cursor: pointer;
 }
 
-.sval-pane button.sval-fp-group-toggle:hover {
+.sval-pane button.sval-fp-group-toggle:is(:hover, :hover:active:not(:disabled)) {
   background: var(--sval-card-hover);
+  color: var(--sval-ink-body);
 }
 
 .sval-fp-group-toggle[aria-expanded="true"] .sval-agent-chevron {
@@ -3015,7 +2985,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   flex: none;
 }
 
-.sval-pane button.sval-sites-reset {
+.sval-pane .sval-sites-reset {
   flex: none;
 }
 
@@ -3026,6 +2996,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 
 /* A choice that follows the default for every site. */
 .sval-pane select.sval-agent-select[data-default] {
+  --sval-select-ink: var(--sval-ink-muted);
   color: var(--sval-ink-muted);
 }
 
@@ -3061,10 +3032,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   font-size: var(--settings-small-size);
 }
 
-.sval-pane button.sval-sites-hidden-show {
+.sval-pane .sval-sites-hidden-show {
+  --sval-button-block-size: 30px;
+  --sval-button-secondary-fill: var(--sval-card-hover);
   flex: none;
-  height: 30px;
-  background: var(--sval-card-hover);
 }
 
 .sval-sites-hidden-open {
@@ -3084,40 +3055,45 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 }
 
 /* The site menu's pin button (`sval-protection.css`, `.sval-site-pin`), so
-   pinning looks the same wherever it is done. */
-.sval-address-pin-button {
+   pinning looks the same wherever it is done. Under `:root`, so each state
+   here outranks the in-content sheet's rule for a native button in it
+   (`common-shared.css`). */
+:root .sval-address-pin-button {
+  --sval-pin-ink: var(--sval-ink);
+  --sval-pin-hover: var(--sval-border);
+  appearance: none;
   display: grid;
   flex: none;
   place-items: center;
   width: 32px;
+  min-width: 0;
   height: 32px;
+  min-height: 0;
   margin: 0;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--sval-ink);
+  color: var(--sval-pin-ink);
 
   & > .sval-glyph {
     width: 16px;
     height: 16px;
   }
 
-  &:hover {
-    background-color: var(--sval-border);
-  }
-
   &[aria-pressed="true"] {
+    --sval-pin-ink: var(--sval-page);
+    --sval-pin-hover: color-mix(in srgb, var(--sval-ink) 86%, var(--sval-page));
     background-color: var(--sval-ink);
-    color: var(--sval-page);
 
     & > .sval-glyph {
       --sval-glyph-icon: var(--sval-icon-pinned);
     }
+  }
 
-    &:hover {
-      background-color: color-mix(in srgb, var(--sval-ink) 86%, var(--sval-page));
-    }
+  &:is(:hover, :hover:active):not(:disabled) {
+    background-color: var(--sval-pin-hover);
+    color: var(--sval-pin-ink);
   }
 
   &:focus-visible {
@@ -3126,11 +3102,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   }
 
   @media (forced-colors) {
-    color: ButtonText;
+    --sval-pin-ink: ButtonText;
 
     &[aria-pressed="true"] {
+      --sval-pin-ink: HighlightText;
       background-color: Highlight;
-      color: HighlightText;
     }
   }
 }
@@ -3333,11 +3309,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   opacity: 0.45;
 }
 
-.sval-pane button.sval-links-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding-inline-start: 10px;
+.sval-pane .sval-links-add {
+  --sval-button-display: inline-flex;
+  --sval-button-gap: 6px;
+  --sval-button-padding-inline-start: 10px;
 }
 
 .sval-links-sync {
@@ -3447,6 +3422,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   background: transparent;
   color: var(--sval-ink-muted);
   cursor: grab;
+
+  &:hover:active:not(:disabled) {
+    background: transparent;
+    color: var(--sval-ink-muted);
+  }
 }
 
 .sval-links-number {
@@ -3514,7 +3494,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  background: var(--sval-links-tile, var(--sval-tint));
+  background: var(--sval-links-tile, var(--sval-hover-tint));
   color: var(--sval-ink);
   font-size: 11px;
   font-weight: 700;
@@ -3673,8 +3653,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   background: none;
   color: var(--sval-ink);
 
-  &:hover {
+  &:hover,
+  &:hover:active:not(:disabled) {
+    border-color: var(--sval-border);
     background: var(--sval-card-hover);
+    color: var(--sval-ink);
   }
 
   > .sval-glyph {
@@ -3788,7 +3771,10 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 }
 
 /* At a host's scope, what it inherits reads as a default does. */
-.sval-pane button.sval-site-exceptions[data-default],
+.sval-pane .sval-site-exceptions[data-default] {
+  --sval-button-secondary-ink: var(--sval-ink-muted);
+}
+
 .sval-site-row[data-default] .sval-site-row-label {
   color: var(--sval-ink-muted);
 }
@@ -3943,15 +3929,18 @@ sval-choice-pill {
   padding: 0 6px 0 12px;
   border: 0;
   border-radius: 999px;
+  --sval-pill-ink: var(--sval-ink);
   background: color-mix(in srgb, var(--sval-ink) 10%, transparent);
-  color: var(--sval-ink);
+  color: var(--sval-pill-ink);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
+  &:hover:not(:disabled),
+  &:hover:active:not(:disabled) {
     background: color-mix(in srgb, var(--sval-ink) 16%, transparent);
+    color: var(--sval-pill-ink);
   }
 
   > .sval-glyph {
@@ -3962,7 +3951,7 @@ sval-choice-pill {
 
 /* A choice that follows the default for every site. */
 sval-choice-pill[data-default] > button.sval-choice-pill {
-  color: var(--sval-ink-muted);
+  --sval-pill-ink: var(--sval-ink-muted);
 }
 
 .sval-site-value {
@@ -3972,12 +3961,12 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   font-weight: 600;
 }
 
-.sval-pane button.sval-site-exceptions {
+.sval-pane .sval-site-exceptions {
+  --sval-button-gap: 6px;
   flex: none;
-  gap: 6px;
 
   &[data-none="true"] {
-    color: var(--sval-ink-muted);
+    --sval-button-secondary-ink: var(--sval-ink-muted);
   }
 
   > .sval-glyph {
@@ -4003,14 +3992,10 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   gap: 8px 16px;
 }
 
-.sval-pane button.sval-site-data-everywhere {
+.sval-pane .sval-site-data-everywhere {
+  --sval-button-height: 32px;
+  --sval-button-soft-disabled-opacity: 0.45;
   flex: none;
-  min-height: 32px;
-
-  &[aria-disabled="true"] {
-    opacity: 0.45;
-    cursor: default;
-  }
 }
 
 .sval-site-data-head .sval-site-card-count {
@@ -4055,9 +4040,9 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   font-variant-numeric: tabular-nums;
 }
 
-.sval-pane button.sval-site-data-clear {
-  min-height: 30px;
-  background: var(--sval-card-hover);
+.sval-pane .sval-site-data-clear {
+  --sval-button-height: 30px;
+  --sval-button-secondary-fill: var(--sval-card-hover);
 }
 
 /* A row whose last clear failed says why in its sub line. */
@@ -4118,20 +4103,19 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   font-size: 13px;
 }
 
-#sval-blocking-dialog[data-confirm="clear-everywhere"] {
-  width: 420px;
+#sval-blocking-dialog[data-confirm="clear-everywhere"] > sval-dialog {
+  --sval-dialog-width: 420px;
 }
 
-#sval-blocking-dialog[data-confirm="forget"] {
-  width: 440px;
+#sval-blocking-dialog[data-confirm="forget"] > sval-dialog {
+  --sval-dialog-width: 440px;
 }
 
 /* What 8a lists and 8b keeps, under the confirm's body. */
-.sval-modal-more:not([hidden]) {
+#sval-blocking-dialog-more:not([hidden]) {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 18px 24px 0;
 }
 
 .sval-forget-well {
@@ -4193,9 +4177,8 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   font-size: 13px;
 }
 
-.sval-pane button:is(.sval-button-danger, [data-tone="danger"])[aria-disabled="true"] {
-  opacity: 0.45;
-  cursor: default;
+.sval-pane sval-button[type="danger"] {
+  --sval-button-soft-disabled-opacity: 0.45;
 }
 
 .sval-pane .sval-reset-keep {
@@ -4222,13 +4205,13 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   --sval-glyph-icon: var(--sval-icon-check);
 }
 
-.sval-pane button.sval-site-forget {
+.sval-pane .sval-site-forget {
+  --sval-button-height: 36px;
+  --sval-button-gap: 6px;
+  --sval-button-secondary-border: var(--danger-outline-border);
+  --sval-button-secondary-ink: var(--danger-outline-ink);
+  --sval-button-soft-disabled-opacity: 0.45;
   flex: none;
-  gap: 6px;
-  min-height: 36px;
-  border: 1px solid var(--danger-outline-border);
-  background: transparent;
-  color: var(--danger-outline-ink);
 
   > .sval-glyph {
     width: 16px;
@@ -4236,13 +4219,9 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   }
 }
 
-.sval-site-forget-none button.sval-site-forget,
-.sval-pane button.sval-site-forget[aria-disabled="true"] {
-  opacity: 0.45;
-}
-
-.sval-pane button.sval-site-forget[aria-disabled="true"] {
-  cursor: default;
+/* A site with nothing to forget, whose Forget is disabled. */
+.sval-site-forget-none .sval-site-forget {
+  --sval-button-disabled-opacity: 0.45;
 }
 
 /* What a Forget left, above the cards. */
@@ -4407,6 +4386,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   gap: 4px;
   min-width: 0;
   color: var(--sval-ink);
+  font-size: var(--settings-text-size);
   text-decoration: none;
 
   > .sval-agent-site {

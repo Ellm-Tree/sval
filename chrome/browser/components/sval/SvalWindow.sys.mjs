@@ -37,6 +37,8 @@ import { SPLIT_MAX_PANES } from "moz-src:///browser/components/sval/SvalPanelMod
 import { SvalWindowWorkspace } from "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs";
 
 const PANEL_CSS = "chrome://browser/content/sval/sval-panel.css";
+const ROLES_CSS = "chrome://browser/content/sval/sval-roles.css";
+const ELEMENTS_URL = "chrome://browser/content/sval/elements/sval-elements.mjs";
 /** The panel's side on its container, which `sval-panel.css` places it by. */
 const PLACEMENT_ATTR = "sval-placement";
 /**
@@ -375,10 +377,19 @@ export const SvalWindow = {
    */
   mount(win) {
     const doc = win.document;
+    // First, so the roles `sval-header.css` sets for the window win over the
+    // shared ones.
+    win.windowUtils.loadSheetUsingURIString(
+      ROLES_CSS,
+      win.windowUtils.AUTHOR_SHEET
+    );
     win.windowUtils.loadSheetUsingURIString(
       PANEL_CSS,
       win.windowUtils.AUTHOR_SHEET
     );
+    // Through the window's own `ChromeUtils`, so "current" is the window and
+    // the tags register in its `customElements`.
+    win.ChromeUtils.importESModule(ELEMENTS_URL, { global: "current" });
 
     const quick = SvalPeek.isOpening(win);
     if (quick) {

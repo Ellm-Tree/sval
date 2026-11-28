@@ -22,6 +22,6 @@
 
   .export:hover {
     border-color: var(--sval-accent) !important;
-    background: var(--sval-tint) !important;
+    background: var(--sval-hover-tint) !important;
   }
 }

@@ -28,7 +28,7 @@ async function answerADialog() {
   await TestUtils.waitForCondition(
     () =>
       (button = gDialogBox.dialog._frame.contentDocument?.querySelector(
-        ".sval-dialog-actions button.primary"
+        'sval-dialog sval-button[type="primary"]'
       )),
     "the dialog has drawn its buttons"
   );

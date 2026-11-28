@@ -228,7 +228,7 @@ add_task(async function a_settings_dialog_is_one_card() {
   await within(
     TestUtils.waitForCondition(() => {
       dialog = ui.page.gSubDialog._topDialog;
-      // Shaped once its document has loaded (`sval-dialog-frame.js`).
+      // Shaped once its document has loaded (`SvalDialogBox.fitFrame`).
       return (
         dialog?._frame.contentDocument?.querySelector("dialog") &&
         dialog._box.style.borderTopWidth
@@ -236,6 +236,12 @@ add_task(async function a_settings_dialog_is_one_card() {
     }, "Update History opens"),
     10_000,
     "Update History opening"
+  );
+  Assert.ok(
+    [...dialog._frame.contentDocument.styleSheets].some(
+      sheet => sheet.href == "chrome://global/skin/in-content/common.css"
+    ),
+    "one of Firefox's dialogs keeps the sheet SubDialog injects"
   );
   const box = dialog._box.getBoundingClientRect();
   const frame = dialog._frame.getBoundingClientRect();

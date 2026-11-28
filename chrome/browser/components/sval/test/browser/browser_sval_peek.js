@@ -485,11 +485,11 @@ add_task(async function an_isolated_workspace_asks_then_opens_in_its_jar() {
     "it asks about Work"
   );
   Assert.ok(
-    question.querySelector('button[data-button="cancel"]'),
+    question.querySelector('sval-button[data-button="cancel"]'),
     "as a question that can be declined"
   );
   const closed = BrowserTestUtils.domWindowClosed(win);
-  question.querySelector('button[data-button="ok"]').click();
+  question.querySelector('sval-button[data-button="ok"]').click();
   await within(closed, 10_000, "the Peek closing");
 
   Assert.equal(

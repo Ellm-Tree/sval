@@ -67,16 +67,6 @@ const SvalEmojiPicker = {
       window.frameElement?.svalEmojiArgs ?? { initial: "", tone: null };
     this._inline = !!window.frameElement?.svalEmojiArgs;
     document.documentElement.toggleAttribute("data-inline", this._inline);
-    if (this._inline) {
-      // The design tokens the page is drawn in come with the stylesheet
-      // `SubDialog` gives every dialog it opens (`_injectedStyleSheets`),
-      // which a frame does not get.
-      const link = this._element("link", {
-        rel: "stylesheet",
-        href: "chrome://global/skin/in-content/common.css",
-      });
-      document.head.prepend(link);
-    }
     this._groups = drawableEmojiGroups(EMOJI_GROUPS, document);
     this._els = {
       picker: document.querySelector(".sval-emoji-picker"),
@@ -181,7 +171,7 @@ const SvalEmojiPicker = {
       topMarker,
       bottomMarker,
       top: this._els.tones,
-      bottom: this._els.picker.querySelector(".sval-emoji-actions"),
+      bottom: this._els.picker.querySelector(".sval-emoji-foot"),
     });
   },
 
@@ -294,7 +284,7 @@ const SvalEmojiPicker = {
   },
 
   _onClick(event) {
-    const target = event.target.closest?.("button");
+    const target = event.target.closest?.("button, sval-button");
     if (!target) {
       return;
     }

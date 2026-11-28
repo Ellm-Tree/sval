@@ -741,8 +741,7 @@ const SvalFirstRunPage = {
     this._presetEarlier(this._facts.earlier ?? {});
     document.title = STRINGS.title;
 
-    this._shapeBox();
-    this._main = document.querySelector("main");
+    this._main = document.querySelector("sval-dialog");
     this._announcer = this._element("p", {
       class: "sval-visually-hidden",
       "aria-live": "polite",
@@ -763,11 +762,11 @@ const SvalFirstRunPage = {
     // The sheet's size is its stylesheet's, the same for every step, so it
     // waits only for Outfit and the engines, which it is drawn with when
     // they come in time.
-    document.mozSubdialogReady = Promise.all([
+    this._main.pending = Promise.all([
       this._bounded(this._loadEngines()),
       this._bounded(document.fonts.load('15px "Outfit"')),
     ]);
-    document.subDialogSetDefaultFocus = () => this._focusStep();
+    this._main.defaultFocus = () => this._stepFocus();
 
     this._main.addEventListener("click", this);
     this._main.addEventListener("change", this);
@@ -860,21 +859,6 @@ const SvalFirstRunPage = {
 
   _in(selector, step = this._step) {
     return this._section(step).querySelector(selector);
-  },
-
-  /**
-   * The dialog box holds nothing but the sheet, so it draws the sheet's card
-   * with its shadow (`SvalDialogBox`). `SubDialog` clones the box for this
-   * dialog alone and removes it when the dialog closes, so nothing outlives
-   * the sheet.
-   */
-  _shapeBox() {
-    const { shapeDialogBox } = ChromeUtils.importESModule(
-      "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs"
-    );
-    shapeDialogBox(document.querySelector(".sval-fr"), {
-      shadow: "0 24px 64px rgba(3, 5, 26, 0.55)",
-    });
   },
 
   /**
@@ -1979,6 +1963,11 @@ const SvalFirstRunPage = {
    * on. The welcome waits on its heading while its import runs.
    */
   _focusStep() {
+    this._main.focusDefault();
+  },
+
+  /** @returns {Element|null} What {@link _focusStep} focuses. */
+  _stepFocus() {
     const section = this._section(this._step);
     let target;
     switch (this._step) {
@@ -2013,10 +2002,7 @@ const SvalFirstRunPage = {
           section.querySelector('input[type="radio"]:checked') ??
           section.querySelector('input[type="radio"]');
     }
-    target?.focus();
-    if (this._step === STEPS.workspace) {
-      target.select();
-    }
+    return target ?? null;
   },
 
   /** Brings the shown step's controls into line with the answers. */

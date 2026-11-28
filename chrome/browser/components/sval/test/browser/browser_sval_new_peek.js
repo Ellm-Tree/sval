@@ -196,7 +196,7 @@ add_task(async function moving_it_to_a_shared_workspace_reloads_it_there() {
   await dialogShown(win.gDialogBox.dialog, "the dialog");
   const question = win.gDialogBox.dialog._frame.contentDocument;
   const closed = BrowserTestUtils.domWindowClosed(win);
-  question.querySelector('button[data-button="ok"]').click();
+  question.querySelector('sval-button[data-button="ok"]').click();
   await within(closed, 10_000, "the Peek closing");
 
   Assert.equal(

@@ -170,12 +170,11 @@ add_task(async function clear_everywhere_confirms_first() {
   ok(dialog.open, "the confirm opens");
   is(dialog.getAttribute("role"), "alertdialog", "as an alert dialog");
   is(dialog.dataset.confirm, "clear-everywhere", "to clear everywhere");
-  ok(
-    ui.byId("sval-blocking-dialog-tile").querySelector(".sval-glyph-sc-cookie"),
-    "the cookie tile"
-  );
+  const card = ui.byId("sval-blocking-dialog-card");
+  is(card.icon, "cookie", "the cookie tile");
+  is(card.tone, "danger", "in the danger tone");
   is(
-    ui.byId("sval-blocking-dialog-confirm").dataset.tone,
+    ui.byId("sval-blocking-dialog-confirm").type,
     "danger",
     "the button warns"
   );
@@ -185,9 +184,8 @@ add_task(async function clear_everywhere_confirms_first() {
   ok(!dialog.open, "Cancel closes it");
   is(cookiesIn(0) + cookiesIn(jar), 2, "and clears nothing");
   await until(
-    () =>
-      ui.byId("sval-blocking-dialog-tile").querySelector(".sval-glyph-trash-2"),
-    "the tile put back for the other confirms"
+    () => !card.icon && card.tone === "default",
+    "the tile taken off for the other confirms"
   );
 
   data.everywhere().click();

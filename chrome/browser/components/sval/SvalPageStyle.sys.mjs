@@ -230,13 +230,21 @@ export function dialogSheetsFor(url) {
  * Called from `SubDialog._onContentLoaded`, where Firefox injects its own
  * sheets, before the box is shown.
  *
+ * Sval's own dialogs draw their card as `sval-dialog`, which fits the box
+ * itself, and take none of Firefox's sheets: `SubDialog` injects
+ * `in-content/common.css` into a dialog only where this returns false.
+ *
  * @param {Element} frame The box's `dialogFrame`.
+ * @returns {boolean} Whether the dialog is one of Sval's own.
  */
 export function styleDialog(frame) {
   const win = frame.contentWindow;
+  if (pageOf(win.document.documentURI).startsWith(OWN_DIALOGS)) {
+    return true;
+  }
   const sheets = dialogSheetsFor(win.document.documentURI);
   if (!sheets.length) {
-    return;
+    return false;
   }
   const utils = win.windowUtils;
   for (const sheet of sheets) {
@@ -249,6 +257,7 @@ export function styleDialog(frame) {
     utils.loadSheetUsingURIString(shadowSheet, utils.USER_SHEET);
   }
   Services.scriptloader.loadSubScript(FRAME_SCRIPT, win);
+  return false;
 }
 
 let registered = false;

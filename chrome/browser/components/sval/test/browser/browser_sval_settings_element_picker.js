@@ -243,7 +243,7 @@ add_task(async function the_row_x_confirms_before_deleting_lines() {
   );
   const confirm = ui.byId("sval-blocking-dialog-confirm");
   Assert.stringContains(confirm.textContent, "2", "the confirm counts them");
-  is(confirm.dataset.tone, "danger", "the confirm is the danger button");
+  is(confirm.type, "danger", "the confirm is the danger button");
   is(
     ui.page.document.activeElement,
     ui.byId("sval-blocking-dialog-cancel"),
@@ -279,15 +279,9 @@ add_task(async function the_row_x_confirms_before_deleting_lines() {
   is(SvalBlocking.myFilters, OTHER_LINE, "with both lines, and no others");
   await until(() => !rowOf(ui, SITE), "the row going");
   ok(!dialog.hasAttribute("role"), "and gives the role back");
-  is(
-    confirm.dataset.tone,
-    "primary",
-    "the dialog's other uses get their button back"
-  );
-  ok(
-    ui.byId("sval-blocking-dialog-title").previousElementSibling.hidden,
-    "and lose the tile"
-  );
+  is(confirm.type, "primary", "the dialog's other uses get their button back");
+  const card = ui.byId("sval-blocking-dialog-card");
+  ok(!card.icon && card.tone === "default", "and lose the tile");
 });
 
 add_task(async function one_line_reads_in_the_singular() {

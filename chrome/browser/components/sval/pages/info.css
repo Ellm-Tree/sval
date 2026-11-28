@@ -109,7 +109,7 @@ td.integer {
   }
 
   #categories > :is(.category[selected], .category.selected) {
-    background-color: var(--sval-tint);
+    background-color: var(--sval-hover-tint);
     color: var(--sval-accent);
   }
 

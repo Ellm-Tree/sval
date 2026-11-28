@@ -122,6 +122,8 @@ async function openHome() {
   return tab;
 }
 
+add_setup(solidWindows);
+
 add_task(async function a_home_tab_wears_its_workspaces_colour() {
   const { ids, engine, observer } = await withSwitcherTabs();
   const [first, second] = ids.workspaces;

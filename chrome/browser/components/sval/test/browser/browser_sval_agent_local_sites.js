@@ -51,7 +51,7 @@ function loopbackPage() {
  * @returns {string[]} Its buttons' choices, in order.
  */
 function choicesIn(doc) {
-  return [...doc.querySelectorAll(".sval-aa-actions button")].map(
+  return [...doc.querySelectorAll("sval-dialog [data-choice]")].map(
     b => b.dataset.choice
   );
 }

@@ -19,6 +19,7 @@
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { FileUtils } from "resource://gre/modules/FileUtils.sys.mjs";
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
 
 const DIALOG_URL = "chrome://browser/content/sval/backup-key.xhtml";
 
@@ -176,9 +177,8 @@ export const SvalBackupKey = {
       fingerprint,
       checkDestination: path => this.checkDestination(path, sharedRoot),
       saved: false,
-      getProperty: name => name === "async",
     };
-    await win.gDialogBox?.open(DIALOG_URL, args);
+    await openSvalDialogPage(win, DIALOG_URL, args);
     return args.saved;
   },
 };

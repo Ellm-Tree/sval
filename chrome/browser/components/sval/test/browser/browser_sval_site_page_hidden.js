@@ -63,7 +63,7 @@ add_task(async function every_line_newest_first_and_show_again() {
     "a network rule says it stops a download"
   );
 
-  rowsOf(ui)[0].querySelector("button").click();
+  rowsOf(ui)[0].querySelector("sval-button").click();
   await until(() => rowsOf(ui).length === 10, "the line gone from the card");
   ok(
     !SvalBlocking.myFilters.split("\n").includes(LINES.at(-1)),
@@ -75,7 +75,7 @@ add_task(async function every_line_newest_first_and_show_again() {
   );
   is(
     page.document.activeElement,
-    rowsOf(ui)[0].querySelector("button"),
+    rowsOf(ui)[0].querySelector("sval-button"),
     "focus on the row that took its place"
   );
 });

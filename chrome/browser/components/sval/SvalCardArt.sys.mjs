@@ -11,6 +11,7 @@
  */
 
 import { cardYears } from "moz-src:///browser/components/sval/SvalCard.sys.mjs";
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -683,7 +684,5 @@ const DIALOG_URL = "chrome://browser/content/sval/card/card-dialog.xhtml";
  * @returns {Promise<void>} once the dialog closes.
  */
 export async function openCardDialog(win) {
-  await win.gDialogBox?.open(DIALOG_URL, {
-    getProperty: name => name === "async",
-  });
+  await openSvalDialogPage(win, DIALOG_URL);
 }

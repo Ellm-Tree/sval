@@ -233,7 +233,7 @@ function syncCardOf(page) {
   const doc = page.document;
   return {
     state: doc.getElementById("sval-storage").dataset.state,
-    commands: [...doc.querySelectorAll("#sval-sync-buttons button")].map(
+    commands: [...doc.querySelectorAll("#sval-sync-buttons sval-button")].map(
       button => button.dataset.command
     ),
   };
@@ -380,7 +380,7 @@ add_task(async function an_unreadable_key_is_tried_again_without_a_restart() {
 add_task(async function starting_over_works_with_the_key_missing() {
   const { win, panel, ourKey, storedKey } = await startingWithoutTheKey();
   const pending = panel.setUpSyncAgain();
-  await pressInDialog(win, '.sval-dialog-actions button[data-button="ok"]');
+  await pressInDialog(win, 'sval-dialog sval-button[data-button="ok"]');
   const result = await within(pending, 30_000, "starting over");
   Assert.ok(result.done, `it started over: ${result.failure}`);
   const stored = await storedKey();
@@ -500,7 +500,7 @@ add_task(async function setting_up_sync_again_shuts_the_old_key_out() {
   );
 
   const pending = SvalPanel.setUpSyncAgain();
-  await pressInDialog(window, '.sval-dialog-actions button[data-button="ok"]');
+  await pressInDialog(window, 'sval-dialog sval-button[data-button="ok"]');
   const result = await within(pending, 30_000, "setting up sync again");
 
   Assert.ok(result.done, `it set up sync again: ${result.failure}`);
@@ -554,10 +554,7 @@ add_task(async function a_setup_whose_key_did_not_save_removes_nothing() {
   await SvalTestDeny.read(secrets);
   try {
     const pending = SvalPanel.setUpSyncAgain();
-    await pressInDialog(
-      window,
-      '.sval-dialog-actions button[data-button="ok"]'
-    );
+    await pressInDialog(window, 'sval-dialog sval-button[data-button="ok"]');
     result = await within(pending, 30_000, "setting up sync again");
   } finally {
     await SvalTestDeny.allow(secrets);

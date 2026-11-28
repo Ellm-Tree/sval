@@ -30,7 +30,7 @@ const { sinon } = ChromeUtils.importESModule(
  * @returns {Element|undefined} the one visible step.
  */
 function shownSection(doc) {
-  return [...doc.querySelectorAll("main > section")].find(
+  return [...doc.querySelectorAll(".sval-fr > section")].find(
     section => !section.hidden
   );
 }

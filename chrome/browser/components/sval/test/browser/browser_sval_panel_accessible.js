@@ -183,7 +183,8 @@ function luminance({ r, g, b }) {
 
 /**
  * A coloured group's name reads at 4.5:1 or better on its own block, in
- * every colour, in an untinted window and in every workspace tint.
+ * every colour, in an untinted window and in every workspace tint, solid
+ * and see-through.
  */
 add_task(async function a_group_name_reads_on_its_colour() {
   const { engine, ids } = await withFreshPanel();
@@ -200,22 +201,28 @@ add_task(async function a_group_name_reads_on_its_colour() {
     });
 
   const failing = [];
-  for (const tint of [null, ...COLOR_TOKENS]) {
-    await setColor(ids.workspace, tint);
-    for (const color of COLOR_TOKENS) {
-      await setColor(ids.groupA, color);
-      await SvalPanel.refresh();
-      const name = SvalPanel._rowElementFor(ids.groupA).querySelector(
-        ".sval-row-name"
-      );
-      const behind = drawnBehind(name);
-      const ink = paintedOver(rgba(getComputedStyle(name).color), behind);
-      const [hi, lo] = [luminance(ink), luminance(behind)].sort(
-        (a, b) => b - a
-      );
-      const ratio = (hi + 0.05) / (lo + 0.05);
-      if (ratio < 4.5) {
-        failing.push(`${color} in ${tint ?? "no tint"}: ${ratio.toFixed(2)}`);
+  for (const see of [false, true]) {
+    await windowSeeThrough(see);
+    const kind = see ? "see-through" : "solid";
+    for (const tint of [null, ...COLOR_TOKENS]) {
+      await setColor(ids.workspace, tint);
+      for (const color of COLOR_TOKENS) {
+        await setColor(ids.groupA, color);
+        await SvalPanel.refresh();
+        const name = SvalPanel._rowElementFor(ids.groupA).querySelector(
+          ".sval-row-name"
+        );
+        const behind = drawnBehind(name);
+        const ink = paintedOver(rgba(getComputedStyle(name).color), behind);
+        const [hi, lo] = [luminance(ink), luminance(behind)].sort(
+          (a, b) => b - a
+        );
+        const ratio = (hi + 0.05) / (lo + 0.05);
+        if (ratio < 4.5) {
+          failing.push(
+            `${color} in ${tint ?? "no tint"}, ${kind}: ${ratio.toFixed(2)}`
+          );
+        }
       }
     }
   }

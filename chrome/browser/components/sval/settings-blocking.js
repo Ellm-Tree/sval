@@ -111,7 +111,7 @@
         blockingDialogCancel: byId("sval-blocking-dialog-cancel"),
         blockingDialogConfirm: byId("sval-blocking-dialog-confirm"),
         blockingDialogAlt: byId("sval-blocking-dialog-alt"),
-        blockingDialogTile: byId("sval-blocking-dialog-tile"),
+        blockingDialogCard: byId("sval-blocking-dialog-card"),
         blockingDialogMore: byId("sval-blocking-dialog-more"),
         trustedScriptlets: byId("sval-trusted-scriptlets"),
         myFiltersNote: byId("sval-my-filters-note"),
@@ -182,12 +182,12 @@
         this._els.blockingDialogMore.hidden = true;
         this._els.blockingDialogMore.replaceChildren();
         this._els.blockingDialogConfirm.removeAttribute("aria-disabled");
-        this._els.blockingDialogTile.hidden = true;
-        this._els.blockingDialogTile.replaceChildren(this._glyph("trash-2"));
+        this._els.blockingDialogCard.icon = null;
+        this._els.blockingDialogCard.tone = "default";
         delete this._els.blockingDialog.dataset.confirm;
         delete this._els.blockingDialog.dataset.list;
         this._els.blockingDialog.removeAttribute("role");
-        this._els.blockingDialogConfirm.dataset.tone = "primary";
+        this._els.blockingDialogConfirm.type = "primary";
         this._describeBlocking(opener);
       });
       this._els.trustedScriptlets.addEventListener("change", () =>
@@ -505,10 +505,9 @@
       body.textContent = "";
 
       const add = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "add-list" },
         },
         "Add list"
@@ -871,19 +870,18 @@
       }
       category.value = adding.category;
       const confirm = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-button-primary sval-agent-small",
+          type: "primary",
+          className: "sval-agent-small",
           dataset: { svalKey: "adding-list-add" },
         },
         "Add"
       );
       const cancel = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "adding-list-cancel" },
         },
         "Cancel"
@@ -1067,10 +1065,9 @@
       body.textContent = "";
 
       const add = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "add-domain" },
         },
         "Add domain"
@@ -1214,19 +1211,18 @@
         dataset: { svalKey: "adding-domain" },
       });
       const confirm = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-button-primary sval-agent-small",
+          type: "primary",
+          className: "sval-agent-small",
           dataset: { svalKey: "adding-domain-add" },
         },
         "Add"
       );
       const cancel = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "adding-domain-cancel" },
         },
         "Cancel"

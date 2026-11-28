@@ -35,6 +35,9 @@ const { SvalLog } = ChromeUtils.importESModule(
 const { pickerTiming } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalColorPicker.sys.mjs"
 );
+const { paintTint } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs"
+);
 
 const SvalNewWorkspace = {
   /**
@@ -126,7 +129,9 @@ const SvalNewWorkspace = {
       },
       onPickEmoji: () => this._finish("pickEmoji"),
     });
-    this._syncTint();
+    // The card reads the window's colour as it fits the box (`fitFrame`),
+    // and the choice is painted over that.
+    Promise.resolve(document.mozSubdialogReady).then(() => this._syncTint());
     this._showSaveError(this._args.lookError ? "look" : null);
 
     this._els.form.addEventListener("submit", event => {
@@ -134,29 +139,27 @@ const SvalNewWorkspace = {
       this._submit();
     });
     this._els.cancel.addEventListener("click", () => this._finish("cancel"));
-    const focusTarget =
+    const card = document.querySelector("sval-dialog");
+    card.defaultFocus =
       this._args.focus === "emoji" ? this._form.els.emoji : this._form.els.name;
-    // `SubDialog.focus` calls this when the dialog opens, in place of its own
-    // move to the first field it finds.
-    document.subDialogSetDefaultFocus = () => focusTarget.focus();
-    document.subDialogSetDefaultFocus();
+    card.focusDefault();
   },
 
   /**
    * Paints the card in what the choice will look like: for a workspace the
-   * window it will get, opaque, with the colours drawn on it, as
-   * `sval-dialog-frame.js` paints a dialog over a tinted window; for a group
+   * window it will get, opaque, with the colours drawn on it, as a dialog
+   * over a tinted window is painted (`SvalDialogBox.paintTint`); for a group
    * its block on the window under the dialog, or the window's own colour
    * with none chosen.
    */
   _syncTint() {
     if (this._args.tintsWindow) {
-      window.svalPaintDialogTint(this._form.color, {
+      paintTint(document, this._form.color, {
         transparency: this._form.transparency,
       });
       return;
     }
-    window.svalPaintDialogTint(undefined, {
+    paintTint(document, undefined, {
       group: this._form.color,
       on: this._args.blockSurface,
     });

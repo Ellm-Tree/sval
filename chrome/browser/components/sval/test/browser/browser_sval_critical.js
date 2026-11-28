@@ -144,7 +144,7 @@ async function criticalDialog(win = window) {
   await TestUtils.waitForCondition(() => {
     doc = box.dialog?._frame.contentDocument;
     return doc?.querySelector(
-      '.sval-dialog[data-tone="critical"] .sval-dialog-actions button.primary'
+      'sval-dialog[tone="critical"] sval-button[type="primary"]'
     );
   }, "the critical dialog has drawn its buttons");
   return doc;
@@ -166,7 +166,7 @@ async function dialogClosed() {
  */
 function buttonsOf(doc) {
   return Object.fromEntries(
-    [...doc.querySelectorAll(".sval-dialog-actions button")].map(button => [
+    [...doc.querySelectorAll("sval-dialog sval-button")].map(button => [
       button.dataset.button,
       button,
     ])
@@ -207,7 +207,9 @@ add_task(async function a_save_failure_says_nothing_at_first() {
     "Try Again is offered"
   );
   Assert.ok(
-    BrowserTestUtils.isVisible(doc.querySelector(".sval-dialog-close")),
+    BrowserTestUtils.isVisible(
+      doc.querySelector("sval-dialog").shadowRoot.querySelector(".close")
+    ),
     "with a ✕"
   );
 

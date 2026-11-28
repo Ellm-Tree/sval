@@ -105,7 +105,7 @@ add_task(async function the_storage_section_follows_the_folder_while_open() {
   );
   Assert.equal(
     ui.command("chooseInUse"),
-    ui.els.syncButtons.querySelector(".sval-button-primary"),
+    ui.els.syncButtons.querySelector('[type="primary"]'),
     "with choosing the folder again first"
   );
   Assert.ok(

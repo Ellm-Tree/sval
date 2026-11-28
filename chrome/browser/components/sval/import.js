@@ -56,7 +56,8 @@ const SvalImportPage = {
   start() {
     this._args = window.arguments?.[0] ?? {};
     this._els = {
-      form: document.querySelector(".sval-im"),
+      form: document.querySelector("form"),
+      dialog: document.querySelector("sval-dialog"),
       picker: document.querySelector(".sval-im-picker"),
       run: document.querySelector(".sval-im-run"),
       rows: document.querySelector(".sval-im-progress"),
@@ -89,16 +90,6 @@ const SvalImportPage = {
       }
     });
 
-    // The dialog box holds nothing but the page, so it draws the page's
-    // card with its shadow, as first run's does. `SubDialog` clones the box
-    // for this dialog alone.
-    const { shapeDialogBox } = ChromeUtils.importESModule(
-      "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs"
-    );
-    shapeDialogBox(document.querySelector(".sval-im"), {
-      shadow: "0 24px 64px rgba(3, 5, 26, 0.55)",
-    });
-
     // Only first run hands the page a plan, and its Done is where first run
     // ends.
     if (this._args.plan?.length) {
@@ -106,7 +97,7 @@ const SvalImportPage = {
       this._els.done.dataset.ends = "first-run";
       this._showRun();
       this._els.picker.hidden = true;
-      document.mozSubdialogReady = Promise.resolve().then(() => this._fix());
+      this._els.dialog.pending = Promise.resolve().then(() => this._fix());
       return this._run(this._args.plan.map(entry => this._addItem(entry)));
     }
     return this._startPicker();
@@ -143,7 +134,7 @@ const SvalImportPage = {
     // browsers to be drawn if they come in time. The page is then fixed at
     // that height, and a row opened later scrolls inside the list.
     const reading = picker.load();
-    document.mozSubdialogReady = raceTimeout(
+    this._els.dialog.pending = raceTimeout(
       reading.catch(() => {}),
       IMPORT_READ_WAIT_MS,
       window
@@ -154,7 +145,7 @@ const SvalImportPage = {
   /** Fixes the page at its height now, which `SubDialog` sizes the box to. */
   _fix() {
     const root = document.documentElement;
-    root.style.height = `${Math.ceil(this._els.form.getBoundingClientRect().height)}px`;
+    root.style.height = `${Math.ceil(this._els.dialog.getBoundingClientRect().height)}px`;
     root.toggleAttribute("data-sized", true);
   },
 

@@ -41,7 +41,7 @@ async function openPrompt() {
   let doc;
   await TestUtils.waitForCondition(() => {
     doc = gDialogBox.dialog._frame.contentDocument;
-    return doc?.querySelector(".sval-dialog-actions button.primary");
+    return doc?.querySelector('sval-dialog sval-button[type="primary"]');
   }, "the prompt has drawn its buttons");
   return { answer, doc };
 }
@@ -84,15 +84,16 @@ add_task(async function the_launch_question_is_svals_dialog() {
       await expectedTitle(),
       "it asks Firefox's question"
     );
-    const buttons = [...doc.querySelectorAll(".sval-dialog-actions button")];
+    const buttons = [...doc.querySelectorAll("sval-dialog sval-button")];
     Assert.deepEqual(
-      buttons.map(b => b.classList.contains("primary")),
+      buttons.map(b => b.type === "primary"),
       [false, true],
       "Not now, then the primary answer"
     );
-    const icon = doc.querySelector(".sval-dialog-icon");
+    const card = doc.querySelector("sval-dialog");
+    const icon = card.shadowRoot.querySelector(".icon");
     Assert.ok(
-      icon.checkVisibility() && icon.dataset.icon == "sval",
+      icon.checkVisibility() && card.icon == "sval",
       "it shows Sval's mark"
     );
   } finally {
@@ -111,7 +112,7 @@ add_task(async function dont_show_again_turns_the_check_off() {
   const box = doc.querySelector(".sval-dialog-check input");
   Assert.ok(box.checkVisibility(), "the prompt offers not to ask again");
   box.click();
-  doc.querySelector(".sval-dialog-actions button:not(.primary)").click();
+  doc.querySelector('sval-dialog sval-button:not([type="primary"])').click();
   await within(answer, 10_000, "the prompt's answer");
   Assert.ok(
     !Services.prefs.getBoolPref("browser.shell.checkDefaultBrowser"),
@@ -122,7 +123,7 @@ add_task(async function dont_show_again_turns_the_check_off() {
 add_task(async function not_now_keeps_the_check() {
   Services.prefs.setBoolPref("browser.shell.checkDefaultBrowser", true);
   const { answer, doc } = await openPrompt();
-  doc.querySelector(".sval-dialog-actions button:not(.primary)").click();
+  doc.querySelector('sval-dialog sval-button:not([type="primary"])').click();
   await within(answer, 10_000, "the prompt's answer");
   Assert.ok(
     Services.prefs.getBoolPref("browser.shell.checkDefaultBrowser"),

@@ -6,7 +6,7 @@
 
 <!--
   The backup of the sync key, shown by `SvalBackupKey.sys.mjs` in the window's
-  dialog box, in Sval's dialog frame. The code is filled in by `backup-key.js`.
+  dialog box, on Sval's dialog card. The code is filled in by `backup-key.js`.
 -->
 
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
@@ -18,7 +18,6 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>Back up your sync key</title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
     <link
       rel="stylesheet"
       href="chrome://browser/content/sval/sval-dialog.css"
@@ -27,41 +26,34 @@
       rel="stylesheet"
       href="chrome://browser/content/sval/backup-key.css"
     />
-    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/backup-key.js"></script>
   </head>
 
   <body>
-    <div
-      class="sval-dialog sval-backup"
+    <sval-dialog
+      class="sval-backup"
+      icon="key"
       role="dialog"
       aria-labelledby="sval-backup-title"
       aria-describedby="sval-backup-body"
     >
-      <div class="sval-dialog-head">
-        <span
-          class="sval-dialog-icon"
-          data-icon="key"
-          aria-hidden="true"
-        ></span>
-        <div class="sval-dialog-copy">
-          <h1 class="sval-dialog-title" id="sval-backup-title">
-            Back up your sync key
-          </h1>
-          <p class="sval-dialog-body" id="sval-backup-body">
-            The sync key unlocks your synced Workspaces. Only your devices have
-            the sync key. Keep a copy somewhere safe.
-          </p>
-        </div>
-      </div>
+      <h1 slot="title" class="sval-dialog-title" id="sval-backup-title">
+        Back up your sync key
+      </h1>
+      <p slot="body" class="sval-dialog-body" id="sval-backup-body">
+        The sync key unlocks your synced Workspaces. Only your devices have the
+        sync key. Keep a copy somewhere safe.
+      </p>
 
       <div class="sval-dialog-well sval-backup-key">
         <p class="sval-backup-code"></p>
         <div class="sval-backup-key-foot">
           <p class="sval-backup-fingerprint"></p>
-          <button class="sval-dialog-btn sval-backup-copy" type="button">
-            Copy
-          </button>
+          <sval-button class="sval-backup-copy">Copy</sval-button>
         </div>
       </div>
 
@@ -87,21 +79,21 @@
 
       <p class="sval-backup-status" role="status" aria-live="polite"></p>
 
-      <div class="sval-dialog-actions">
-        <button class="sval-dialog-btn sval-backup-print" type="button">
-          Print…
-        </button>
-        <button class="sval-dialog-btn sval-backup-save" type="button">
-          Save to a file…
-        </button>
-        <button
-          class="sval-dialog-btn sval-backup-done primary"
-          type="button"
-          autofocus="autofocus"
-        >
-          Done
-        </button>
-      </div>
-    </div>
+      <sval-button slot="actions" class="sval-backup-print" data-button="print">
+        Print…
+      </sval-button>
+      <sval-button slot="actions" class="sval-backup-save" data-button="save">
+        Save to a file…
+      </sval-button>
+      <sval-button
+        slot="actions"
+        class="sval-backup-done"
+        data-button="ok"
+        type="primary"
+        autofocus="autofocus"
+      >
+        Done
+      </sval-button>
+    </sval-dialog>
   </body>
 </html>

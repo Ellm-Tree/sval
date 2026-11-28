@@ -1,61 +1,59 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
-@import url("chrome://browser/content/sval/sval-type.css");
-
 /*
- * Sval's emoji picker page. Like `sval-panel.css`, every colour, size and space
- * comes from Firefox's design tokens, so the dialog follows the browser's
- * themes.
+ * Sval's emoji picker page, on Sval's dialog card (`sval-dialog`), drawn in
+ * the dialog palette `sval-dialog.css` gives the page: the window's colour
+ * in its modal box, and first run's dark sheet inline.
  */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 .sval-emoji-picker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-small);
-  box-sizing: border-box;
-  width: 36em;
-  padding: var(--space-large);
+  --sval-dialog-width: 36em;
+  --sval-dialog-padding: 16px;
+  --sval-dialog-gap: 8px;
 }
 
 .sval-emoji-tones {
   display: flex;
-  gap: var(--space-xsmall);
+  gap: 4px;
 }
 
 .sval-emoji-tone,
 .sval-emoji-choice {
+  appearance: none;
   margin: 0;
   padding: 0;
   min-width: 0;
   min-height: 0;
   border: none;
-  border-radius: var(--border-radius-small);
+  border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-size: calc(var(--font-size-xxlarge) * 1.6);
+  font: inherit;
+  font-size: calc(1.6rem * 1.6);
   line-height: 1;
+  cursor: pointer;
 }
 
 .sval-emoji-tone {
   flex: 1;
-  padding-block: var(--space-xsmall);
+  padding-block: 4px;
   /* Reserved, so the chosen tone's ring moves nothing. */
   border: 2px solid transparent;
 }
 
-/* The chosen tone is ringed in the selection colour, 3:1 or more on the page
- * in every theme. A border, so a focus outline can show beside it. */
+/* The chosen tone is ringed in the focus colour, 3:1 or more on the card in
+ * every palette. A border, so a focus outline can show beside it. */
 .sval-emoji-tone[aria-checked="true"] {
-  background: var(--background-color-dimmed);
-  border-color: var(--border-color-selected);
+  background: var(--sval-dialog-secondary);
+  border-color: var(--sval-dialog-focus);
 }
 
 /* A transparent border is not kept under forced colours, so the unchosen
  * tones take the page's colour. */
 @media (forced-colors) {
   .sval-emoji-tone {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
     border-color: Canvas;
   }
 }
@@ -71,14 +69,18 @@
   height: 0;
 }
 
-/* The picker's gap separates the grid from the parts across its edges, so
- * each shadow starts at the grid's edge. */
+/* The card's gap separates the tones from the grid, so their shadow starts
+ * at the grid's top edge. */
 .sval-emoji-tones::after {
-  top: calc(100% + var(--space-small));
+  top: calc(100% + var(--sval-dialog-gap));
 }
 
-.sval-emoji-actions::after {
-  bottom: calc(100% + var(--space-small));
+/* No height and no room of its own: its top edge is the grid's bottom edge,
+ * where its shadow ends, and the card's answers stay one gap below the
+ * grid. */
+.sval-emoji-foot {
+  height: 0;
+  margin-block-start: calc(-1 * var(--sval-dialog-gap));
 }
 
 .sval-emoji-group:not([hidden]) {
@@ -93,10 +95,10 @@
 
 .sval-emoji-heading {
   grid-column: 1 / -1;
-  padding: var(--space-small) var(--space-xsmall);
-  color: var(--text-color-deemphasized);
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-semibold);
+  padding: 8px 4px;
+  color: var(--sval-dialog-muted);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .sval-emoji-choice {
@@ -111,41 +113,48 @@
 
 .sval-emoji-tone:hover,
 .sval-emoji-choice:hover {
-  background: var(--background-color-list-item-hover);
+  background: var(--sval-dialog-secondary-hover);
 }
 
 .sval-emoji-tone:focus-visible,
 .sval-emoji-choice:focus-visible {
-  outline: 2px solid var(--focus-outline-color, Highlight);
+  outline: 2px solid var(--sval-dialog-focus);
   outline-offset: -2px;
 }
 
 .sval-emoji-empty {
-  padding: var(--space-xlarge);
-  color: var(--text-color-deemphasized);
+  padding: 24px;
+  color: var(--sval-dialog-muted);
   text-align: center;
 }
 
-.sval-emoji-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-small);
-}
-
 /* In first run's sheet (`emoji-picker.js`), the frame is the sheet's width
- * and the sheet is always dark, so the page takes both. */
+ * and the sheet is always dark, so the page takes both, with the dark
+ * palette's values and no card of its own. */
 :root[data-inline] {
   color-scheme: dark;
+  --sval-dialog-card: transparent;
+  --sval-dialog-text: #ffffff;
+  --sval-dialog-body: var(--sval-palette-ink-300);
+  --sval-dialog-muted: var(--sval-palette-ink-400);
+  --sval-dialog-field: rgba(6, 10, 46, 0.72);
+  --sval-dialog-field-border: var(--sval-palette-ink-400);
+  --sval-dialog-focus: var(--sval-palette-neon);
+  --sval-dialog-secondary: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-dialog-secondary-hover: rgb(var(--sval-palette-wash-dark) / 0.16);
+  --sval-dialog-secondary-ink: #ffffff;
   background: transparent;
 
   body {
-    margin: 0;
     background: transparent;
   }
 
   .sval-emoji-picker {
-    width: auto;
-    padding: 0;
+    --sval-dialog-width: auto;
+    --sval-dialog-padding: 0;
+    border: none;
+    box-shadow: none;
+    animation: none;
   }
 
   .sval-emoji-grid {

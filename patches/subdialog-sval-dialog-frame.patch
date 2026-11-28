@@ -4,15 +4,18 @@ SubDialog loads every dialog Firefox shows in a modal box: Settings', a
 window's and a tab's, the common dialog behind Services.prompt among them.
 Handing each to SvalPageStyle.styleDialog where SubDialog injects its own
 sheets dresses them all in Sval's design, those no list names included.
+Sval's own dialogs draw their card in a shadow root and take none of the
+sheets SubDialog injects, whose rules on native controls would reach the
+fields and buttons a page keeps in its light DOM.
 
 diff --git a/toolkit/modules/SubDialog.sys.mjs b/toolkit/modules/SubDialog.sys.mjs
-index 580222e00c..a2c8c12e70 100644
+index 580222e..6779198 100644
 --- a/toolkit/modules/SubDialog.sys.mjs
 +++ b/toolkit/modules/SubDialog.sys.mjs
 @@ -6,6 +6,10 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
- 
+
  let lazy = {};
- 
+
 +ChromeUtils.defineESModuleGetters(lazy, {
 +  styleDialog: "moz-src:///browser/components/sval/SvalPageStyle.sys.mjs",
 +});
@@ -20,11 +23,17 @@ index 580222e00c..a2c8c12e70 100644
  XPCOMUtils.defineLazyServiceGetter(
    lazy,
    "dragService",
-@@ -374,6 +378,7 @@ SubDialog.prototype = {
-     for (let styleSheetURL of this._injectedStyleSheets) {
-       this.injectStylesheet(styleSheetURL);
+@@ -371,8 +375,11 @@ SubDialog.prototype = {
+       return;
      }
-+    lazy.styleDialog(this._frame);
- 
+
+-    for (let styleSheetURL of this._injectedStyleSheets) {
+-      this.injectStylesheet(styleSheetURL);
++    // Sval's own dialogs draw themselves and take no injected sheet.
++    if (!lazy.styleDialog(this._frame)) {
++      for (let styleSheetURL of this._injectedStyleSheets) {
++        this.injectStylesheet(styleSheetURL);
++      }
+     }
+
      let { contentDocument } = this._frame;
-     // Provide the ability for the dialog to know that it is loaded in a frame

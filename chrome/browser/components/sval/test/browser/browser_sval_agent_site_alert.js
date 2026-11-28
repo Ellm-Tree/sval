@@ -50,7 +50,7 @@ add_task(async function the_alert_shows_outside_text_as_text() {
     ["<u>one</u>", "two"]
   );
   Assert.equal(doc.querySelectorAll("u").length, 0);
-  const buttons = [...doc.querySelectorAll(".sval-aa-actions button")];
+  const buttons = [...doc.querySelectorAll("sval-dialog [data-choice]")];
   Assert.deepEqual(
     buttons.map(b => [b.dataset.choice, b.textContent]),
     [

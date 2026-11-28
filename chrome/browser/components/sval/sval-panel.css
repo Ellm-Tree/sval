@@ -1384,6 +1384,18 @@ menupopup:not([sval-stem]) {
     &:hover {
       --sval-selected-step: 1.2;
     }
+
+    /* A Workspace's colour has its steps solved with its ink
+       (`SvalColor.windowLook`). */
+    :root[data-sval-tint] & {
+      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+      background-color: var(--sval-tint-selected);
+
+      &:hover {
+        /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+        background-color: var(--sval-tint-selected-hover);
+      }
+    }
   }
 }
 

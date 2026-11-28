@@ -65,12 +65,12 @@ add_task(async function an_app_on_the_machine_connects_and_disconnects() {
     "an app that is not installed says so"
   );
   Assert.ok(
-    !row("Claude Desktop").querySelector("button"),
+    !row("Claude Desktop").querySelector("button, sval-button"),
     "and has nothing to press"
   );
 
   const message = doc.getElementById("sval-agent-clients-message");
-  row("Cursor").querySelector("button").click();
+  row("Cursor").querySelector("sval-button").click();
   await TestUtils.waitForCondition(
     () =>
       message.dataset.said === "connected" &&
@@ -86,7 +86,7 @@ add_task(async function an_app_on_the_machine_connects_and_disconnects() {
     "Cursor is shown connected"
   );
 
-  row("Cursor").querySelector("button").click();
+  row("Cursor").querySelector("sval-button").click();
   await TestUtils.waitForCondition(
     () =>
       message.dataset.said === "disconnected" &&
@@ -160,7 +160,7 @@ add_task(async function a_moved_entry_changes_only_when_connect_is_pressed() {
     "opening and coming back to Settings leave Cursor's settings as they are"
   );
 
-  row("Cursor").querySelector("button").click();
+  row("Cursor").querySelector("sval-button").click();
   await TestUtils.waitForCondition(
     () =>
       doc.getElementById("sval-agent-clients-message").dataset.said ===
@@ -194,7 +194,7 @@ add_task(async function a_broken_entry_changes_only_when_fix_is_pressed() {
     "opening Settings leaves Cursor's settings as they are"
   );
 
-  row("Cursor").querySelector("button").click();
+  row("Cursor").querySelector("sval-button").click();
   await TestUtils.waitForCondition(
     () =>
       doc.getElementById("sval-agent-clients-message").dataset.said ===

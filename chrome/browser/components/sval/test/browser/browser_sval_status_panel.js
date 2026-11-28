@@ -58,6 +58,8 @@ function labelCut() {
   return getComputedStyle(gBrowser.selectedBrowser).maskPosition.split(", ")[1];
 }
 
+add_setup(solidWindows);
+
 add_task(async function a_plain_window_paints_the_tab_over_the_page() {
   await showLink();
   try {

@@ -260,7 +260,7 @@ add_task(async function edit_address_refuses_a_non_address() {
   const menu = await contextOn(await itemIn(popup, n => n.uri === A));
   await chooseMenuItem(menu, "editAddress");
   const doc = await typeInto("javascript:alert(1)");
-  const buttons = doc.querySelectorAll(".sval-dialog-actions button");
+  const buttons = doc.querySelectorAll("sval-dialog sval-button");
   await TestUtils.waitForCondition(
     () => doc.querySelector(".sval-dialog-error").textContent,
     "a reason shows"
@@ -1356,18 +1356,13 @@ add_task(async function import_says_it_brings_favorites() {
     const exportButton = doc.getElementById("data-export");
     Assert.ok(exportButton, "and Export beside it");
     exportButton.click();
-    const page = await TestUtils.waitForCondition(
-      () =>
-        gDialogBox.dialog?._frame.contentDocument?.querySelector(
-          ".sval-ex-cancel"
-        ),
+    const { doc: page } = await openedSvalDialog();
+    Assert.ok(
+      page.querySelector(".sval-ex-cancel"),
       "Export opens the export page"
     );
-    const closed = BrowserTestUtils.waitForEvent(
-      gDialogBox.dialog._frame.contentWindow,
-      "unload"
-    );
-    page.click();
+    const closed = BrowserTestUtils.waitForEvent(page.defaultView, "unload");
+    await pressDialogButton(page, "cancel");
     await within(closed, 10_000, "Cancel closing the page");
   });
 });

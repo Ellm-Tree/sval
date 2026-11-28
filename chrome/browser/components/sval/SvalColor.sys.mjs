@@ -226,6 +226,8 @@ function meets(ink, S, req) {
 const WHITE = [1, 1, 1];
 const BLACK = [0, 0, 0];
 const MIDNIGHT = hexToRgb("#060a2e");
+// `--sval-palette-blue` (`sval-tokens.css`), the fill of what is on.
+const ACTION = hexToRgb("#1f6bff");
 
 // The ink side for a surface: the side whose purest ink meets req, and when
 // both or neither do, the one APCA rates higher; and whether either meets it.
@@ -767,6 +769,24 @@ export function maxTransparency() {
 
 const MAX_TRANSPARENCY = 0.65;
 
+/**
+ * Sval's default window: a Workspace that holds no transparency of its own
+ * is this see-through (decision 0057). A transparency the user chose, 0
+ * included, is kept as chosen.
+ */
+export const DEFAULT_TRANSPARENCY = 0.3;
+
+/**
+ * A Workspace's transparency as its window shows it.
+ *
+ * @param {number|null|undefined} stored As the appearance group holds it
+ *   (`SvalTree.appearanceOf`), null for none.
+ * @returns {number}
+ */
+export function transparencyOf(stored) {
+  return stored ?? DEFAULT_TRANSPARENCY;
+}
+
 // What each window material shows on average, gamma sRGB, a neutral grey in
 // each appearance of the material. `hud` was measured on macOS 26 in Sval's
 // window with a clear root: over black and over white wallpapers the dark
@@ -942,6 +962,32 @@ function rolesOf(tint, more, side) {
   if (!meets(strong, S, R.body)) {
     strong = dark ? WHITE : BLACK;
   }
+  // The selected row steps as `sval-panel.css` steps an untinted window's,
+  // a further fifth while hovered, and eases back toward the window until
+  // the window's strong ink reads on it. A window whose ink only just reads
+  // on it steps away from the ink instead, so the row still stands out.
+  const selectedAt = scale => {
+    const step = (dark ? 0.17 : -0.12) * scale;
+    for (let i = 10; i >= -10; i--) {
+      const fill = quantize(oklch(L + (step * i) / 10, C + 0.02, h));
+      if (i && meets(strong, solid(fill), R.body)) {
+        return fill;
+      }
+    }
+    return tint;
+  };
+  const selected = selectedAt(1);
+  const selectedHover = selectedAt(1.2);
+  // An on switch is told from an off one by its fill alone (WCAG 1.4.11):
+  // Sval's blue, moved off the window and its popups' surface
+  // (`sval-tokens.css`) until it stands apart from both.
+  const popup = solid(quantize(oklch(L + (dark ? 0.04 : -0.04), C, h)));
+  const [aL, aC, ah] = toOklch(ACTION);
+  const apart = rgb => meets(rgb, S, R.line) && meets(rgb, popup, R.line);
+  let switchOn = ACTION;
+  for (let i = 1; i <= 100 && !apart(switchOn); i++) {
+    switchOn = quantize(oklch(aL + (dark ? i : -i) / 100, aC, ah));
+  }
   const tc = Math.min(C, 0.02);
   const mc = Math.min(C, 0.05);
   const fieldSide = sideFor(FS, R.body);
@@ -959,8 +1005,18 @@ function rolesOf(tint, more, side) {
     fieldMuted: solveInk(h, mc, FS, R.muted, fieldSide),
     secondary,
     secondaryInk: solveInk(h, tc, SS, R.body, sideFor(SS, R.body)),
+    selected,
+    selectedHover,
+    switchOn,
     focus: scoreOf(focusRgb, S).w >= 3 ? focusRgb : strong,
-    surfaces: { window: S, field: FS, secondary: SS },
+    surfaces: {
+      window: S,
+      field: FS,
+      secondary: SS,
+      popup,
+      selected: solid(selected),
+      selectedHover: solid(selectedHover),
+    },
   };
 }
 
@@ -1126,6 +1182,9 @@ export function windowProperties(look) {
     "--sval-tint-secondary": css(look.secondary, k),
     "--sval-tint-secondary-ink": css(look.secondaryInk),
     "--sval-tint-focus": css(look.focus),
+    "--sval-tint-selected": css(look.selected),
+    "--sval-tint-selected-hover": css(look.selectedHover),
+    "--sval-tint-switch-on": css(look.switchOn),
     "--sval-tint-l": String(+look.block.l.toFixed(4)),
     // A group's block lets through half of what the window does, so it reads
     // as tinted glass and keeps its colour; its text is solved on the solid
@@ -1525,6 +1584,8 @@ export const SvalColor = Object.freeze({
   markOf,
   maxChroma,
   maxTransparency,
+  DEFAULT_TRANSPARENCY,
+  transparencyOf,
   seeThroughMaterial,
   nearestIndex,
   oklch,

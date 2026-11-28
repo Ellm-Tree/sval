@@ -19,6 +19,8 @@
  * `SvalPanelModel`'s, so they are testable without a window.
  */
 
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
+
 const PICKER_URL = "chrome://browser/content/sval/emoji-picker.xhtml";
 
 /**
@@ -94,13 +96,10 @@ export async function chooseEmoji(win, initial = "") {
     initial,
     tone: lastTone,
     result: null,
-    // Read by `gDialogBox.open` while the window is in a modal state; see
-    // `SvalAgentAlerts.askToPair`.
-    getProperty: name => name === "async",
   };
-  // Only the browser window has a `gDialogBox`; elsewhere there is nowhere to
-  // show one, which reads as a dismissal.
-  await win.gDialogBox?.open(PICKER_URL, args);
+  // A window with no modal box has nowhere to show one, which reads as a
+  // dismissal.
+  await openSvalDialogPage(win, PICKER_URL, args);
   lastTone = args.tone ?? null;
   return args.result ?? { ok: false, value: "" };
 }

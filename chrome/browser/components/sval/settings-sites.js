@@ -271,10 +271,9 @@
         this._describeSites();
       });
       const add = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "add-site" },
         },
         "Add site"
@@ -547,10 +546,9 @@
           title = `Puts ${name} back to the defaults. Addresses on ${name} keep their choices. Cookies and logins stay.`;
         }
         const reset = this._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button sval-agent-small sval-sites-reset",
+            className: "sval-agent-small sval-sites-reset",
             ariaLabel: `Reset ${name}`,
             title,
             dataset: { svalKey: `remove-site:${name}` },
@@ -568,7 +566,7 @@
       }
       row.append(cell, this._glyph("sc-next", "sval-sites-chevron"));
       row.addEventListener("click", event => {
-        if (!event.target.closest("button, a")) {
+        if (!event.target.closest("button, sval-button, a")) {
           link.click();
         }
       });
@@ -680,19 +678,18 @@
         dataset: { svalKey: "adding-site" },
       });
       const confirm = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-button-primary sval-agent-small",
+          type: "primary",
+          className: "sval-agent-small",
           dataset: { svalKey: "adding-site-add" },
         },
         "Add"
       );
       const cancel = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "adding-site-cancel" },
         },
         "Cancel"
@@ -813,10 +810,9 @@
       );
       if (!this._privateWindow) {
         const show = this._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button sval-agent-small sval-sites-hidden-show",
+            className: "sval-agent-small sval-sites-hidden-show",
             ariaLabel: `Show ${entry.shown} again`,
             dataset: { svalKey: `hidden-show:${site}:${at}` },
           },
@@ -917,7 +913,8 @@
         ? "reset-with-exceptions"
         : "reset";
       els.blockingDialog.setAttribute("role", "alertdialog");
-      els.blockingDialogTile.hidden = false;
+      els.blockingDialogCard.icon = "trash";
+      els.blockingDialogCard.tone = "danger";
       els.blockingDialogTitle.textContent = `Reset ${site}?`;
       els.blockingDialogBody.textContent =
         (exceptions
@@ -938,7 +935,7 @@
       );
       els.blockingDialogMore.hidden = false;
       els.blockingDialogConfirm.textContent = `Reset and delete ${counted(count, "rule")}`;
-      els.blockingDialogConfirm.dataset.tone = "danger";
+      els.blockingDialogConfirm.type = "danger";
       this._showBlockingDialog(els.sitesBody);
       els.blockingDialogCancel.focus();
     },

@@ -4,19 +4,19 @@
 @import url("chrome://browser/content/sval/sval-icons.css");
 
 /*
- * Sval's workspace and group dialog, on `sval-dialog.css`'s frame, with the
- * colour section's look in `sval-color-picker.css`. The card's colour while
- * a workspace's colour is chosen is set inline (`sval-dialog-frame.js`),
- * because none is a value a stylesheet can name.
+ * Sval's workspace and group dialog, on Sval's dialog card (`sval-dialog`),
+ * with the colour section's look in `sval-color-picker.css`. The card's
+ * colour while a workspace's colour is chosen is set inline
+ * (`SvalDialogBox.paintTint`), because none is a value a stylesheet can name.
  */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 /* As wide as the colours in one row, and never narrower than the frame's
  * usual width. The name field takes whatever the row leaves it. */
-.sval-nw {
-  width: max-content;
-  min-width: max(400px, 100%);
-  max-width: none;
+.sval-nw > sval-dialog {
+  --sval-dialog-width: max-content;
+  --sval-dialog-min-width: max(400px, 100%);
+  --sval-dialog-max-width: none;
 }
 
 .sval-nw-row {

@@ -193,7 +193,9 @@
       }
       // Disabled rather than `inert`, which would hide the card's state from
       // a screen reader too.
-      for (const control of section.querySelectorAll("button, input")) {
+      for (const control of section.querySelectorAll(
+        "button, sval-button, input"
+      )) {
         control.disabled = true;
       }
     },
@@ -392,7 +394,7 @@
       ) {
         // The state's own way forward, else the folder's.
         (
-          this._els.syncButtons.querySelector("button") ??
+          this._els.syncButtons.querySelector("sval-button") ??
           (this._els.storageChange.hidden
             ? this._els.storageChoose
             : this._els.storageChange)

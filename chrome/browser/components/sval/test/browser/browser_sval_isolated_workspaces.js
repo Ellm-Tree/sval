@@ -135,7 +135,7 @@ async function answerDialog(ok) {
     "the dialog has drawn its buttons"
   );
   const seen = {
-    tone: doc.querySelector(".sval-dialog").dataset.tone,
+    tone: doc.querySelector("sval-dialog").tone,
     body: doc.getElementById("sval-dialog-body").textContent,
   };
   doc.querySelector(`[data-button="${ok ? "ok" : "cancel"}"]`).click();

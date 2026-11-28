@@ -10,6 +10,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
 import {
   clearInterval,
   clearTimeout,
@@ -354,22 +355,14 @@ export async function askToPair(
   // permanent private browsing `getTopWindow` ignores `private`
   // (`BrowserWindowTracker.getTopWindow`), so the window is checked too.
   const win = lazy.BrowserWindowTracker.getTopWindow({ private: false });
-  if (!win?.gDialogBox || lazy.PrivateBrowsingUtils.isWindowPrivate(win)) {
+  if (!win || lazy.PrivateBrowsingUtils.isWindowPrivate(win)) {
     return { action: "no_window" };
   }
-  const args = {
-    label,
-    facts,
-    isolated,
-    again,
-    result: null,
-    // While the window is in a modal state, `gDialogBox.open` reads this as
-    // an `nsIPropertyBag` and refuses a caller that is not "async", since a
-    // synchronous one would deadlock (browser/base/content/browser.js). This
-    // caller only awaits the dialog.
-    getProperty: name => name === "async",
-  };
-  const closed = win.gDialogBox.open(DIALOG_URL, args);
+  const args = { label, facts, isolated, again, result: null };
+  const closed = openSvalDialogPage(win, DIALOG_URL, args);
+  if (!closed) {
+    return { action: "no_window" };
+  }
   drawAttention(win);
   if (!(await closedInPlace(win, closed))) {
     return { action: "no_window" };
@@ -424,7 +417,7 @@ export async function ask(
         }
       : choice;
   let args = null;
-  if (!win || win.closed || !win.gDialogBox) {
+  if (!win || win.closed) {
     return answer("no_window");
   }
   args = {
@@ -439,10 +432,11 @@ export async function ask(
     scopes: scope,
     scope: scope?.value ?? null,
     result: null,
-    // See `askToPair`.
-    getProperty: name => name === "async",
   };
-  const closed = win.gDialogBox.open(ALERT_URL, args);
+  const closed = openSvalDialogPage(win, ALERT_URL, args);
+  if (!closed) {
+    return answer("no_window");
+  }
   drawAttention(win);
   if (!(await closedInPlace(win, closed))) {
     return answer("no_window");

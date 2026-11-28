@@ -70,6 +70,7 @@ const { SvalWorkspaceJar } = ChromeUtils.importESModule(
 
 add_setup(async function the_window_is_ready() {
   await within(SvalPanel.started, 10_000, "the panel starting");
+  await solidWindows();
 });
 
 const gAccService = Cc["@mozilla.org/accessibilityService;1"].getService(
@@ -269,6 +270,11 @@ add_task(async function the_dialog_starts_with_an_emoji_and_asks_a_name() {
   Assert.equal(node.content.name, "Errands", "the workspace has the name");
   Assert.ok(!node.appearance?.color, "no colour");
   Assert.equal(
+    node.appearance?.transparency,
+    SvalColor.DEFAULT_TRANSPARENCY,
+    "at the transparency the dialog started with, Sval's default"
+  );
+  Assert.equal(
     node.appearance?.emoji,
     offered,
     "and the emoji the dialog started with"
@@ -286,7 +292,7 @@ add_task(async function a_chosen_colour_is_in_the_workspace() {
   const { doc, made } = await openDialog();
   const view = doc.defaultView;
   const card = () =>
-    view.getComputedStyle(doc.querySelector(".sval-nw")).backgroundColor;
+    view.getComputedStyle(doc.querySelector("sval-dialog")).backgroundColor;
   const untinted = card();
 
   typeName(doc, "Reading");
@@ -489,7 +495,7 @@ add_task(async function new_group_has_the_colour_and_emoji_pickers() {
   );
 
   const card = () =>
-    doc.defaultView.getComputedStyle(doc.querySelector(".sval-nw"))
+    doc.defaultView.getComputedStyle(doc.querySelector("sval-dialog"))
       .backgroundColor;
   typeName(doc, "Recipes");
   clickSwatch(doc, "orange");
@@ -641,7 +647,7 @@ add_task(async function the_panels_questions_are_drawn_inside_the_window() {
       () => chooseOnRow(ids.groupA, "deleteGroup"),
     ]) {
       await ask();
-      const doc = await dialogDocument(".sval-dialog-actions button");
+      const doc = await dialogDocument("sval-dialog sval-button");
       Assert.equal(
         doc.documentURI,
         "chrome://browser/content/sval/sval-dialog.xhtml",
@@ -762,9 +768,9 @@ add_task(async function a_deletion_starts_on_cancel() {
   const { engine, ids } = await withFreshPanel();
   const before = Object.keys((await engine.tree()).nodes).sort();
   await chooseOnRow(ids.groupA, "deleteGroup");
-  let doc = await dialogDocument(".sval-dialog-actions button");
+  let doc = await dialogDocument("sval-dialog sval-button");
   Assert.equal(
-    doc.querySelector(".sval-dialog").dataset.tone,
+    doc.querySelector("sval-dialog").tone,
     "danger",
     "the dialog is drawn as a danger"
   );
@@ -782,8 +788,8 @@ add_task(async function a_deletion_starts_on_cancel() {
   );
 
   await chooseOnRow(ids.groupA, "deleteGroup");
-  doc = await dialogDocument(".sval-dialog-extra");
-  doc.querySelector(".sval-dialog-extra").click();
+  doc = await dialogDocument('sval-dialog [data-button="extra"]');
+  doc.querySelector('sval-dialog [data-button="extra"]').click();
   await dialogGone(doc);
   await dismissUndoMessage();
   let after = (await engine.tree()).nodes;
@@ -797,7 +803,7 @@ add_task(async function a_deletion_starts_on_cancel() {
   }
 
   await chooseOnRow(ids.groupB, "deleteGroup");
-  doc = await dialogDocument(".sval-dialog-extra");
+  doc = await dialogDocument('sval-dialog [data-button="extra"]');
   doc.querySelector('[data-button="ok"]').click();
   await dialogGone(doc);
   await dismissUndoMessage();

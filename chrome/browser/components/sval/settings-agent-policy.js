@@ -950,10 +950,9 @@
       });
 
       const remove = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small sval-rule-remove",
+          className: "sval-agent-small sval-rule-remove",
           ariaLabel: `Remove rule for ${site}`,
           dataset: { svalKey: `remove:${id}:${site}` },
         },
@@ -1506,19 +1505,18 @@
         dataset: { svalKey: `adding-scope:${id}` },
       });
       const confirm = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-button-primary sval-agent-small",
+          type: "primary",
+          className: "sval-agent-small",
           dataset: { svalKey: `adding-add:${id}` },
         },
         "Add"
       );
       const cancel = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: `adding-cancel:${id}` },
         },
         "Cancel"

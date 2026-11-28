@@ -31,7 +31,7 @@ Object.assign(SvalPanel, {
   /**
    * The Workspace colour the window wears ({@link _applyWindowTint}), or
    * null: Sval's dialogs over the window solve their card from it
-   * (`sval-dialog-frame.js`).
+   * (`SvalDialogBox.fitFrame`).
    *
    * @type {string|object|null}
    */
@@ -148,9 +148,10 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * How see-through a workspace asks its window to be, as stored, with no
-   * colour too, since no colour is Sval's own (`SvalColor.windowLook`): 0
-   * for an agent's, which wears the agent's hue ({@link workspaceColor}).
+   * How see-through a workspace asks its window to be, as stored or Sval's
+   * default when it holds none (`SvalColor.transparencyOf`), with no colour
+   * too, since no colour is Sval's own (`SvalColor.windowLook`): 0 for an
+   * agent's, which wears the agent's hue ({@link workspaceColor}).
    *
    * @param {string|null} id A workspace id.
    * @returns {number}
@@ -161,7 +162,9 @@ Object.assign(SvalPanel, {
     if (!id || agentLabelOf(this._nodes, id, this.switcher.devices())) {
       return 0;
     }
-    return appearanceOf(this._nodes, id).transparency ?? 0;
+    return this._modules.SvalColor.transparencyOf(
+      appearanceOf(this._nodes, id).transparency
+    );
   },
 
   /**

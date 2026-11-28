@@ -174,7 +174,7 @@ add_task(async function the_confirm_lists_what_the_site_holds() {
     "only the parts holding something, each in its group"
   );
   ok(ui.doc.querySelector(".sval-forget-foot"), "the foot line");
-  is(forget.confirm().dataset.tone, "danger", "in danger red");
+  is(forget.confirm().type, "danger", "in danger red");
   is(page.document.activeElement.id, "sval-blocking-dialog-cancel", "Cancel");
 
   ui.byId("sval-blocking-dialog-cancel").click();
@@ -271,12 +271,12 @@ add_task(async function a_failed_part_says_so_and_retries_alone() {
   is(SvalSiteProtections.ruleFor(SITE).protections, undefined, "the rest went");
   is(
     page.document.activeElement,
-    alert.querySelector("button"),
+    alert.querySelector("sval-button"),
     "focus on Try again"
   );
 
   await SvalTestDeny.allow(storage);
-  alert.querySelector("button").click();
+  alert.querySelector("sval-button").click();
   await until(() => alert.hidden, "the note going once it worked");
   is(page.document.activeElement, ui.byId("sval-site-title"), "focus on h1");
   await until(

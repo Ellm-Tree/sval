@@ -149,7 +149,7 @@ add_task(async function always_allows_one_tool_as_it_is_defined() {
   Assert.ok(text.includes("order"), "the alert names the tool");
   Assert.ok(text.includes(ORDER_DESCRIPTION), "and what the site says");
   Assert.ok(text.includes('"item": "boots"'), "and the input");
-  const buttons = [...doc.querySelectorAll(".sval-aa-actions button")];
+  const buttons = [...doc.querySelectorAll("sval-dialog [data-choice]")];
   Assert.deepEqual(
     buttons.map(b => b.dataset.choice),
     ["allow", "allow_always", "deny_always", "deny"]
@@ -299,7 +299,7 @@ add_task(async function ask_asks_about_every_call() {
   });
   const doc = await alertIn(win);
   Assert.ok(
-    !doc.querySelector('.sval-aa-actions button[data-choice="allow_always"]'),
+    !doc.querySelector('sval-dialog [data-choice="allow_always"]'),
     "no Always under ask"
   );
   await choose(doc, "allow");

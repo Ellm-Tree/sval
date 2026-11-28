@@ -30,6 +30,8 @@ const { SvalColor } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalColor.sys.mjs"
 );
 
+add_setup(solidWindows);
+
 /**
  * Each emoji under test is a different number of code points: a one-code-point
  * emoji passes with any implementation, including a wrong one.
@@ -790,10 +792,10 @@ add_task(async function a_dialog_wears_the_workspaces_tint() {
     let doc;
     await TestUtils.waitForCondition(() => {
       doc = gDialogBox.dialog._frame.contentDocument;
-      return doc?.querySelector(".sval-dialog-actions button");
+      return doc?.querySelector("sval-dialog sval-button");
     }, "the dialog has drawn its buttons");
     const card = InspectorUtils.colorToRGBA(
-      doc.defaultView.getComputedStyle(doc.querySelector(".sval-dialog"))
+      doc.defaultView.getComputedStyle(doc.querySelector("sval-dialog"))
         .backgroundColor
     );
     gDialogBox.dialog.close();

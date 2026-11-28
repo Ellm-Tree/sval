@@ -151,8 +151,8 @@
       // card holds its dialogs, so one listener there hears them too.
       for (const holder of [this._els.storageSection, this._els.syncAdvanced]) {
         holder.addEventListener("click", event => {
-          const command = event.target.closest("button[data-command]")?.dataset
-            .command;
+          const command =
+            event.target.closest("[data-command]")?.dataset.command;
           if (command) {
             this.runSyncCommand(command);
           }
@@ -275,11 +275,10 @@
         this._shownSyncActions = actionsKey;
         els.syncButtons.replaceChildren(
           ...actions.map((action, index) => {
-            const button = document.createElement("button");
-            button.className =
-              index === 0 && action === page.primary
-                ? "sval-button sval-button-primary"
-                : "sval-button";
+            const button = document.createElement("sval-button");
+            if (index === 0 && action === page.primary) {
+              button.type = "primary";
+            }
             button.dataset.command = action.command;
             button.textContent = action.label;
             button.disabled = !!action.disabled || page.working !== null;

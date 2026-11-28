@@ -295,17 +295,24 @@ add_task(async function transparency_is_kept_and_shown_where_it_can_be() {
   }
   const { engine, ids } = await withFreshPanel();
   const { doc, closed } = await openEdit(ids.workspace);
-  clickSwatch(doc, "blue");
   const root = document.documentElement;
   const rootAlpha = () =>
     InspectorUtils.colorToRGBA(getComputedStyle(root).backgroundColor).a;
+  const transparency = sliderNamed(doc, "Transparency");
+  Assert.equal(
+    transparency.getAttribute("aria-valuetext"),
+    `${Math.round(SvalColor.DEFAULT_TRANSPARENCY * 100)}%`,
+    "a Workspace that holds no transparency opens at Sval's default"
+  );
+  Assert.less(rootAlpha(), 1, "and its window shows through");
+  clickSwatch(doc, "blue");
+  transparency.focus();
+  EventUtils.synthesizeKey("KEY_Home", {}, doc.defaultView);
   Assert.equal(
     rootAlpha(),
     1,
     "at no transparency the window's one background is whole"
   );
-  const transparency = sliderNamed(doc, "Transparency");
-  transparency.focus();
   EventUtils.synthesizeKey("KEY_End", {}, doc.defaultView);
   Assert.less(
     rootAlpha(),
@@ -421,7 +428,7 @@ add_task(async function a_groups_dialog_wears_its_block() {
   const { doc, closed } = await openEdit(ids.groupA);
   const view = doc.defaultView;
   const card = () =>
-    view.getComputedStyle(doc.querySelector(".sval-nw")).backgroundColor;
+    view.getComputedStyle(doc.querySelector("sval-dialog")).backgroundColor;
   const painted = colour => {
     const probe = doc.body.appendChild(doc.createElement("div"));
     probe.style.backgroundColor = colour;

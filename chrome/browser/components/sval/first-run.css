@@ -78,7 +78,12 @@ body {
   background: var(--ink-850);
 }
 
+/* First run's card (`sval-dialog`), one grid cell every step's section
+ * shares. The box draws its shadow. */
 .sval-fr {
+  --sval-dialog-padding: 0;
+  --sval-dialog-gap: 0;
+  --sval-dialog-shadow: 0 24px 64px rgba(3, 5, 26, 0.55);
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   box-sizing: border-box;

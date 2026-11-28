@@ -512,11 +512,11 @@ async function dialogGoneFrom(win, doc) {
  * @param {string} value
  */
 async function answerNameDialog(win, value) {
-  const doc = await dialogIn(win, ".sval-dialog-actions button");
+  const doc = await dialogIn(win, "sval-dialog sval-button");
   const input = doc.querySelector(".sval-dialog-input");
   input.value = value;
   input.dispatchEvent(new doc.defaultView.Event("input", { bubbles: true }));
-  doc.querySelector('.sval-dialog-actions [data-button="ok"]').click();
+  doc.querySelector('sval-dialog [data-button="ok"]').click();
   await dialogGoneFrom(win, doc);
 }
 

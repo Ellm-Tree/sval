@@ -14,6 +14,8 @@
  * then opens this dialog again with what the user had entered.
  */
 
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
+
 const DIALOG_URL = "chrome://browser/content/sval/new-workspace.xhtml";
 
 /**
@@ -47,12 +49,9 @@ export async function askNewContainer(win, state) {
     // A group's swatches are its block on the window under the dialog.
     blockSurface: win.SvalPanel?.windowBlockSurface() ?? null,
     result: null,
-    // Read by `gDialogBox.open` while the window is in a modal state; see
-    // `SvalAgentAlerts.askToPair`.
-    getProperty: name => name === "async",
   };
-  // Only the browser window has a `gDialogBox`; elsewhere there is nowhere to
-  // show one, which reads as a dismissal.
-  await win.gDialogBox?.open(DIALOG_URL, args);
+  // A window with no modal box has nowhere to show one, which reads as a
+  // dismissal.
+  await openSvalDialogPage(win, DIALOG_URL, args);
   return args.result ?? { action: "cancel" };
 }

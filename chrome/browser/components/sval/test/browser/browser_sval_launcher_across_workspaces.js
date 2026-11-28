@@ -164,10 +164,10 @@ async function parentOf(engine, id) {
  * @returns {Promise<string>} the dialog's title.
  */
 async function answerDialog(ok) {
-  const doc = await dialogDocument('.sval-dialog-btn[data-button="ok"]');
+  const doc = await dialogDocument('sval-button[data-button="ok"]');
   const title = doc.querySelector(".sval-dialog-title").textContent;
   doc
-    .querySelector(`.sval-dialog-btn[data-button="${ok ? "ok" : "cancel"}"]`)
+    .querySelector(`sval-button[data-button="${ok ? "ok" : "cancel"}"]`)
     .click();
   return title;
 }

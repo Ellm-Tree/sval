@@ -19,18 +19,25 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>Emoji</title>
-    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
     <link
       rel="stylesheet"
       href="chrome://browser/content/sval/emoji-picker.css"
     />
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
     <script src="chrome://browser/content/sval/emoji-picker.js"></script>
   </head>
 
   <body>
-    <div class="sval-emoji-picker">
+    <sval-dialog class="sval-emoji-picker" role="dialog" aria-label="Emoji">
       <input
-        class="sval-emoji-search"
+        class="sval-dialog-input sval-emoji-search"
         type="search"
         placeholder="Search emoji"
         aria-label="Search emoji"
@@ -50,13 +57,22 @@
         aria-label="Emoji"
         tabindex="-1"
       ></div>
+      <!-- Where the grid ends, the part across its bottom edge: its shadow
+           falls over the rows past that edge (`SvalDom.shadeScrollEdges`). -->
+      <div class="sval-emoji-foot sval-edge-below" aria-hidden="true"></div>
       <div class="sval-emoji-empty" role="status" hidden="hidden">
         No emoji match.
       </div>
-      <div class="sval-emoji-actions sval-edge-below">
-        <button class="sval-emoji-none" type="button">No emoji</button>
-        <button class="sval-emoji-cancel" type="button">Cancel</button>
-      </div>
-    </div>
+      <sval-button slot="actions" class="sval-emoji-none" data-button="none">
+        No emoji
+      </sval-button>
+      <sval-button
+        slot="actions"
+        class="sval-emoji-cancel"
+        data-button="cancel"
+      >
+        Cancel
+      </sval-button>
+    </sval-dialog>
   </body>
 </html>

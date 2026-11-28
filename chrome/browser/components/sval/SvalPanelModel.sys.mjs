@@ -1309,7 +1309,9 @@ export function randomWorkspaceEmoji(groups, random = Math.random) {
  * the same rules as every other write of them, so the document never holds a
  * colour this build cannot draw or more than one emoji. Only a Workspace
  * keeps a transparency, with no colour too: no colour is Sval's own, which
- * can be see-through like any other (`SvalColor.windowLook`).
+ * can be see-through like any other (`SvalColor.windowLook`). A chosen 0 is
+ * kept, since a Workspace that holds none is Sval's default
+ * (`SvalColor.transparencyOf`).
  *
  * @param {boolean} ok Whether the dialog was accepted.
  * @param {{name: string, color: string|object|null, emoji: string,
@@ -1326,10 +1328,8 @@ export function chosenContainer(ok, answer, kind = "workspace") {
   }
   const color = colorOf(answer.color, kind);
   const transparency =
-    kind === "workspace" &&
-    Number.isFinite(answer.transparency) &&
-    answer.transparency > 0
-      ? Math.min(1, answer.transparency)
+    kind === "workspace" && Number.isFinite(answer.transparency)
+      ? Math.min(1, Math.max(0, answer.transparency))
       : null;
   return {
     name,

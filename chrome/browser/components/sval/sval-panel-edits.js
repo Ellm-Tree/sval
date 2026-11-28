@@ -60,9 +60,9 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * The operation that gives a workspace or group being made the colour and
-   * emoji its dialog chose, for the batch that makes it; none if it chose
-   * neither.
+   * The operation that gives a workspace or group being made the colour,
+   * emoji and transparency its dialog chose, for the batch that makes it;
+   * none if it chose none of them.
    *
    * @param {string} id The new node.
    * @param {{color: string|object|null, emoji: string|null,
@@ -71,7 +71,7 @@ Object.assign(SvalPanel, {
    * @returns {object[]}
    */
   _chosenAppearanceOps(id, made) {
-    if (!made.color && !made.emoji) {
+    if (!made.color && !made.emoji && made.transparency === null) {
       return [];
     }
     return [
@@ -108,6 +108,7 @@ Object.assign(SvalPanel, {
       tintsWindow: true,
       name,
       color: null,
+      transparency: this._modules.SvalColor.DEFAULT_TRANSPARENCY,
       emoji:
         randomWorkspaceEmoji(drawableEmojiGroups(EMOJI_GROUPS, document)) ?? "",
       isolated: false,
@@ -398,10 +399,15 @@ Object.assign(SvalPanel, {
       }
       const keep = sameColor(fields.color, held.color);
       const color = keep ? held.color : made.color;
+      // The dialog opens on what the window shows, which for a Workspace
+      // that holds no transparency is Sval's default; left there, the
+      // Workspace keeps holding none.
+      const shown =
+        kind === "workspace"
+          ? SvalColor.transparencyOf(held.transparency)
+          : held.transparency;
       const transparency =
-        keep && fields.transparency === held.transparency
-          ? held.transparency
-          : made.transparency;
+        fields.transparency === shown ? held.transparency : made.transparency;
       if (made.name !== held.name) {
         wrote = true;
         await this._engine.mutate({
@@ -477,7 +483,7 @@ Object.assign(SvalPanel, {
         tintsWindow: node.kind === WORKSPACE,
         name: held.name,
         color: held.color,
-        transparency: held.transparency ?? 0,
+        transparency: SvalColor.transparencyOf(held.transparency),
         emoji: held.emoji ?? "",
         ...(ownArchive && { autoArchive: ownArchive }),
         save,

@@ -514,3 +514,75 @@ add_task(async function the_emoji_are_one_grid() {
   );
   await dismiss(opened);
 });
+
+/**
+ * The grid's scroll shadows (`SvalDom.shadeScrollEdges`): the tones cast one
+ * down from the grid's top edge while emoji lie above it, and the foot casts
+ * one up to the grid's bottom edge while emoji lie below it. The foot takes
+ * no room, so the answers stay one gap below the grid.
+ */
+add_task(async function the_grid_shades_the_rows_past_each_edge() {
+  const opened = await openPicker();
+  const { doc } = opened;
+  const win = doc.defaultView;
+  const grid = doc.querySelector(".sval-emoji-grid");
+  const tones = doc.querySelector(".sval-emoji-tones");
+  const foot = doc.querySelector(".sval-emoji-foot");
+  const answers = doc
+    .querySelector(".sval-emoji-picker")
+    .shadowRoot.querySelector(".actions");
+  const rect = el => el.getBoundingClientRect();
+  const shadow = el => win.getComputedStyle(el, "::after");
+  const over = el => el.hasAttribute("sval-over-rows");
+  // Layout rounds to a 60th of a pixel, and these sums to a float's bits.
+  const near = (actual, expected, what) =>
+    Assert.less(Math.abs(actual - expected), 0.01, `${what}: ${actual}`);
+
+  const gridBox = rect(grid);
+  Assert.equal(rect(foot).height, 0, "the foot takes no height");
+  near(
+    rect(foot).top,
+    gridBox.bottom,
+    "the foot's top edge is the grid's bottom edge"
+  );
+  const gap = parseFloat(
+    win.getComputedStyle(doc.querySelector(".sval-emoji-picker")).rowGap
+  );
+  near(
+    rect(answers).top - gridBox.bottom,
+    gap,
+    "the answers stay one gap below the grid"
+  );
+  // The foot's shadow ends at its own top edge, the grid's bottom, and lies
+  // over the grid's last rows.
+  Assert.equal(shadow(foot).bottom, "0px", "its shadow ends at the foot");
+  const shadowHeight = parseFloat(shadow(foot).height);
+  Assert.greater(shadowHeight, 0, "and rises over the rows");
+  // The tones' shadow starts one gap below them, at the grid's top edge.
+  near(
+    rect(tones).bottom + gap,
+    gridBox.top,
+    "the gap below the tones ends at the grid's top"
+  );
+  near(
+    parseFloat(shadow(tones).top),
+    rect(tones).height + gap,
+    "the tones' shadow starts at the grid's top edge"
+  );
+
+  await TestUtils.waitForCondition(
+    () => !over(tones) && over(foot),
+    "at the top, only the rows below are shaded"
+  );
+  grid.scrollTop = grid.scrollHeight;
+  await TestUtils.waitForCondition(
+    () => over(tones) && !over(foot),
+    "at the bottom, only the rows above are shaded"
+  );
+  grid.scrollTop = grid.scrollHeight / 2;
+  await TestUtils.waitForCondition(
+    () => over(tones) && over(foot),
+    "in the middle, both are"
+  );
+  await dismiss(opened);
+});

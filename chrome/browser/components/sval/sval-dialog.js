@@ -18,32 +18,24 @@
 const SvalDialogPage = {
   start() {
     const args = window.arguments?.[0] ?? {};
-    const form = document.querySelector(".sval-dialog");
+    const card = document.querySelector("sval-dialog");
+    const form = card.closest("form");
     const tone = ["danger", "critical"].includes(args.tone)
       ? args.tone
       : "default";
-    form.dataset.tone = tone;
+    card.tone = tone;
     if (args.state) {
-      form.dataset.state = String(args.state);
+      card.state = String(args.state);
     }
     if (tone !== "default") {
-      form.setAttribute("role", "alertdialog");
+      card.setAttribute("role", "alertdialog");
     }
-    if (tone === "critical") {
-      this._critical(form);
-    }
-
     if (args.icon) {
-      const icon = document.querySelector(".sval-dialog-icon");
-      icon.dataset.icon = String(args.icon);
-      icon.hidden = false;
+      card.icon = String(args.icon);
     }
-    this._text(form, args);
-    if (args.closeButton) {
-      const close = document.querySelector(".sval-dialog-close");
-      close.hidden = false;
-      close.addEventListener("click", () => window.close());
-    }
+    this._text(card, args);
+    // The ✕ closes the page, which answers as Escape does.
+    card.closeButton = !!args.closeButton;
 
     const input = args.field ? this._field(args.field) : null;
     if (!input && Array.isArray(args.details) && args.details.length) {
@@ -63,9 +55,9 @@ const SvalDialogPage = {
       update: text => {
         Object.assign(args, text);
         if (args.state) {
-          form.dataset.state = String(args.state);
+          card.state = String(args.state);
         }
-        this._text(form, args);
+        this._text(card, args);
         this._fit();
       },
       value: () => input?.value ?? "",
@@ -83,13 +75,13 @@ const SvalDialogPage = {
       },
       close: () => window.close(),
     };
-    const actions = document.querySelector(".sval-dialog-actions");
     for (const { id, label, primary, extra } of args.buttons ?? []) {
-      const button = document.createElement("button");
-      button.className = "sval-dialog-btn";
-      button.classList.toggle("primary", !!primary);
-      button.classList.toggle("sval-dialog-extra", !!extra);
-      button.type = primary ? "submit" : "button";
+      const button = document.createElement("sval-button");
+      button.slot = extra ? "extra" : "actions";
+      if (primary) {
+        button.type = "primary";
+        button.submit = true;
+      }
       button.dataset.button = String(id);
       button.textContent = String(label);
       if (!primary) {
@@ -100,10 +92,11 @@ const SvalDialogPage = {
           this._finish(args, id);
         });
       }
-      actions.append(button);
+      card.append(button);
       buttons.set(id, button);
     }
-    const primary = actions.querySelector(".primary");
+    const primary =
+      [...buttons.values()].find(button => button.type === "primary") ?? null;
 
     // The primary button stays enabled, so a keyboard user can reach it and
     // hear why it did not answer: pressing it with nothing in the field, or
@@ -140,14 +133,8 @@ const SvalDialogPage = {
       }
     });
 
-    const focusTarget = input ?? buttons.get(args.focus) ?? primary;
-    // `SubDialog.focus` calls this when the dialog opens, in place of its own
-    // move to the first focusable element.
-    document.subDialogSetDefaultFocus = () => {
-      focusTarget?.focus();
-      input?.select();
-    };
-    document.subDialogSetDefaultFocus();
+    card.defaultFocus = input ?? buttons.get(args.focus) ?? primary;
+    card.focusDefault();
     args.onOpen?.(page);
   },
 
@@ -174,10 +161,10 @@ const SvalDialogPage = {
    * Writes the title, body and warning from `args`, so a dialog the opener
    * updates reads as a fresh one would.
    *
-   * @param {Element} form
+   * @param {Element} card The `sval-dialog`.
    * @param {object} args
    */
-  _text(form, args) {
+  _text(card, args) {
     const title = String(args.title ?? "");
     document.getElementById("sval-dialog-title").textContent = title;
     // `SubDialog` follows `DOMTitleChanged`, so the frame is named for it.
@@ -190,47 +177,13 @@ const SvalDialogPage = {
     warning.hidden = !args.warning;
     const described = [body, warning].filter(el => !el.hidden);
     if (described.length) {
-      form.setAttribute(
+      card.setAttribute(
         "aria-describedby",
         described.map(el => el.id).join(" ")
       );
     } else {
-      form.removeAttribute("aria-describedby");
+      card.removeAttribute("aria-describedby");
     }
-  },
-
-  /**
-   * The critical frame (messages spec §9.3). Its body sits under the title
-   * band, and the scrim is the window's: `gDialogBox` draws it as the
-   * `::backdrop` of `#window-modal-dialog`, which `sval-header.css` colours
-   * for the attribute set here. `SvalDialog.sys.mjs` takes the attribute off
-   * when the dialog closes.
-   *
-   * @param {Element} form
-   */
-  _critical(form) {
-    const head = form.querySelector(".sval-dialog-head");
-    head.after(
-      document.getElementById("sval-dialog-body"),
-      document.getElementById("sval-dialog-warning")
-    );
-    const frame = window.frameElement;
-    frame?.ownerDocument
-      .getElementById("window-modal-dialog")
-      ?.setAttribute("data-sval-tone", "critical");
-    const card = getComputedStyle(form);
-    // `SubDialog.resizeHorizontally` sizes the frame from the root's inline
-    // min-width when there is one, and otherwise from the content as laid out
-    // in the frame's default width, which is narrower than this card.
-    document.documentElement.style.minWidth = card
-      .getPropertyValue("--sval-dialog-width")
-      .trim();
-    const { shapeDialogBox } = ChromeUtils.importESModule(
-      "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs"
-    );
-    shapeDialogBox(form, {
-      shadow: card.getPropertyValue("--sval-dialog-shadow").trim(),
-    });
   },
 
   _field({ label, value, placeholder, maxLength }) {

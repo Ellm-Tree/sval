@@ -136,7 +136,7 @@ async function dialog() {
   let doc;
   await TestUtils.waitForCondition(() => {
     doc = gDialogBox.dialog?._frame.contentDocument;
-    return doc?.querySelector(".sval-dialog-actions button");
+    return doc?.querySelector("sval-dialog sval-button");
   }, "the dialog has drawn");
   return doc;
 }
@@ -164,7 +164,7 @@ async function typeInto(value) {
  * @param {Document} doc
  */
 async function confirm(doc) {
-  const buttons = doc.querySelectorAll(".sval-dialog-actions button");
+  const buttons = doc.querySelectorAll("sval-dialog sval-button");
   const primary = buttons[buttons.length - 1];
   await TestUtils.waitForCondition(() => !primary.disabled);
   const closed = TestUtils.waitForCondition(() => !gDialogBox.isOpen);

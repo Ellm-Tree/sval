@@ -11,7 +11,7 @@
  * Every string is set with `textContent`. The question names an agent and a
  * site, and both come from outside Sval, so nothing here is parsed as markup.
  * The default choice has focus, so a stray Enter picks the safe answer. The
- * first grant is the dialog's primary button (`sval-dialog.css`). Two choices
+ * first grant is the dialog's primary button. Two choices
  * share a row, the safe one first and the grant at the end. More than two
  * do not fit a row, so they stack, the grants from the top and the safe
  * answer last.
@@ -25,8 +25,9 @@
 const SvalAgentAlert = {
   start() {
     const args = window.arguments?.[0] ?? {};
+    const card = document.querySelector("sval-dialog");
     if (args.kind) {
-      document.querySelector(".sval-aa").dataset.kind = String(args.kind);
+      card.dataset.kind = String(args.kind);
     }
     document.getElementById("sval-aa-question").textContent = String(
       args.question ?? ""
@@ -80,36 +81,37 @@ const SvalAgentAlert = {
       group.hidden = false;
     }
     const closeMenu = this.showScopes(args);
-    const actions = document.querySelector(".sval-aa-actions");
     let fallback = null;
     const grants = [];
     for (const { id, label } of args.choices ?? []) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "sval-dialog-btn";
+      const grant = id !== args.defaultChoice;
+      const button = document.createElement("sval-button");
+      button.slot = "actions";
       button.dataset.choice = String(id);
       button.textContent = String(label);
       button.addEventListener("click", () => {
         args.result = id;
         window.close();
       });
-      if (id === args.defaultChoice) {
+      if (!grant) {
         fallback = button;
       } else {
-        button.classList.toggle("primary", !grants.length);
+        if (!grants.length) {
+          button.type = "primary";
+        }
         grants.push(button);
       }
     }
     const stacked = grants.length > 1;
-    actions.classList.toggle("sval-dialog-actions-stacked", stacked);
+    card.stacked = stacked;
     const safe = fallback ? [fallback] : [];
-    actions.append(...(stacked ? [...grants, ...safe] : [...safe, ...grants]));
+    card.append(...(stacked ? [...grants, ...safe] : [...safe, ...grants]));
     // The alert's description is what it asks the user to decide on: what
     // the agent would send, and the sites or files. Focus opens on the
     // default choice, so this is what a screen reader reads with the
     // question.
-    const form = document.querySelector(".sval-aa");
-    form.ariaDescribedByElements = [
+    const form = card.closest("form");
+    card.ariaDescribedByElements = [
       document.getElementById("sval-aa-detail"),
       list,
     ].filter(el => !el.hidden);
@@ -135,9 +137,7 @@ const SvalAgentAlert = {
     // Enter in the form submits it; only a click on a choice answers.
     form.addEventListener("submit", event => event.preventDefault());
     if (fallback) {
-      // `SubDialog.focus` calls this when the dialog opens, in place of its
-      // own move to the first focusable element.
-      document.subDialogSetDefaultFocus = () => fallback.focus();
+      card.defaultFocus = fallback;
       fallback.focus();
     }
   },

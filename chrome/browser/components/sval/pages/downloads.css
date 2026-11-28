@@ -33,11 +33,11 @@
     color: var(--sval-ink-body);
 
     &:hover {
-      background-color: var(--sval-tint);
+      background-color: var(--sval-hover-tint);
     }
 
     &[selected] {
-      background-color: var(--sval-tint);
+      background-color: var(--sval-hover-tint);
       color: var(--sval-ink);
     }
 

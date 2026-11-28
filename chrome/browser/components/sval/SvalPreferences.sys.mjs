@@ -16,6 +16,8 @@
 
 import { SvalChromePages } from "moz-src:///browser/components/sval/SvalChromePages.sys.mjs";
 
+const ELEMENTS_URL = "chrome://browser/content/sval/elements/sval-elements.mjs";
+
 const PANE_SCRIPTS = [
   "chrome://browser/content/sval/settings-helpers.js",
   "chrome://browser/content/sval/settings.js",
@@ -69,6 +71,11 @@ function isPreferencesURL(spec) {
 let watching = false;
 
 function addPanes(doc) {
+  // Through the page's own `ChromeUtils`, so "current" is the page and the
+  // tags register in its `customElements` before the panes draw any.
+  doc.defaultView.ChromeUtils.importESModule(ELEMENTS_URL, {
+    global: "current",
+  });
   for (const url of PANE_SCRIPTS) {
     Services.scriptloader.loadSubScript(url, doc.defaultView);
   }

@@ -941,6 +941,12 @@
   &[aria-checked="true"] {
     background-color: var(--sval-action);
     box-shadow: none;
+
+    /* A Workspace's colour has the fill solved to stand off its popups
+       (`SvalColor.windowLook`). */
+    :root[data-sval-tint] & {
+      background-color: var(--sval-tint-switch-on);
+    }
     justify-content: flex-end;
 
     &::after {

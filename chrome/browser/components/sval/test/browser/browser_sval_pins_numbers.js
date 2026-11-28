@@ -42,25 +42,30 @@ async function tintHome(color) {
 }
 
 /**
- * Calls `check` in each theme and workspace colour, with where it is.
+ * Calls `check` in each theme and workspace colour, on a solid window and a
+ * see-through one, with where it is.
  *
  * @param {function(string): void} check
  */
 async function inEveryColourAndTheme(check) {
   atTaskEnd(() => tintHome(null));
-  for (const dark of [0, 1]) {
-    await SpecialPowers.pushPrefEnv({
-      set: [["ui.systemUsesDarkTheme", dark]],
-    });
-    await TestUtils.waitForCondition(
-      () => matchMedia("(prefers-color-scheme: dark)").matches === !!dark,
-      "the theme changes"
-    );
-    for (const color of [null, ...COLOR_TOKENS]) {
-      await tintHome(color);
-      check(`${color ?? "no colour"}, ${dark ? "dark" : "light"}`);
+  for (const see of [false, true]) {
+    await windowSeeThrough(see);
+    for (const dark of [0, 1]) {
+      await SpecialPowers.pushPrefEnv({
+        set: [["ui.systemUsesDarkTheme", dark]],
+      });
+      await TestUtils.waitForCondition(
+        () => matchMedia("(prefers-color-scheme: dark)").matches === !!dark,
+        "the theme changes"
+      );
+      for (const color of [null, ...COLOR_TOKENS]) {
+        await tintHome(color);
+        const kind = see ? "see-through" : "solid";
+        check(`${color ?? "no colour"}, ${kind}, ${dark ? "dark" : "light"}`);
+      }
+      await SpecialPowers.popPrefEnv();
     }
-    await SpecialPowers.popPrefEnv();
   }
 }
 

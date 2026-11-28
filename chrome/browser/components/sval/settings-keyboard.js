@@ -121,7 +121,7 @@
           )
         );
       this._list.addEventListener("click", event => {
-        const button = event.target.closest("button[data-action]");
+        const button = event.target.closest("sval-button[data-action]");
         if (button?.closest(".sval-keys-quick-peek")) {
           this._actClick(button);
         } else if (button) {
@@ -135,7 +135,7 @@
       // Pressing Cancel would take the focus from the field, and the field's
       // focusout would end the change and hide Cancel before its click.
       this._list.addEventListener("mousedown", event => {
-        if (event.target.closest('button[data-action="cancel"]')) {
+        if (event.target.closest('sval-button[data-action="cancel"]')) {
           event.preventDefault();
         }
       });
@@ -273,9 +273,7 @@
       }
       row.dataset.id = entry.id;
       const button = (action, label) => {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "sval-button";
+        const el = document.createElement("sval-button");
         el.dataset.action = action;
         el.textContent = label;
         el.setAttribute("aria-describedby", `${name.id} ${shortcut.id}`);
@@ -317,9 +315,7 @@
     _clickRow(row, entry, id) {
       row.classList.add("sval-keys-quick-peek");
       const button = (action, label) => {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "sval-button";
+        const el = document.createElement("sval-button");
         el.dataset.action = action;
         el.textContent = label;
         el.setAttribute("aria-describedby", `${id}-name ${id}-key`);

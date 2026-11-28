@@ -25,11 +25,6 @@
 
   const day = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 
-  // `SubDialog.resizeHorizontally` sizes the frame from the root's own
-  // width when it has one, and otherwise from the page's width in a frame
-  // still too narrow for the card and its facts side by side.
-  document.documentElement.style.width = "620px";
-
   const start = async () => {
     const $ = selector => document.querySelector(selector);
     const done = $(".sval-card-dialog-done");

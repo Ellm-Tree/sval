@@ -120,7 +120,7 @@ add_task(async function a_malformed_code_is_refused_before_any_argon2_work() {
       `"${typed}" is refused as not looking like a code, never as wrong`
     );
     Assert.equal(
-      asked.form.dataset.state,
+      asked.card.state,
       "enter-code",
       "and the folder is not looked at"
     );
@@ -129,7 +129,7 @@ add_task(async function a_malformed_code_is_refused_before_any_argon2_work() {
   // A check that refused every code would pass every assertion above.
   submitCode(asked, "ABCD-EFGH-JKMN");
   await TestUtils.waitForCondition(
-    () => asked.form.dataset.state === "waiting",
+    () => asked.card.state === "waiting",
     "a well-formed code is put to the folder"
   );
   asked.cancel.click();
@@ -156,7 +156,7 @@ add_task(async function waiting_is_never_rendered_as_a_wrong_code() {
   const asked = await codeDialog(ui);
   submitCode(asked, "ABCD-EFGH-JKMN");
   await TestUtils.waitForCondition(
-    () => asked.form.dataset.state === "waiting",
+    () => asked.card.state === "waiting",
     "with no offer in the folder, the dialog says none has arrived"
   );
   Assert.ok(
@@ -169,7 +169,7 @@ add_task(async function waiting_is_never_rendered_as_a_wrong_code() {
   await SvalSharedFolder._whenIdle();
   await SvalPairing.offer(us.root, randomBytes(32));
   await TestUtils.waitForCondition(
-    () => asked.form.dataset.state === "no-match",
+    () => asked.card.state === "no-match",
     "the next look reports a live offer this code does not open as wrong",
     250,
     80

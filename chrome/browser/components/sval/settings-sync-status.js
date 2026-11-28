@@ -191,8 +191,7 @@
         actionsEl.replaceChildren();
         return;
       }
-      const button = document.createElement("button");
-      button.className = "sval-button";
+      const button = document.createElement("sval-button");
       button.dataset.command = action.command;
       button.textContent = action.label;
       button.addEventListener("click", () =>

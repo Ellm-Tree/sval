@@ -8,102 +8,15 @@
  * radius. Settings imports this sheet, and `SvalPageStyle` loads it into
  * Firefox's own pages, so a page drawn with Firefox's design system and
  * components takes Sval's look through Firefox's design tokens, which are set
- * here to Sval's values. The Sval values are the system's tokens under their
- * system names, as in home/home.css, because they are Sval's brand rather
- * than Firefox's design tokens; each colour role has a light and a dark
- * value, so the page follows the system theme.
+ * here to Sval's colour roles (`sval-roles.css`), each with a light and a
+ * dark value, so the page follows the system theme.
  */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
-@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-roles.css");
 
 :root {
-  --sval-blue: var(--sval-palette-blue);
-  --sval-neon: var(--sval-palette-neon);
-  --sval-action: var(--sval-blue);
-  --sval-action-hover: var(--sval-palette-blue-600);
-  --sval-action-press: var(--sval-palette-blue-700);
-  --sval-action-text: #ffffff;
-  --sval-accent: var(--sval-blue);
-  --sval-focus: var(--sval-blue);
-  --sval-page: var(--sval-palette-ink-50);
-  --sval-ink: var(--sval-palette-ink-950);
-  --sval-ink-body: var(--sval-palette-ink-700);
-  --sval-ink-muted: var(--sval-palette-ink-500);
-  --sval-card: #ffffff;
-  --sval-sunken: var(--sval-palette-ink-50);
-  --sval-border: rgb(var(--sval-palette-wash-light) / 0.14);
-  --sval-border-strong: rgb(var(--sval-palette-wash-light) / 0.28);
-  /* A control's edge, and an off switch's track: 3:1 or more against the
-     card and the page, as a control's boundary must be (WCAG 1.4.11). The
-     faint borders are for cards, which are not controls. */
-  --sval-control-edge: var(--sval-palette-ink-500);
-  --sval-switch-knob-off: #ffffff;
-  --sval-shadow: 0 8px 24px rgb(var(--sval-palette-wash-light) / 0.1);
-  --sval-tint: rgba(31, 107, 255, 0.1);
-  --sval-problem: #c8321f;
-  --sval-problem-tint: rgba(200, 50, 31, 0.1);
-  /* A result line's glyph (messages spec §9.6). */
-  --sval-result-success: #1a7f3c;
-  --sval-result-error: var(--sval-palette-red);
-  --sval-result-error-tint: rgba(196, 47, 58, 0.08);
-  --sval-border-subtle: rgb(var(--sval-palette-wash-light) / 0.08);
-  --sval-card-hover: #ffffff;
-  --sval-raised: #ffffff;
-  --sval-glass: rgba(245, 249, 255, 0.82);
-  --sval-fixed: #1e8c3a;
-  --sval-security: #c2410a;
-  --sval-inverse: #ffffff;
-  --sval-modal-dim: rgba(6, 10, 46, 0.28);
-  --sval-modal-shadow: 0 40px 100px rgb(var(--sval-palette-wash-light) / 0.28), 0 12px 32px rgb(var(--sval-palette-wash-light) / 0.14);
-  --sval-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
-  --sval-dur: 240ms;
-  /* One button for the whole page: a pill, as the Agents pane draws it. */
-  --sval-button-height: 34px;
-  --sval-button-font-size: 14px;
-  --sval-button-font-weight: 600;
-  /* A page's title: Settings' panes, the info and error pages. */
-  --sval-heading-size: 28px;
-  --sval-heading-weight: 600;
-  --sval-heading-tracking: -0.02em;
-
   font-family: var(--sval-font);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --sval-action-hover: var(--sval-palette-blue-400);
-    --sval-action-press: var(--sval-palette-blue-600);
-    --sval-accent: var(--sval-neon);
-    --sval-focus: var(--sval-neon);
-    --sval-page: var(--sval-palette-ink-850);
-    --sval-ink: #ffffff;
-    --sval-ink-body: var(--sval-palette-ink-200);
-    --sval-ink-muted: var(--sval-palette-ink-400);
-    --sval-card: rgb(var(--sval-palette-wash-light) / 0.28);
-    --sval-sunken: rgba(6, 10, 46, 0.55);
-    --sval-border: rgb(var(--sval-palette-wash-dark) / 0.18);
-    --sval-border-strong: rgb(var(--sval-palette-wash-dark) / 0.34);
-    --sval-control-edge: var(--sval-palette-ink-400);
-    /* A white knob is under 3:1 on the light track. */
-    --sval-switch-knob-off: var(--sval-palette-ink-850);
-    --sval-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    --sval-tint: rgba(92, 242, 255, 0.12);
-    --sval-problem: #ff7a6b;
-    --sval-problem-tint: rgba(255, 122, 107, 0.14);
-    --sval-result-success: #5ee08a;
-    --sval-result-error: var(--sval-palette-red-invert);
-    --sval-result-error-tint: rgba(255, 138, 144, 0.12);
-    --sval-border-subtle: rgb(var(--sval-palette-wash-dark) / 0.1);
-    --sval-card-hover: rgb(var(--sval-palette-wash-light) / 0.44);
-    --sval-raised: var(--sval-palette-ink-850);
-    --sval-glass: rgba(6, 10, 46, 0.72);
-    --sval-fixed: #4fcf6a;
-    --sval-security: #ffc22a;
-    --sval-inverse: var(--sval-palette-ink-950);
-    --sval-modal-dim: rgba(3, 5, 26, 0.62);
-    --sval-modal-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), 0 12px 32px rgba(0, 0, 0, 0.4);
-  }
 }
 
 /*
@@ -146,8 +59,8 @@
     --button-min-height: var(--sval-button-height);
     --button-padding: 0 16px;
     --button-background-color: transparent;
-    --button-background-color-hover: var(--sval-tint);
-    --button-background-color-active: var(--sval-tint);
+    --button-background-color-hover: var(--sval-hover-tint);
+    --button-background-color-active: var(--sval-hover-tint);
     --button-background-color-disabled: transparent;
     --button-border-color: var(--sval-border-strong);
     --button-border-color-hover: var(--sval-accent);
@@ -167,8 +80,8 @@
     --button-background-color-destructive-active: color-mix(in srgb, var(--sval-problem) 86%, var(--sval-ink));
     --button-border-color-destructive: transparent;
     --button-text-color-destructive: var(--sval-inverse);
-    --button-background-color-ghost-hover: var(--sval-tint);
-    --button-background-color-ghost-active: var(--sval-tint);
+    --button-background-color-ghost-hover: var(--sval-hover-tint);
+    --button-background-color-ghost-active: var(--sval-hover-tint);
 
     --card-background-color: var(--sval-card);
     --card-border-color: var(--sval-border);
@@ -247,7 +160,7 @@ moz-fieldset::part(label) {
 
   moz-page-nav-button {
     --page-nav-button-indicator-color: var(--sval-accent);
-    --page-nav-button-background-color-selected: var(--sval-tint);
+    --page-nav-button-background-color-selected: var(--sval-hover-tint);
   }
 
   moz-promo {

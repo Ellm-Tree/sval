@@ -498,6 +498,16 @@ add_task(function a_new_workspace_needs_only_a_name() {
     "a Workspace with no colour keeps how see-through it is"
   );
   Assert.deepEqual(
+    chosenContainer(true, {
+      name: "Errands",
+      color: null,
+      emoji: "",
+      transparency: 0,
+    }),
+    { name: "Errands", color: null, emoji: null, transparency: 0 },
+    "a Workspace made solid keeps it, since one that holds none is Sval's default"
+  );
+  Assert.deepEqual(
     chosenContainer(
       true,
       { name: "Errands", color: custom, emoji: "", transparency: 0.4 },

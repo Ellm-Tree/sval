@@ -45,7 +45,7 @@ Object.assign(SvalPanel, {
       : {
           color: preview?.color ?? null,
           emoji: preview?.emoji || null,
-          transparency: preview?.transparency ?? 0,
+          transparency: preview?.transparency ?? null,
         };
     // An agent's workspace wears the robot face and the agent's hue, never an
     // emoji of its own (`workspaceColor` says the same of its colour).
@@ -62,7 +62,7 @@ Object.assign(SvalPanel, {
     // window wears the agent's hue, solid.
     const shownLook = this._colorPreview ?? {
       color,
-      transparency: agent ? 0 : (stored.transparency ?? 0),
+      transparency: agent ? 0 : SvalColor.transparencyOf(stored.transparency),
     };
     this._shownLook = shownLook;
 

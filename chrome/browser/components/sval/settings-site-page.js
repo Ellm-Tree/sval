@@ -925,19 +925,18 @@
         dataset: { svalKey: "site-add-host" },
       });
       const confirm = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-button-primary sval-agent-small",
+          type: "primary",
+          className: "sval-agent-small",
           dataset: { svalKey: "site-add-host-add" },
         },
         "Add"
       );
       const cancel = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small",
+          className: "sval-agent-small",
           dataset: { svalKey: "site-add-host-cancel" },
         },
         "Cancel"
@@ -1501,10 +1500,9 @@
       }
       const open = this._sitePage.exceptionsOpen;
       const pill = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-agent-small sval-site-exceptions",
+          className: "sval-agent-small sval-site-exceptions",
           disabled: unavailable,
           title,
           ariaExpanded: String(open),
@@ -1971,10 +1969,9 @@
         );
       const row = (state, sub, label, act) => {
         const button = this._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button sval-agent-small",
+            className: "sval-agent-small",
             dataset: { svalKey: "site-style-action" },
           },
           label
@@ -2120,10 +2117,9 @@
       );
       if (live && (!ready || rows.length)) {
         const everywhere = this._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button sval-agent-small sval-site-data-everywhere",
+            className: "sval-agent-small sval-site-data-everywhere",
             dataset: { svalKey: "site-data-everywhere" },
           },
           "Clear everywhere"
@@ -2313,10 +2309,9 @@
       );
       if (!this._privateWindow) {
         const clear = this._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button sval-agent-small sval-site-data-clear",
+            className: "sval-agent-small sval-site-data-clear",
             ariaLabel: `${failed ? "Try clearing again" : "Clear"}: ${name}`,
             dataset: { svalKey: clearKey(key) },
           },
@@ -2414,8 +2409,8 @@
       this._blockingView.clearEverywhere = site;
       els.blockingDialog.setAttribute("role", "alertdialog");
       els.blockingDialog.dataset.confirm = "clear-everywhere";
-      els.blockingDialogTile.replaceChildren(this._glyph("sc-cookie"));
-      els.blockingDialogTile.hidden = false;
+      els.blockingDialogCard.icon = "cookie";
+      els.blockingDialogCard.tone = "danger";
       els.blockingDialogTitle.textContent = `Clear ${site} everywhere?`;
       els.blockingDialogBody.textContent =
         `This signs you out of ${site} in every Workspace.` +
@@ -2423,7 +2418,7 @@
           ? ` It deletes ${total ? `${sizeOf(total)} of ` : ""}cookies and site data from ${places}.`
           : "");
       els.blockingDialogConfirm.textContent = "Clear and sign out";
-      els.blockingDialogConfirm.dataset.tone = "danger";
+      els.blockingDialogConfirm.type = "danger";
       this._showBlockingDialog(this._siteEls.page);
       els.blockingDialogCancel.focus();
     },
@@ -2477,10 +2472,9 @@
       }
       const none = this._sitePage.held === false;
       const button = this._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button sval-site-forget",
+          className: "sval-site-forget",
           disabled: none,
           dataset: { svalKey: "site-forget" },
         },
@@ -2575,12 +2569,12 @@
       this._blockingView.forget = { site, counts, at };
       els.blockingDialog.setAttribute("role", "alertdialog");
       els.blockingDialog.dataset.confirm = "forget";
-      els.blockingDialogTile.replaceChildren(this._glyph("trash-2"));
-      els.blockingDialogTile.hidden = false;
+      els.blockingDialogCard.icon = "trash";
+      els.blockingDialogCard.tone = "danger";
       els.blockingDialogTitle.textContent = `Forget ${site}?`;
       els.blockingDialogBody.textContent = "In every Workspace, this clears:";
       els.blockingDialogConfirm.textContent = `Forget ${site}`;
-      els.blockingDialogConfirm.dataset.tone = "danger";
+      els.blockingDialogConfirm.type = "danger";
       this._drawForgetList();
       els.blockingDialogMore.hidden = false;
       this._showBlockingDialog(this._siteEls.page);
@@ -2747,7 +2741,7 @@
       this._drawSitePage();
       const els = this._siteEls;
       if (failed.length) {
-        els.alert.querySelector("button").focus();
+        els.alert.querySelector("sval-button").focus();
         return;
       }
       els.title.focus({ preventScroll: true });
@@ -2775,8 +2769,8 @@
           ? `One part of ${page.site} wasn't forgotten`
           : `${NUMBER_WORDS[n - 1] ?? n} parts of ${page.site} weren't forgotten`;
       const again = this._el(
-        "button",
-        { type: "button", className: "sval-button sval-agent-small" },
+        "sval-button",
+        { className: "sval-agent-small" },
         "Try again"
       );
       const site = page.site;

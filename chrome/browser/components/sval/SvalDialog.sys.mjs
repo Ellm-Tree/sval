@@ -17,6 +17,37 @@
 const DIALOG_URL = "chrome://browser/content/sval/sval-dialog.xhtml";
 
 /**
+ * Shows one of Sval's dialog pages in `win`'s modal box (`gDialogBox`):
+ * drawn inside the window it is about, so it goes where that window goes,
+ * and queued behind any dialog already showing there.
+ *
+ * @param {Window} win The browser window to show it in.
+ * @param {string} url The page.
+ * @param {object} [args] The page's `window.arguments[0]`, through which it
+ *   answers.
+ * @returns {Promise<void>|null} Settles once the dialog has closed. Null for
+ *   a window with no modal box, since only a browser window has one.
+ */
+export function openSvalDialogPage(win, url, args = {}) {
+  const box = win?.gDialogBox;
+  if (!box) {
+    return null;
+  }
+  // While the window is in a modal state, `gDialogBox.open` reads this as an
+  // `nsIPropertyBag` and refuses a caller that is not "async", since a
+  // synchronous one would deadlock (`gDialogBox.open` in browser.js). Every
+  // caller here only awaits the dialog.
+  args.getProperty ??= name => name === "async";
+  return box.open(url, args).finally(() => {
+    // Set by a critical card (`sval-dialog`) to colour the window's scrim,
+    // which outlives the dialog.
+    win.document
+      .getElementById("window-modal-dialog")
+      ?.removeAttribute("data-sval-tone");
+  });
+}
+
+/**
  * Asks one question in `win` and waits for the answer.
  *
  * @param {Window} win The browser window to ask in.
@@ -117,18 +148,9 @@ export async function openSvalDialog(
     buttons,
     focus,
     result: null,
-    // Read by `gDialogBox.open` while the window is in a modal state; see
-    // `SvalAgentAlerts.askToPair`.
-    getProperty: name => name === "async",
   };
-  // Only a browser window has a `gDialogBox`; elsewhere there is nowhere to
-  // ask, which reads as a cancel.
-  await win?.gDialogBox?.open(DIALOG_URL, args);
-  // Set by the critical frame (`sval-dialog.js`) to colour the window's
-  // scrim, which outlives the dialog.
-  win?.document
-    ?.getElementById("window-modal-dialog")
-    ?.removeAttribute("data-sval-tone");
+  // A window with no modal box has nowhere to ask, which reads as a cancel.
+  await openSvalDialogPage(win, DIALOG_URL, args);
   const checked = checkbox ? { checked: !!args.checked } : {};
   switch (args.result?.button) {
     case "ok":

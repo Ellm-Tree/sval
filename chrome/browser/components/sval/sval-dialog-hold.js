@@ -8,12 +8,12 @@
  * under a click the user meant for the page, and that click must not land
  * on a grant.
  *
- * While the timer runs, each held button carries `data-hold` and
- * `sval-dialog.css` sweeps its fill across it over the delay, so the wait
- * shows without words. The timer restarts when the alert's window comes back
- * from behind another, and on a repeated key, and the sweep restarts with
- * it. A held button outside the timer, while the alert's window is behind
- * another, shows the plain disabled look.
+ * While the timer runs, each grant is a `held` `sval-button`, whose fill
+ * sweeps across it over the delay, so the wait shows without words. The
+ * timer restarts when the alert's window comes back from behind another,
+ * and on a repeated key, and the sweep restarts with it. A grant outside
+ * the timer, while the alert's window is behind another, is disabled with
+ * the plain disabled look.
  */
 
 "use strict";
@@ -26,7 +26,7 @@
   /**
    * Holds `buttons` through the dialog delay.
    *
-   * @param {HTMLButtonElement[]} buttons The grants.
+   * @param {Element[]} buttons The grants, `sval-button`s.
    * @param {(held: boolean) => void} [onChange] Called after the buttons
    *   are disabled or enabled.
    * @returns {object} The `EnableDelayHelper`, which the page keeps for as
@@ -35,18 +35,13 @@
   window.svalHoldGrants = (buttons, onChange) => {
     const sweep = delay => {
       for (const button of buttons) {
-        button.style.setProperty("--sval-dialog-hold-time", `${delay}ms`);
-        // A CSS animation starts over only when it is removed and applied
-        // again, with a style flush between.
-        button.removeAttribute("data-hold");
-        button.getBoundingClientRect();
-        button.toggleAttribute("data-hold", true);
+        button.hold(delay);
       }
     };
     const set = held => {
       for (const button of buttons) {
         button.disabled = held;
-        button.removeAttribute("data-hold");
+        button.held = false;
       }
       onChange?.(held);
     };

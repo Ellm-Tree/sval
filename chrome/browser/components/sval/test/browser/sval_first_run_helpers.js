@@ -58,7 +58,7 @@ const LEVEL_PREF = "browser.sval.adblock.level";
  * @returns {Element|null} the one visible step.
  */
 function shownSection(doc) {
-  const shown = [...doc.querySelectorAll("main > section")].filter(
+  const shown = [...doc.querySelectorAll(".sval-fr > section")].filter(
     section => !section.hidden
   );
   return shown.length === 1 ? shown[0] : null;
@@ -69,7 +69,9 @@ function shownSection(doc) {
  * @returns {string|null} the visible step's name.
  */
 function shownStep(doc) {
-  return doc?.querySelector?.("main") ? shownSection(doc)?.dataset.step : null;
+  return doc?.querySelector?.("sval-dialog.sval-fr")
+    ? shownSection(doc)?.dataset.step
+    : null;
 }
 
 /**

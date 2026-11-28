@@ -131,7 +131,7 @@ async function dialogIn(win) {
   let doc;
   await TestUtils.waitForCondition(() => {
     doc = box.dialog?._frame.contentDocument;
-    return doc?.querySelector(".sval-dialog-actions button.primary");
+    return doc?.querySelector('sval-dialog sval-button[type="primary"]');
   }, "the question has drawn its buttons");
   return doc;
 }
@@ -282,9 +282,7 @@ async function dragIntoAnIsolatedWindow() {
 add_task(async function a_drag_into_another_jar_moves_once_asked() {
   const { win, workspace, id, jar, question } =
     await dragIntoAnIsolatedWindow();
-  question
-    .querySelector('.sval-dialog-actions button[data-button="ok"]')
-    .click();
+  question.querySelector('sval-dialog sval-button[data-button="ok"]').click();
 
   await TestUtils.waitForCondition(() => {
     const mine = win.gBrowser.tabs.find(
@@ -306,7 +304,7 @@ add_task(
     const { win, id, jar, question } = await dragIntoAnIsolatedWindow();
     const placed = (await treeNodes())[id].placement;
     question
-      .querySelector('.sval-dialog-actions button[data-button="cancel"]')
+      .querySelector('sval-dialog sval-button[data-button="cancel"]')
       .click();
 
     let back;
@@ -467,9 +465,7 @@ add_task(async function a_tab_row_dropped_into_another_jar_moves_once_asked() {
     isWithin(await treeNodes(), id, SvalWindowWorkspace.of(window).id),
     "until the answer the tab stays in its workspace"
   );
-  question
-    .querySelector('.sval-dialog-actions button[data-button="ok"]')
-    .click();
+  question.querySelector('sval-dialog sval-button[data-button="ok"]').click();
 
   await TestUtils.waitForCondition(() => {
     const tab = win.SvalPanel.observer.tabFor(id);

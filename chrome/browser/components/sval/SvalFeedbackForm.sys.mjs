@@ -10,13 +10,17 @@
  *
  * The popover is drawn in the window's own document, over the page. The tab
  * that covers the button, the stem from it and the box are the header
- * popovers' one shape (`SvalStem`), growing sideways from the tab.
+ * popovers' one shape (`SvalStem`), growing sideways from the tab. The box
+ * is Sval's dialog card (`sval-dialog`), its answers `sval-button`s, and
+ * over a window that shows what is behind it the card is frosted as a
+ * dialog's is (decision 0057, `SvalDialogBox.frostLook`).
  *
  * The report is `SvalFeedback`'s: built once as the form opens, viewed and
  * posted as built (spec §4).
  */
 
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
+import { iconURL } from "moz-src:///browser/components/sval/SvalIcons.sys.mjs";
 import {
   STEM_FILLET,
   SvalStem,
@@ -26,7 +30,10 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   DownloadUtils: "resource://gre/modules/DownloadUtils.sys.mjs",
+  FROST_BLUR: "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs",
+  frostLook: "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs",
   MIN_DESCRIPTION: "moz-src:///browser/components/sval/SvalFeedback.sys.mjs",
+  SvalColor: "moz-src:///browser/components/sval/SvalColor.sys.mjs",
   SvalFeedback: "moz-src:///browser/components/sval/SvalFeedback.sys.mjs",
   crashTime: "moz-src:///browser/components/sval/SvalFeedback.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
@@ -117,9 +124,17 @@ function bytes(size) {
   return lazy.DownloadUtils.convertByteUnits(size).join(" ");
 }
 
-function button(doc, className, label, onClick) {
-  const node = htmlElement(doc, "button", { className }, label);
-  node.type = "button";
+/**
+ * @param {Document} doc
+ * @param {string} className
+ * @param {string} label
+ * @param {Function} onClick
+ * @param {object} [attrs] The `sval-button`'s attributes: its `type`,
+ *   `size` or `icon`.
+ * @returns {Element} an `sval-button`.
+ */
+function button(doc, className, label, onClick, attrs = {}) {
+  const node = htmlElement(doc, "sval-button", { className, attrs }, label);
   node.addEventListener("click", onClick);
   return node;
 }
@@ -201,6 +216,8 @@ class FeedbackForm {
     this.listening = null;
     /** Whether View shows a part in place of the list. */
     this.viewing = false;
+    /** The custom properties {@link frost} set on the popover. */
+    this.frostProperties = [];
     this.build();
   }
 
@@ -221,25 +238,25 @@ class FeedbackForm {
     // The button's icon, drawn again over the tab that covers it.
     const tab = htmlElement(doc, "div", { className: "sval-feedback-tab" });
     tab.setAttribute("aria-hidden", "true");
+    // Frosted, what lies under the whole shape is blurred through this
+    // layer, which `place` clips to the shape.
+    const frost = htmlElement(doc, "div", { className: "sval-feedback-frost" });
+    frost.setAttribute("aria-hidden", "true");
 
-    const box = htmlElement(doc, "div", { className: "sval-feedback-box" });
+    const box = htmlElement(doc, "sval-dialog", {
+      className: "sval-feedback-box",
+    });
     const title = htmlElement(
       doc,
       "h2",
-      { className: "sval-feedback-title" },
+      { className: "sval-feedback-title", attrs: { slot: "title" } },
       "Send Feedback"
     );
     title.id = "sval-feedback-title";
     const context = htmlElement(doc, "p", {
       className: "sval-feedback-context",
+      attrs: { slot: "body" },
     });
-    const head = htmlElement(
-      doc,
-      "div",
-      { className: "sval-feedback-head" },
-      title,
-      context
-    );
 
     const message = htmlElement(doc, "textarea", {
       className: "sval-feedback-message",
@@ -340,37 +357,41 @@ class FeedbackForm {
     );
     sent.hidden = true;
 
-    const cancel = button(doc, "sval-feedback-action", "Cancel", () =>
-      this.cancel()
+    const answer = { slot: "actions" };
+    const cancel = button(
+      doc,
+      "sval-feedback-action",
+      "Cancel",
+      () => this.cancel(),
+      { ...answer, "data-button": "cancel" }
     );
     const send = button(
       doc,
-      "sval-feedback-action sval-feedback-primary sval-feedback-send",
+      "sval-feedback-action sval-feedback-send",
       "",
-      () => this.send()
+      () => this.send(),
+      { ...answer, type: "primary" }
     );
     const close = button(
       doc,
-      "sval-feedback-action sval-feedback-primary",
+      "sval-feedback-action",
       "Close",
-      () => this.close()
-    );
-    const actions = htmlElement(
-      doc,
-      "div",
-      { className: "sval-feedback-actions" },
-      cancel,
-      send,
-      close
+      () => this.close(),
+      { ...answer, type: "primary" }
     );
 
-    box.append(head, grid, sent, failure, actions);
-    root.append(tab, box);
+    box.append(title, context, grid, sent, failure, cancel, send, close);
+    root.append(frost, tab, box);
     root.addEventListener("keydown", event => this.onKey(event));
     doc.body.append(root);
+    // Until the card first draws, its shadow root has no slots, so nothing
+    // in it is laid out or can take the focus `show` gives the message in
+    // this same task. Lit would draw it on a later microtask.
+    box.performUpdate();
 
     this.root = root;
     this.els = {
+      frost,
       box,
       context,
       message,
@@ -410,6 +431,7 @@ class FeedbackForm {
       }
       this.els.message.value = draft.message;
       this.els.email.value = draft.email;
+      this.frost();
       this.root.hidden = false;
       this.listen();
     } else if (context && draft) {
@@ -431,6 +453,36 @@ class FeedbackForm {
       this.els.message.focus();
     }
     return settled;
+  }
+
+  /**
+   * Frosts the card over a window that shows what is behind it, as a
+   * dialog's card is frosted (`SvalDialogBox.frostLook`): the tab and the
+   * card blur what lies under them, the shape wears the look's colour, and
+   * the text and fields take the colours solved on it (`sval-feedback.css`).
+   * Over any other window the shape wears the window's popover colour.
+   */
+  frost() {
+    const { root } = this;
+    for (const name of this.frostProperties) {
+      root.style.removeProperty(name);
+    }
+    this.frostProperties = [];
+    const look = lazy.frostLook(this.win);
+    root.toggleAttribute("frosted", !!look);
+    this.els.box.toggleAttribute("frosted", !!look);
+    if (!look) {
+      return;
+    }
+    const properties = {
+      ...lazy.SvalColor.windowProperties(look),
+      "--sval-feedback-frost": look.accent,
+      "--sval-feedback-blur": `${lazy.FROST_BLUR}px`,
+    };
+    for (const [name, value] of Object.entries(properties)) {
+      root.style.setProperty(name, value);
+      this.frostProperties.push(name);
+    }
   }
 
   /** Back to an empty form, once a report has been sent. */
@@ -513,7 +565,7 @@ class FeedbackForm {
     els.close.hidden = !sent;
     const sendLabels = { sending: "Sending…", failed: "Send Again" };
     els.send.textContent = sendLabels[state] ?? "Send";
-    els.send.toggleAttribute("busy", sending);
+    els.send.busy = sending;
     els.reference.textContent = sent ? `Reference: ${this.reference}` : "";
     this.drawFailure();
     this.drawList();
@@ -570,7 +622,8 @@ class FeedbackForm {
           () => {
             this.collect();
             this.draw();
-          }
+          },
+          { size: "small" }
         )
       );
     }
@@ -694,8 +747,12 @@ class FeedbackForm {
         )
       );
     }
-    const view = button(doc, "sval-feedback-view", "View", () =>
-      this.view(part)
+    const view = button(
+      doc,
+      "sval-feedback-view",
+      "View",
+      () => this.view(part),
+      { size: "small" }
     );
     view.setAttribute("aria-describedby", titleId);
     row.append(
@@ -732,7 +789,10 @@ class FeedbackForm {
     }
     const { doc } = this;
     const { viewer, listing } = this.els;
-    const back = button(doc, "sval-feedback-back", "Back", () => this.back());
+    const back = button(doc, "sval-feedback-back", "Back", () => this.back(), {
+      size: "small",
+      icon: iconURL("previous"),
+    });
     const meta = part.tooLarge
       ? `${bytes(part.size)} · too large to send`
       : `${bytes(part.size)} · exactly as sent`;
@@ -1054,6 +1114,15 @@ class FeedbackForm {
       content: this.els.box,
       side: right ? "left" : "right",
     });
+    // The blur takes the shape's own path, and lies under its fill, which
+    // `SvalStem` puts first in the popover.
+    const { frost } = this.els;
+    const path = this.root.querySelector(":scope > .sval-stem-outline path");
+    const d = this.root.hasAttribute("sval-stem") && path?.getAttribute("d");
+    frost.style.clipPath = d ? `path("${d}")` : "";
+    if (this.root.firstElementChild !== frost) {
+      this.root.prepend(frost);
+    }
   }
 }
 

@@ -11,6 +11,8 @@
  * panel stays the one owner of the engine, the storage setting and the key.
  */
 
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
+
 const DIALOG_URL = "chrome://browser/content/sval/first-run.xhtml";
 
 const lazy = {};
@@ -169,11 +171,8 @@ export const SvalFirstRun = {
       facts: { ...facts },
       roots,
       result: null,
-      // Read by `gDialogBox.open` while the window is in a modal state; see
-      // `SvalAgentAlerts.askToPair`.
-      getProperty: name => name === "async",
     };
-    await win.gDialogBox?.open(DIALOG_URL, args);
+    await openSvalDialogPage(win, DIALOG_URL, args);
     return args.result ?? { outcome: "closed" };
   },
 };

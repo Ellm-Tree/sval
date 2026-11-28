@@ -982,10 +982,8 @@
       const waiting = lazy.SvalUpdateDelay.waiting(addon.id);
       if (waiting) {
         const button = ui._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button",
             dataset: { svalKey: "page-update-now" },
           },
           "Update now"
@@ -1021,10 +1019,8 @@
         addon.optionsType !== AddonManager.OPTIONS_TYPE_INLINE_BROWSER
       ) {
         const button = ui._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button",
             dataset: { svalKey: "page-options" },
           },
           "Open"
@@ -1094,10 +1090,8 @@
     _checkRow(addon) {
       const ui = this._ui;
       const button = ui._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-button",
           dataset: { svalKey: "page-check-updates" },
         },
         "Check now"
@@ -1619,10 +1613,8 @@
           dataset: { svalKey: "sites-entry" },
         });
         const add = ui._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button",
             dataset: { svalKey: "sites-add" },
           },
           "Add"
@@ -1661,10 +1653,9 @@
       // The agent page's Unpair card (`settings-agents.js`): a line on what
       // removing does, and a button that names the extension.
       const button = ui._el(
-        "button",
+        "sval-button",
         {
-          type: "button",
-          className: "sval-agent-unpair",
+          type: "danger",
           dataset: { svalKey: "page-remove" },
         },
         `Remove ${addon.name}`
@@ -1829,10 +1820,8 @@
       const ui = this._ui;
       const button = (action, label) =>
         ui._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button",
             dataset: { action },
             ariaDescribedby: `${id}-name ${id}-key`,
           },
@@ -2020,10 +2009,8 @@
         }
         const headingId = `sval-keys-extension-${cards.length}`;
         const change = ui._el(
-          "button",
+          "sval-button",
           {
-            type: "button",
-            className: "sval-button",
             ariaDescribedby: headingId,
             dataset: { svalKey: `keys-change:${addon.id}` },
           },

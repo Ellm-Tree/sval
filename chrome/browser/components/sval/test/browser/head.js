@@ -14,7 +14,8 @@ const { makeTempDir, tempPath } = ChromeUtils.importESModule(
 /* exported dialogShown, closeDialog, rightClickOpens, chooseMenuItem, AGENT_LABEL, svalKeys, ROOT, PAGE, PAGE2, PAGE2_TITLE, LINKS, ORG_PAGE, NET_PAGE, POST_PATH,
             atTaskEnd,
             countAlerts, alertIn, heldRequests, choose, pair, closeLeftoverDialog,
-            openedDialog, clickInDialog,
+            openedDialog, clickInDialog, openedSvalDialog, pressDialogButton,
+            solidWindows,
             agentSetup, agentAccessForTask, agentAccessOff,
             timePassed, tabsOpenedIn, newWindowAfter, strayNodes, refFor,
             closeAndRestore, dialogsSetup, buttonRunning, settledFlag,
@@ -1220,9 +1221,9 @@ async function dialogShown(dialog, what) {
  * `win`, and returns its parts.
  *
  * @param {Window} win The browser window it opens in.
- * @param {string} state The dialog's `data-state`, naming its question.
- * @returns {Promise<object>} `{ dialog, doc, form, input, ok, cancel,
- *   warning }`, where `form` is the page's `.sval-dialog`.
+ * @param {string} state The dialog's `state`, naming its question.
+ * @returns {Promise<object>} `{ dialog, doc, card, input, ok, cancel,
+ *   warning }`, where `card` is the page's `sval-dialog`.
  */
 async function svalDialogAsking(win, state) {
   let dialog;
@@ -1231,7 +1232,7 @@ async function svalDialogAsking(win, state) {
     return (
       !dialog?._isClosing &&
       dialog?._frame?.contentDocument?.querySelector(
-        `.sval-dialog[data-state="${state}"]`
+        `sval-dialog[state="${state}"]`
       )
     );
   }, `Sval's dialog asks ${state}`);
@@ -1240,10 +1241,10 @@ async function svalDialogAsking(win, state) {
   return {
     dialog,
     doc,
-    form: doc.querySelector(".sval-dialog"),
+    card: doc.querySelector("sval-dialog"),
     input: doc.querySelector(".sval-dialog-input"),
-    ok: doc.querySelector(".sval-dialog-actions .primary"),
-    cancel: doc.querySelector('.sval-dialog-actions [data-button="cancel"]'),
+    ok: doc.querySelector('sval-dialog > [type="primary"]'),
+    cancel: doc.querySelector('sval-dialog > [data-button="cancel"]'),
     warning: doc.getElementById("sval-dialog-warning"),
   };
 }
@@ -1313,7 +1314,7 @@ async function alertIn(win) {
   let doc;
   await TestUtils.waitForCondition(() => {
     doc = win.gDialogBox.dialog?._frame.contentDocument;
-    return doc?.querySelector(".sval-aa-actions button");
+    return doc?.querySelector("sval-dialog [data-choice]");
   }, "the alert has drawn");
   return doc;
 }
@@ -1361,6 +1362,114 @@ async function openedDialog(selector) {
 }
 
 /**
+ * Makes the file's windows solid. Sval's default window is see-through
+ * where the system can show what is behind it
+ * (`SvalColor.DEFAULT_TRANSPARENCY`), so a file about the colours a solid
+ * window wears has the system reduce transparency, as a person can, for the
+ * rest of the file. `browser_sval_color_picker.js` covers the see-through
+ * window, and `browser_sval_dialog_frosted.js` its dialogs.
+ */
+async function solidWindows() {
+  await SpecialPowers.pushPrefEnv({
+    set: [["ui.prefersReducedTransparency", 1]],
+  });
+  await TestUtils.waitForCondition(
+    () => !document.documentElement.hasAttribute("data-sval-see-through"),
+    "the window is solid"
+  );
+}
+
+let systemSeeThrough = null;
+
+/**
+ * Draws this window as a system that can show what is behind it draws it
+ * (`see` true, with the material macOS gives), or as one that cannot,
+ * whichever system the test runs on, and waits for the window to wear that
+ * look. Sval's default window is see-through where the system allows it
+ * (`SvalColor.DEFAULT_TRANSPARENCY`), so a check of what a window draws on
+ * runs on both. The file's end gives the window the system's answer back.
+ *
+ * @param {boolean} see
+ */
+async function windowSeeThrough(see) {
+  if (!systemSeeThrough) {
+    systemSeeThrough = {
+      own: Object.getOwnPropertyDescriptor(SvalPanel, "seeThrough"),
+    };
+    registerCleanupFunction(() => {
+      const { own } = systemSeeThrough;
+      systemSeeThrough = null;
+      if (own) {
+        Object.defineProperty(SvalPanel, "seeThrough", own);
+      } else {
+        delete SvalPanel.seeThrough;
+      }
+      return within(SvalPanel.refresh(), 10_000, "the panel redrawing");
+    });
+  }
+  const { seeThroughMaterial } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalColor.sys.mjs"
+  );
+  SvalPanel.seeThrough = see
+    ? () => seeThroughMaterial("macosx", query => matchMedia(query).matches)
+    : () => null;
+  await within(SvalPanel.refresh(), 10_000, "the panel redrawing");
+  await TestUtils.waitForCondition(
+    () =>
+      document.documentElement.hasAttribute("data-sval-see-through") === see,
+    see ? "the window is see-through" : "the window is solid"
+  );
+}
+
+/**
+ * The Sval dialog `win` shows, once a person can see it: the page `gDialogBox`
+ * shows, sized and painted (`dialogShown`), and its card, the `sval-dialog`
+ * that has fitted the box to itself (`mozSubdialogReady`).
+ *
+ * @param {Window} [win]
+ * @returns {Promise<{doc: Document, dialog: Element}>}
+ */
+async function openedSvalDialog(win = window) {
+  await TestUtils.waitForCondition(
+    () => win.gDialogBox.isOpen,
+    "a dialog opens"
+  );
+  const box = win.gDialogBox.dialog;
+  await dialogShown(box, "the dialog's load");
+  const doc = box._frame.contentDocument;
+  const dialog = doc.querySelector("sval-dialog");
+  Assert.ok(dialog, "the page draws its card as sval-dialog");
+  await within(
+    Promise.resolve(doc.mozSubdialogReady),
+    10_000,
+    "the card fits the box"
+  );
+  Assert.ok(BrowserTestUtils.isVisible(box._frame), "and the dialog shows");
+  return { doc, dialog };
+}
+
+/**
+ * Presses the answer `id` (`data-button`) in the dialog `doc` shows, as a
+ * click does, once a person could: shown and enabled.
+ *
+ * @param {Document|Element} doc The dialog's page, or for a page that holds
+ *   several, such as Settings, the native `<dialog>` the card is in.
+ * @param {string} id
+ * @returns {Promise<Element>} The button pressed.
+ */
+async function pressDialogButton(doc, id) {
+  const button = doc.querySelector(`sval-dialog [data-button="${id}"]`);
+  Assert.ok(button, `the dialog offers ${id}`);
+  await TestUtils.waitForCondition(
+    () =>
+      BrowserTestUtils.isVisible(button) && !button.disabled && !button.held,
+    `${id} is shown and enabled`
+  );
+  button.click();
+  return button;
+}
+
+/**
  * Clicks `el`, in a page `openedDialog` answered, as a person would: once it
  * is drawn, enabled and the first thing under its centre, so the click lands
  * on it.
@@ -1401,9 +1510,7 @@ async function clickInDialog(el, what) {
  * @param {string} id
  */
 async function choose(doc, id) {
-  const button = doc.querySelector(
-    `.sval-aa-actions button[data-choice="${id}"]`
-  );
+  const button = doc.querySelector(`sval-dialog [data-choice="${id}"]`);
   await TestUtils.waitForCondition(() => !button.disabled, `${id} is enabled`);
   button.click();
 }
@@ -3065,14 +3172,24 @@ function contrastRatio(first, second) {
 
 /**
  * What `el` is drawn on: every background from the first opaque ancestor
- * inwards, composited.
+ * inwards, composited. In a window that shows what is behind it, the root's
+ * see-through colour stands for the colour the window shows, its colour
+ * over the material's middle, which is what the window's text is solved on
+ * (decision 0057, `SvalPanel.windowLook`).
  *
  * @param {Element} el
  * @returns {{r: number, g: number, b: number}}
  */
 function drawnBehind(el) {
   const layers = [];
+  const root = el.ownerDocument.documentElement;
+  const look = el.documentGlobal.SvalPanel?.windowLook;
   for (let node = el; node; node = node.parentElement) {
+    if (node === root && root.hasAttribute("data-sval-see-through") && look) {
+      const [r, g, b] = look.tint.map(v => Math.round(v * 255));
+      layers.unshift({ r, g, b, a: 1 });
+      break;
+    }
     const bg = rgbaOf(getComputedStyle(node).backgroundColor);
     if (bg.a > 0) {
       layers.unshift(bg);
@@ -3297,7 +3414,7 @@ async function openSvalSettings(section) {
   const byId = id => page.document.getElementById(id);
   const command = name =>
     page.document.querySelector(
-      `#sval-sync-buttons button[data-command="${name}"]`
+      `#sval-sync-buttons sval-button[data-command="${name}"]`
     );
   return {
     tab,
@@ -3375,7 +3492,7 @@ function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
     `${state} shows only its own parts`
   );
   const buttons = [
-    ...doc.getElementById("sval-sync-buttons").querySelectorAll("button"),
+    ...doc.getElementById("sval-sync-buttons").querySelectorAll("sval-button"),
   ];
   Assert.deepEqual(
     buttons.map(button => button.dataset.command),
@@ -3384,7 +3501,9 @@ function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
   );
   const card = doc.getElementById("sval-storage");
   Assert.equal(
-    card.querySelectorAll(".sval-button-primary").length,
+    [...card.querySelectorAll('sval-button[type="primary"]')].filter(
+      button => !button.closest("dialog")
+    ).length,
     primary ? 1 : 0,
     "with one primary at most"
   );
@@ -3392,7 +3511,7 @@ function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
   // Stop Syncing last.
   const row = doc.getElementById("sval-sync-state");
   const stop = doc.getElementById("sval-storage-stop");
-  const inRow = [...row.querySelectorAll("button")].filter(button =>
+  const inRow = [...row.querySelectorAll("sval-button")].filter(button =>
     BrowserTestUtils.isVisible(button)
   );
   Assert.deepEqual(
@@ -3403,10 +3522,7 @@ function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
     "in the state's row"
   );
   if (primary) {
-    Assert.ok(
-      inRow[0].classList.contains("sval-button-primary"),
-      "the primary first"
-    );
+    Assert.equal(inRow[0].type, "primary", "the primary first");
   }
   const footer = settings.panel?.syncIndicator();
   if (footer && settings._page.location) {

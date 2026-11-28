@@ -14,6 +14,7 @@
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { openSvalDialogPage } from "moz-src:///browser/components/sval/SvalDialog.sys.mjs";
 import {
   bookmarksHtml,
   completeReadme,
@@ -67,11 +68,8 @@ export async function askExport(win, { engine, target = "chrome" }) {
       await writeExport(choices, path, { engine });
       return noticeOf(choices.target);
     },
-    // Read by `gDialogBox.open` while the window is in a modal state; see
-    // `SvalAgentAlerts.askToPair`.
-    getProperty: name => name === "async",
   };
-  await win.gDialogBox?.open(DIALOG_URL, args);
+  await openSvalDialogPage(win, DIALOG_URL, args);
 }
 
 /**

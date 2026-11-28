@@ -210,8 +210,8 @@ async function answerSvalDialog(win, button) {
   await dialogShown(dialog, "the dialog's load");
   const selector =
     button === "primary"
-      ? ".sval-dialog-actions .primary"
-      : `.sval-dialog-actions [data-button="${button}"]`;
+      ? 'sval-dialog [type="primary"]'
+      : `sval-dialog [data-button="${button}"]`;
   let target;
   await TestUtils.waitForCondition(() => {
     target = dialog._frame.contentDocument?.querySelector(selector);
@@ -780,14 +780,14 @@ add_task(async function a_restore_says_how_it_went() {
     "true",
     "a typing mistake is refused on the field"
   );
-  Assert.equal(asked.form.dataset.state, "restore", "before any key is tried");
+  Assert.equal(asked.card.state, "restore", "before any key is tried");
 
   atTaskEnd(() => SvalTestDeny.allow(theirDir));
   await SvalTestDeny.write(theirDir);
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
   submitInDialog(asked, backupCode(theirKey));
   await TestUtils.waitForCondition(
-    () => asked.form.dataset.state === "folder",
+    () => asked.card.state === "folder",
     "the dialog says the folder could not be reached"
   );
   Assert.ok(!asked.ok.disabled, "with Restore there to try again");
@@ -826,7 +826,7 @@ add_task(async function send_report_opens_the_form_from_settings() {
   const byId = id => ui.page.document.getElementById(id);
   const actions = byId("sval-storage-result-actions");
   await setUpAgainFromSettings(ui, null);
-  const button = actions.querySelector("button");
+  const button = actions.querySelector("sval-button");
   Assert.equal(button.dataset.command, "sendReport");
   const unsent = button.textContent;
   button.click();

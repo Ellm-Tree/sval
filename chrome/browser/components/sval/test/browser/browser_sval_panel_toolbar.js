@@ -439,47 +439,75 @@ add_task(async function a_click_on_the_address_floats_the_launcher() {
     () => gURLBar.hasAttribute(FLOATING),
     "the Launcher floating over the page"
   );
+  // The Launcher opens on a query, whose results open its view; the task's
+  // end moves the field back, which has no box to place the view by.
+  await within(
+    gURLBar.lastQueryContextPromise,
+    10_000,
+    "the Launcher's first results"
+  );
 });
 
 add_task(async function a_prompt_slides_the_hidden_panel_in() {
   await toolbarInPanel(true);
-  SvalPanel.toggleVisible();
-  atTaskEnd(() => {
-    if (container().hasAttribute("sval-collapsed")) {
-      SvalPanel.toggleVisible();
+  for (const see of [false, true]) {
+    const kind = see ? "see-through" : "solid";
+    await windowSeeThrough(see);
+    SvalPanel.toggleVisible();
+    atTaskEnd(() => {
+      if (container().hasAttribute("sval-collapsed")) {
+        SvalPanel.toggleVisible();
+      }
+    });
+    await TestUtils.waitForCondition(
+      () => container().hasAttribute("sval-collapsed"),
+      "the panel hiding"
+    );
+    SvalPanelToolbar.beforePrompt(window);
+    Assert.equal(
+      container().getAttribute("sval-reveal"),
+      "shown",
+      `${kind}: the panel is in, so the prompt has its button to drop from`
+    );
+    Assert.ok(
+      document
+        .getElementById(PANEL_TOOLBAR_ID)
+        .checkVisibility({ visibilityProperty: true }),
+      `${kind}: and the toolbar shows`
+    );
+    Assert.ok(
+      container().hasAttribute("sval-overlay"),
+      `${kind}: the panel is lifted over the page`
+    );
+    const fill = getComputedStyle(container()).backgroundColor;
+    Assert.equal(
+      fill,
+      getComputedStyle(container().querySelector(".sval-panel"))
+        .backgroundColor,
+      `${kind}: the toolbar stands on the panel's own fill`
+    );
+    // A see-through panel is clear, and the page is cut where it stands
+    // (`sval-header.css`, panel reveal), so the window shows through it.
+    const panels = document.getElementById("tabbrowser-tabpanels");
+    if (see) {
+      Assert.notEqual(
+        getComputedStyle(panels).maskImage,
+        "none",
+        `${kind}: the page is cut under the panel`
+      );
+    } else {
+      Assert.greater(
+        InspectorUtils.colorToRGBA(fill).a,
+        0,
+        `${kind}: the fill hides the page under it`
+      );
     }
-  });
-  await TestUtils.waitForCondition(
-    () => container().hasAttribute("sval-collapsed"),
-    "the panel hiding"
-  );
-  SvalPanelToolbar.beforePrompt(window);
-  Assert.equal(
-    container().getAttribute("sval-reveal"),
-    "shown",
-    "the panel is in, so the prompt has its button to drop from"
-  );
-  Assert.ok(
-    document
-      .getElementById(PANEL_TOOLBAR_ID)
-      .checkVisibility({ visibilityProperty: true }),
-    "and the toolbar shows"
-  );
-  Assert.ok(
-    container().hasAttribute("sval-overlay"),
-    "the panel is lifted over the page"
-  );
-  const fill = getComputedStyle(container()).backgroundColor;
-  Assert.equal(
-    fill,
-    getComputedStyle(container().querySelector(".sval-panel")).backgroundColor,
-    "the toolbar stands on the panel's own fill"
-  );
-  Assert.greater(
-    InspectorUtils.colorToRGBA(fill).a,
-    0,
-    "which hides the page under it"
-  );
+    SvalPanel.toggleVisible();
+    await TestUtils.waitForCondition(
+      () => !container().hasAttribute("sval-collapsed"),
+      "the panel showing"
+    );
+  }
 });
 
 /**

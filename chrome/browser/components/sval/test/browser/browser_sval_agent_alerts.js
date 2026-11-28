@@ -147,8 +147,7 @@ add_task(async function allow_waits_out_the_dialog_delay() {
     defaultChoice: "deny",
   });
   const doc = await alertIn(window);
-  const button = id =>
-    doc.querySelector(`.sval-aa-actions button[data-choice="${id}"]`);
+  const button = id => doc.querySelector(`sval-dialog [data-choice="${id}"]`);
   Assert.ok(button("allow").disabled, "Allow starts disabled");
   Assert.ok(!button("deny").disabled, "Deny does not");
   button("allow").click();
@@ -181,18 +180,16 @@ add_task(async function a_held_allow_is_marked_until_it_enables() {
     defaultChoice: "deny",
   });
   const doc = await alertIn(window);
-  const allow = doc.querySelector(
-    '.sval-aa-actions button[data-choice="allow"]'
-  );
-  const deny = doc.querySelector('.sval-aa-actions button[data-choice="deny"]');
+  const allow = doc.querySelector('sval-dialog [data-choice="allow"]');
+  const deny = doc.querySelector('sval-dialog [data-choice="deny"]');
   Assert.ok(allow.disabled, "Allow starts disabled");
   await TestUtils.waitForCondition(
-    () => allow.hasAttribute("data-hold"),
+    () => allow.held,
     "and held once the alert is in front"
   );
-  Assert.ok(!deny.hasAttribute("data-hold"), "Deny is not held");
+  Assert.ok(!deny.held, "Deny is not held");
   await TestUtils.waitForCondition(() => !allow.disabled, "Allow enables");
-  Assert.ok(!allow.hasAttribute("data-hold"), "and is no longer held");
+  Assert.ok(!allow.held, "and is no longer held");
   await choose(doc, "deny");
   Assert.equal(await answer, "deny");
 });
@@ -264,22 +261,17 @@ add_task(async function a_refocus_holds_allow_afresh() {
     defaultChoice: "deny",
   });
   const doc = await alertIn(own);
-  const allow = doc.querySelector(
-    '.sval-aa-actions button[data-choice="allow"]'
-  );
+  const allow = doc.querySelector('sval-dialog [data-choice="allow"]');
   Assert.ok(allow.disabled, "Allow starts disabled");
   await TestUtils.waitForCondition(() => !allow.disabled, "Allow enables");
 
   await within(SimpleTest.promiseFocus(window), 10_000, "the window's focus");
   await TestUtils.waitForCondition(() => allow.disabled, "a blur disables");
-  Assert.ok(!allow.hasAttribute("data-hold"), "unheld while behind");
+  Assert.ok(!allow.held, "unheld while behind");
   await within(SimpleTest.promiseFocus(own), 10_000, "the window's focus");
-  await TestUtils.waitForCondition(
-    () => allow.hasAttribute("data-hold"),
-    "a refocus holds it"
-  );
+  await TestUtils.waitForCondition(() => allow.held, "a refocus holds it");
   await TestUtils.waitForCondition(() => !allow.disabled, "refocused");
-  Assert.ok(!allow.hasAttribute("data-hold"), "and it enables");
+  Assert.ok(!allow.held, "and it enables");
   await choose(doc, "deny");
   Assert.equal(await answer, "deny");
 });
@@ -296,8 +288,8 @@ add_task(async function an_alert_with_nothing_to_grant_holds_nothing() {
     defaultChoice: "ok",
   });
   const doc = await alertIn(window);
-  const ok = doc.querySelector('.sval-aa-actions button[data-choice="ok"]');
-  Assert.ok(!ok.disabled && !ok.hasAttribute("data-hold"), "OK is not held");
+  const ok = doc.querySelector('sval-dialog [data-choice="ok"]');
+  Assert.ok(!ok.disabled && !ok.held, "OK is not held");
   await choose(doc, "ok");
   Assert.equal(await answer, "ok");
 });

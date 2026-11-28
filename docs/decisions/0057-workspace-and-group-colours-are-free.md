@@ -16,7 +16,7 @@ easily. APCA (APCA-W3 0.0.98G-4g, the method proposed for WCAG 3) rates the
 two polarities apart, closer to how they are seen.
 
 A browser window's own content cannot show what lies behind the window: CSS
-backdrop filters reach only the window. On macOS, AppKit's materials
+backdrop filters reach only the window's own content. On macOS, AppKit's materials
 (`NSVisualEffectView`) blur what is behind the window, and they are neutral
 by design, with no tint. A colour laid over one at 35% or more still reads
 as the colour, and text picked for the colour alone reads over most of
@@ -84,14 +84,25 @@ transparency. The toolbar, the Workspace panel, the sidebars and the margin
 round the page are clear over that background, so they move without a seam.
 The colour keeps at least 35%: every colour goes to 65%. Text keeps the side
 the solid colour gives and is solved on the colour the window shows, the
-colour mixed with the material's measured middle, which popups and dialogs
-wear so they match the window. The material's blur is the system's. At no
+colour mixed with the material's measured middle, which popups and solid
+dialogs wear so they match the window. The material's blur is the system's. At no
 transparency the window is opaque and draws no material. When the system
 reduces transparency (macOS's Reduce transparency, Windows' Transparency
 effects turned off, high contrast on Linux), the window is solid. Windows
 without a system backdrop, Linux on X11 and a Linux compositor that does not
 blur draw the solid colour: without blur, what is behind the window shows
 sharp through its text.
+
+**Dialogs.** A dialog in a see-through window is frosted. Its card blurs
+the dimmed window under it, the page and Sval's own chrome, and never what
+lies behind the window. It wears the colour the window's root wears where
+only a blur lies behind it, as on Linux: the colour at the window's share
+over `hudWindow`'s grey. Its text is solved on what that shows, by the
+targets above. The Send Feedback form, a popover joined to its button, is
+frosted the same way. A critical dialog stays solid, the one dialog that means work
+is being lost, as does a dialog drawn in a palette of its own, such as the
+import page's. When the window is solid, at no transparency or with the
+system reducing transparency, every dialog is opaque.
 
 **No colour** is Sval's own window colour: its navy in dark and its blue
 white in light. Solid, it is drawn by Sval's own styles. With a
@@ -143,7 +154,9 @@ about a third and left every window close to the material's grey. Locking
 the window's brightness to the colour's, with the backdrop's hue laid over
 it, is rejected: pale colours showed nothing behind them, and near-black
 ones showed it banded and oversaturated. A private backdrop layer, which would allow a blur radius, is rejected: it is
-private API. A home page sky tuned to each preset is rejected: a custom colour has
+private API. A dialog that shows what lies behind the window is rejected: a
+dialog is about its window, and the desktop seen through it reads as
+another app's. A home page sky tuned to each preset is rejected: a custom colour has
 no tuned sky, and a sky drawn in a custom colour's hue read as another
 colour once the colour stopped matching the window. A home page filled with the colour the window
 shows is rejected: a light colour turned the page light, and the page lost

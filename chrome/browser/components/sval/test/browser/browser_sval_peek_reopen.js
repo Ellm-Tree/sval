@@ -144,11 +144,11 @@ async function openInWork(win, id) {
     "it asks about Work"
   );
   Assert.ok(
-    question.querySelector('button[data-button="cancel"]'),
+    question.querySelector('sval-button[data-button="cancel"]'),
     "as a question that can be declined"
   );
   const closed = BrowserTestUtils.domWindowClosed(win);
-  question.querySelector('button[data-button="ok"]').click();
+  question.querySelector('sval-button[data-button="ok"]').click();
   await within(closed, 10_000, "the Peek closing");
   Assert.equal(
     SvalWindowWorkspace.of(window).id,
@@ -250,10 +250,10 @@ add_task(async function a_page_that_cannot_load_again_is_refused_first() {
     "it names Work"
   );
   Assert.ok(
-    !notice.querySelector('button[data-button="cancel"]'),
+    !notice.querySelector('sval-button[data-button="cancel"]'),
     "as a notice, with nothing to decline"
   );
-  notice.querySelector('button[data-button="ok"]').click();
+  notice.querySelector('sval-button[data-button="ok"]').click();
   await TestUtils.waitForCondition(
     () => !win.gDialogBox.isOpen,
     "the notice closes"

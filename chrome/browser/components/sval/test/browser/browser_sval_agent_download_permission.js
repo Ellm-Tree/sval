@@ -100,7 +100,7 @@ add_task(async function always_allow_saves_the_sites_later_downloads_unasked() {
   const { call, win, alerts, store, agent, browser } = await downloadsSetup();
   await pageRuns(browser, download("first.txt"));
   const doc = await alertIn(win);
-  const buttons = [...doc.querySelectorAll(".sval-aa-actions button")];
+  const buttons = [...doc.querySelectorAll("sval-dialog [data-choice]")];
   Assert.deepEqual(
     buttons.map(b => b.dataset.choice),
     ["allow", "allow_always", "deny_always", "deny"]

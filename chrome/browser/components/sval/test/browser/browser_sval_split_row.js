@@ -848,7 +848,7 @@ async function answerNameDialog(value) {
   await typeAndPress(
     doc,
     ".sval-dialog-input",
-    '.sval-dialog-actions [data-button="ok"]',
+    'sval-dialog [data-button="ok"]',
     value
   );
 }
