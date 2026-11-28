@@ -144,7 +144,18 @@ button {
 }
 
 :host([size="small"]) button {
+  --_height: var(--sval-button-small-height, 30px);
   min-height: var(--sval-button-small-height, 30px);
+}
+
+/* A leading icon or spinner sits at the centre of the pill's round end, so
+ * the start padding is half the height less half the 16px glyph and the
+ * border. The label's end keeps the type's padding. */
+button:has(> .icon, > .spinner) {
+  padding-inline-start: var(
+    --sval-button-padding-inline-start,
+    calc(var(--_height, var(--sval-button-height, 34px)) / 2 - 8px - var(--sval-button-border-width, 1px))
+  );
 }
 
 button:hover:not(:disabled) {
