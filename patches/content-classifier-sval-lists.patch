@@ -1,7 +1,7 @@
 Sval: serve Sval's own filter lists to the content classifier
 
 List ids that start with "sval-" are lists Sval downloads from each publisher
-(protections spec §1.2, decision 0102). The Remote Settings client is
+(protections spec §1.2). The Remote Settings client is
 the object the content classifier asks for list bytes, so it hands those ids
 to SvalBlockingLists, and hands it the service so that a list Sval refreshes
 rebuilds its engine. Mozilla's lists still come from Remote Settings.

@@ -187,7 +187,7 @@ export class SvalPageRulesParent extends JSWindowActorParent {
       uri = principal.URI;
     }
     // Where the site's protections or ad blocking are off, the user's own
-    // rules still apply (decision 1993).
+    // rules still apply.
     this.#ownOnly =
       protectionsOff(this.manager) || !SvalBlockingLists.enabledIds().length;
     const rules = SvalPageRules.forDocument(

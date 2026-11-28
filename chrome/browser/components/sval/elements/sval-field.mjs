@@ -27,7 +27,7 @@ import { SvalFormControl } from "chrome://browser/content/sval/elements/sval-for
  *   `spellcheck`, `inputmode`, `maxlength`, `min`, `max`, `step`: as a
  *   native field's.
  *
- * `focus()` selects the text (decision 2713): code focuses a field when a
+ * `focus()` selects the text: code focuses a field when a
  * dialog or an action opens it, and typing then replaces the old text. A
  * click or Tab focuses the native field itself, as on any field.
  *
@@ -130,7 +130,7 @@ export class SvalField extends SvalFormControl {
   }
 
   /**
-   * Focuses the field with its text selected (decision 2713).
+   * Focuses the field with its text selected.
    *
    * @param {FocusOptions} [options]
    */

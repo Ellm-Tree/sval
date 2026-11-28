@@ -45,7 +45,7 @@ pref("browser.contentblocking.category", "standard");
 // spec).
 pref("privacy.reducePageProtection.infobar.enabled.pbmode", false);
 
-// A private window's page keeps nothing outside the window (decision 0074).
+// A private window's page keeps nothing outside the window.
 //
 // The window's title, which the system shows in its window lists and gives
 // to any app that reads window titles, carries no page title
@@ -83,7 +83,7 @@ pref(
   "privacy.fingerprintingProtection.overrides",
   "-EfficientCanvasRandomization,+CanvasRandomization,+WebGLVendorSanitize,+WebGPUIsFallbackAdapter,+VideoElementMozFrames,+VideoElementMozFrameDelay,+VideoElementPlaybackQuality,+MediaError,+WebVTT,+PdfjsSpoof,+ScreenPixelDepth,+WindowScreenXY,+WindowInnerScreenXY,+MouseEventScreenPoint,+CSSColorInfo,+CSSVideoDynamicRange,+CSSPrefersReducedTransparency,+CSSInvertedColors,+TouchEvents,+ScreenSizeCommon,+WindowOuterSizeTypical,+LanguagesPrimaryOnly,+MediaDevicesBeforePermission,+GamepadIdGeneric,+PermissionsDefaultDenyPrompt,+SpeechVoicesDefault,+WebGPUTimestampQueryHidden,+AudioOutputRandomization,+NavigatorHWConcurrencyRandomized"
 );
-// Mozilla's fingerprinting webcompat fixes (decision 1685) are off until the
+// Mozilla's fingerprinting webcompat fixes are off until the
 // user turns them on in Settings.
 pref("privacy.fingerprintingProtection.remoteOverrides.enabled", false);
 // The ESR's StaticPrefList offers this cipher, and release Firefox's turns it
@@ -412,7 +412,7 @@ pref("browser.sval.adblock.userListsTrustedHere", "[]");
 // normal and private windows, and the URL classifier steps aside for it, so
 // one engine matches each request. Safe Browsing does not go through it.
 // SvalBlocking writes the engines prefs and each feature's lists from the
-// level (decision 1051); these are the defaults until it first runs. The
+// level; these are the defaults until it first runs. The
 // annotation engine is the tracker tag Firefox's cookie blocking reads.
 pref("privacy.trackingprotection.content.protection.enabled", true);
 pref("privacy.trackingprotection.content.annotation.enabled", true);
@@ -433,7 +433,7 @@ pref("privacy.trackingprotection.content.annotation.engines.pbmode", "");
 pref("privacy.trackingprotection.content.ads.list_ids", "");
 pref("privacy.trackingprotection.content.trackers.list_ids", "");
 pref("privacy.trackingprotection.content.trackers_content.list_ids", "");
-// Sval runs none of Disconnect's data (decision 1051), so the URL
+// Sval runs none of Disconnect's data, so the URL
 // classifier requests none of its tables; Mozilla's harmful add-on table
 // is the one it still fetches.
 pref("urlclassifier.trackingTable", "");
@@ -612,7 +612,7 @@ sticky_pref("browser.sval.update.releaseCandidates", false);
 
 // Debugging the browser itself is off until a developer turns it on in
 // about:config or the DevTools settings. Sval never builds with
-// MOZILLA_OFFICIAL (decision 0063), so all.js would give every Sval the
+// MOZILLA_OFFICIAL, so all.js would give every Sval the
 // defaults Mozilla keeps for local builds; these are release Firefox's.
 // devtools.chrome.enabled gives the Browser Console a command line that runs
 // with the browser's privileges and, with devtools.debugger.remote-enabled,
@@ -777,7 +777,7 @@ pref("browser.sval.webdriver.useWorkspaceCookies", false);
 // Remote Settings is kept for what protects the user (certificate revocation,
 // extension and driver blocklists, tracking protection, site fixes) and for
 // the breach list the Privacy and Security panel matches on the device
-// (fxmonitor-breaches, decision 0131). It syncs nothing else. Any collection
+// (fxmonitor-breaches). It syncs nothing else. Any collection
 // that ships with built-in data syncs whether or not the feature using it is
 // on (remote-settings.sys.mjs `_client`), so turning features off is not
 // enough; remote-settings-allowlist.patch reads this list. An entry written
@@ -790,7 +790,7 @@ pref("browser.sval.webdriver.useWorkspaceCookies", false);
 // fresh profile, so they are listed by consumer. remote-permissions is left
 // out: it lets Mozilla grant sites permissions remotely, and the copy bundled
 // in the build still applies.
-// The Privacy and Security panel's breach warnings (decision 0131). Off, the
+// The Privacy and Security panel's breach warnings. Off, the
 // panel looks nothing up and the breach list does not sync: its entry below
 // names this pref.
 pref("browser.sval.breachWarnings", true);
@@ -873,7 +873,7 @@ pref("extensions.abuseReport.enabled", false); // upstream: true
 // languages Sval ships stay listed.
 pref("intl.multilingual.downloadEnabled", false); // upstream: true
 
-// Secure DNS (Sval decision 0105): the network's own DNS until the user picks
+// Secure DNS: the network's own DNS until the user picks
 // encrypted DNS in Protections, so no automatic rollout and none of its probe
 // lookups. Gecko's `network.trr.mode` default, 0, is that choice.
 pref("doh-rollout.enabled", false);
@@ -1040,7 +1040,7 @@ pref("ui.popup.window_inset", 16);
 // closest of the system's backdrops to the HUD material macOS shows. The
 // backdrop reaches a window only while its root carries `windowsmica`
 // (`nsWindow::UpdateMicaBackdrop`), which a Workspace colour's transparency
-// sets (decision 0057).
+// sets.
 pref("widget.windows.mica", true);
 pref("widget.windows.mica.toplevel-backdrop", 2);
 

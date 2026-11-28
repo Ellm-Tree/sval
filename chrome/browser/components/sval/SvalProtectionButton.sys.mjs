@@ -3,7 +3,7 @@
 
 /**
  * The Privacy and Security button in the address pill, and its panel
- * (protections spec §2.1 and §2.2, decision 0131). It
+ * (protections spec §2.1 and §2.2). It
  * stands in for Firefox's shield and padlock, which `sval-protection.css`
  * hides, so the page's connection is told here too: what `gIdentityHandler`
  * reads from the page's security state colours the button when the
@@ -14,7 +14,7 @@
  * `gProtectionsHandler` classifies it with, and the canvas and font
  * fingerprinting states Gecko reports into the same log. The site's
  * choices are `SvalSiteProtections`'. What a site may do, media included, is
- * the site controls' (`SvalSiteControls`, decision 0132).
+ * the site controls' (`SvalSiteControls`).
  *
  * Clicking only opens the panel, since every change reloads the tab.
  */

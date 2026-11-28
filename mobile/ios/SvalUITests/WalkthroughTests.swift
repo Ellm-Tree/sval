@@ -324,8 +324,7 @@ final class WalkthroughTests: XCTestCase {
         workspace.tap()
         sleep(2)
         shot("sheet")
-        // The phone's own Workspace holds groups as any other does
-        // (decision 2254).
+        // The phone's own Workspace holds groups as any other does.
         startEditing()
         sleep(1)
         XCTAssertTrue(app.buttons["New Group…"].exists, "the phone's own Workspace offers New Group…")

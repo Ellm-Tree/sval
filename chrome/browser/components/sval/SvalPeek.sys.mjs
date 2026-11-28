@@ -15,8 +15,7 @@
  *   its page is never written to the tree. A link from another app's page is
  *   in the shared jar, the default one ordinary workspaces use
  *   (`SvalWorkspaceJar`); New Peek's is in the jar of the window it was
- *   opened from, so the page is signed in as that window's workspace
- *   (decision 1995).
+ *   opened from, so the page is signed in as that window's workspace.
  * - **No session.** It is marked unsaved (`sessionstore-unsaved-windows.patch`),
  *   so no restart, crash or Restore Previous Session brings it back, and its
  *   closed page goes with it rather than into another window's undo-close

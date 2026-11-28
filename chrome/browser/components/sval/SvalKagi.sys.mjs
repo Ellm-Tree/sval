@@ -9,10 +9,10 @@
  * is signed in (`signedIn`), and to fetch Privacy Pass tokens with it
  * (`sessionValue`, for `SvalKagiPrivacyPass` alone). It never carries it into a
  * private window, which would link the user's private searches to their
- * account (decision 0091).
+ * account.
  *
- * **Private windows sign in with Privacy Pass** (Kagi Privacy Pass spec,
- * decision 0091): each request spends one token, which Kagi can check comes
+ * **Private windows sign in with Privacy Pass** (Kagi Privacy Pass spec):
+ * each request spends one token, which Kagi can check comes
  * from a subscriber and cannot link to an account. A Session Link the user
  * pastes into Settings signs private windows in only when Kagi says the
  * account's plan has no Privacy Pass, or the build has no engine to make

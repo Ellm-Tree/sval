@@ -8,7 +8,7 @@
 /**
  * A device publishes nothing before its first time reading, and the first
  * file it publishes after one holds no stamp of its own later than corrected
- * time (decision 1714).
+ * time.
  */
 
 const { SKEW_PREF } = ChromeUtils.importESModule(

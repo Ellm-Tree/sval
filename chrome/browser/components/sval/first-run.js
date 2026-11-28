@@ -3096,7 +3096,7 @@ const SvalFirstRunPage = {
 
   /**
    * Looks in the chosen folder for this user's own key, which a reinstall on
-   * the same machine finds (decision 0084). A key found there is adopted as a
+   * the same machine finds. A key found there is adopted as a
    * claimed code's would be, and the code step is skipped; otherwise the
    * flow asks for a code.
    */
@@ -3403,8 +3403,8 @@ const SvalFirstRunPage = {
       return;
     }
     if (answer.status === "waiting") {
-      // A folder that does not answer is said as the sync indicator says it
-      // (decision 0032). The look goes on, and the line goes back to waiting
+      // A folder that does not answer is said as the sync indicator says it.
+      // The look goes on, and the line goes back to waiting
       // once the folder answers.
       const unreachable = showsFolderNotice({
         problem: answer.problem ?? null,

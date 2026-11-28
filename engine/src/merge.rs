@@ -19,10 +19,10 @@ use std::collections::BTreeMap;
 /// Such a file carried the node, so a side that read it and lacks the node
 /// deleted it. Judging by the writer's watermark keeps a node one device
 /// created offline from reading as a deletion to a third device that never
-/// saw it (decision 0015).
+/// saw it.
 ///
 /// Any one group being news keeps the node, and a group with a timestamp but
-/// no writer is news (decisions 0016, 0017). A wrongly kept node is a visible
+/// no writer is news. A wrongly kept node is a visible
 /// nuisance; a wrongly dropped one is silent data loss.
 ///
 /// **A group never written is skipped** (spec §5.4): it has no timestamp to
@@ -303,7 +303,7 @@ pub fn merge(local: &mut Document, remote: &Document) {
 /// [`merge`], with `unheld` naming a device whose stamps before a time
 /// `local` never held, though its watermark covers them: `local` began then,
 /// empty, under that device's id, and `remote` holds that id's earlier
-/// writes (decision 2232). Those stamps are news to `local`, so what `remote`
+/// writes. Those stamps are news to `local`, so what `remote`
 /// holds of them is kept. Only the half that asks what is news to `local`
 /// reads it; what is news to `remote` is decided as in [`merge`].
 pub fn merge_unheld(
@@ -1635,8 +1635,7 @@ mod tests {
 
     /// A has a workspace W holding one tab. B, apart, files a tab under W and
     /// touches W. A, not having seen that, deletes W with its tab. The touch is
-    /// news to A, so W comes back with B's tab under it, on both devices
-    /// (decisions 0106, 0017).
+    /// news to A, so W comes back with B's tab under it, on both devices.
     #[test]
     fn a_touch_the_deleter_never_saw_brings_the_node_back() {
         let (mut a, mut b, dev_a, dev_b) = two_current_peers(100);
@@ -2441,10 +2440,10 @@ mod tests {
     #[test]
     fn a_stale_published_watermark_keeps_the_node_where_a_current_one_drops_it() {
         // `sync` decides whether to write from the shared state alone, so a
-        // published `seen` can lag what its writer has incorporated (spec §5.4,
-        // decision 0018). The drop half reads the lacking side's watermark, and
-        // a lower watermark makes the node news, which keeps it. The two merges
-        // below differ only in that watermark.
+        // published `seen` can lag what its writer has incorporated (spec
+        // §5.4). The drop half reads the lacking side's watermark, and a lower
+        // watermark makes the node news, which keeps it. The two merges below
+        // differ only in that watermark.
         let writer = DeviceId::from_bytes([1u8; 16]);
         let mut local = base_doc();
         let tab = local.add_tab(

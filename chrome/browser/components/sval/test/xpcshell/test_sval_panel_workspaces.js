@@ -246,7 +246,7 @@ add_task(function a_new_window_takes_an_agents_workspace_only_when_alone() {
 });
 
 /**
- * A phone's or tablet's own workspace (decision 2254) is passed over as an
+ * A phone's or tablet's own workspace is passed over as an
  * agent's is: a window the user opens takes it only when the document holds
  * no workspace of the user's, and one that remembers it keeps it. The
  * switcher's entry says it is a device's.

@@ -9,7 +9,7 @@
 /**
  * The History sidebar lists the history of the workspace its window shows,
  * with the pages visited in no workspace, and every page under "All
- * workspaces", where a column names each page's workspace (decision 1287).
+ * workspaces", where a column names each page's workspace.
  */
 
 ChromeUtils.defineESModuleGetters(this, {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
-//! Local nodes (decision 1372): an address that stays on this device is held
+//! Local nodes: an address that stays on this device is held
 //! in its profile copy and in no file of the shared folder, and a pass over
 //! the shared folder neither deletes nor replaces it.
 

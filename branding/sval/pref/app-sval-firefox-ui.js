@@ -55,7 +55,7 @@ pref("toolkit.datacollection.infoURL", "");
 
 // Firefox's profiler toolbar button and devtools Performance panel open their
 // results on profiler.firefox.com, so Sval offers neither; Sval's own
-// recordings save to a file (decision 2428). With the feature flag false the
+// recordings save to a file. With the feature flag false the
 // toolbar button is never registered (DevToolsStartup
 // `hookProfilerRecordingButton`), so a placement left in a profile's toolbar
 // draws nothing; locked, because profiler.firefox.com and about:logging set

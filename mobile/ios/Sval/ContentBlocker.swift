@@ -23,8 +23,7 @@ final class ContentBlocker {
         /// line added to them compiles this small list alone
         /// (`exceptionLines`).
         var mine: [WKContentRuleList] = []
-        /// My filters' page rules alone, for a page the lists skip
-        /// (decision 1993).
+        /// My filters' page rules alone, for a page the lists skip.
         var own: [WKContentRuleList] = []
         /// The scripts of a site with JavaScript off, stopped in its frames
         /// on any page (`scriptRules`).
@@ -32,7 +31,7 @@ final class ContentBlocker {
 
         /// The lists a page blocks with, in order: the level's and My
         /// filters' where its site has protections on, My filters' page
-        /// rules alone where it hasn't or no list runs (decision 1993), and
+        /// rules alone where it hasn't or no list runs, and
         /// the scripts' everywhere.
         func installed(protected: Bool) -> [WKContentRuleList] {
             let level = lists + last
@@ -365,7 +364,7 @@ final class ContentBlocker {
     private func rebuild(_ inputs: BlockerInputs, due: Bool) async {
         let (lists, pageRules, myFilters, allowed) = (inputs.lists, inputs.pageRules, inputs.myFilters, inputs.allowed)
         // My filters' request blocking is ad blocking, and goes with the
-        // lists; their page rules apply at every level (decision 1993).
+        // lists; their page rules apply at every level.
         let own = pageRules ? myFilters : ""
         requestsGeneration += 1
         let generation = requestsGeneration

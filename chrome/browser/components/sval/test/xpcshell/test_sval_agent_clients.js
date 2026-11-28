@@ -438,7 +438,7 @@ add_task(function only_gnome_on_wayland_is_told_sval_opens_in_front() {
 /**
  * On macOS an AI app runs Sval's copy of the shim in its application data
  * directory, so no app starts a program inside Sval.app while Finder may be
- * replacing it (decision 2052). Elsewhere it runs the one beside the browser.
+ * replacing it. Elsewhere it runs the one beside the browser.
  */
 add_task(function macos_apps_run_the_copy_outside_the_bundle() {
   Assert.equal(shimPath("macosx"), PathUtils.join(APP_DATA, "sval-mcp"));

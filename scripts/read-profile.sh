@@ -3,7 +3,7 @@
 # Copyright 2026 Ellm Tree, Inc.
 #
 # Summarise a performance recording, the .json.gz that Help › Record
-# Performance saves (decision 2428): the busiest threads of each process, the
+# Performance saves: the busiest threads of each process, the
 # functions each spends its time in, and the graphics and media markers.
 # Native frames are named from the recorded build's symbols, sval-symbols
 # <build id> (scripts/publish-symbols.sh), which only a release compile has;

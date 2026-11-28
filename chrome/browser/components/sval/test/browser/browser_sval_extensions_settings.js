@@ -8,7 +8,7 @@
 /* import-globals-from sval_preferences_helpers.js */
 
 /**
- * Settings' Extensions category (decision 1479): the list and its switch, an
+ * Settings' Extensions category: the list and its switch, an
  * extension's page with its switches, its own settings page and Remove,
  * extensions' shortcuts in Keyboard shortcuts and on each extension's page,
  * and search finding the category.

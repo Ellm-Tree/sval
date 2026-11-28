@@ -307,7 +307,7 @@ function countMarks(roots) {
 }
 
 /**
- * The name each window is offered under (decision 0087): the source's own
+ * The name each window is offered under: the source's own
  * name when it has one, otherwise "<Browser> Window N" or, for an Edge or
  * Vivaldi workspace, "<Browser> Workspace N", numbered within its kind.
  *
@@ -380,7 +380,7 @@ export const BOOKMARKS_TO = Object.freeze({
 });
 
 /**
- * The workspace each profile's history goes to (decision 1287): the one its
+ * The workspace each profile's history goes to: the one its
  * plain windows landed in, since a profile is the workspace's analog (§2).
  * A browser keeps a profile's history in one place for all its windows, and
  * records no Space, Tab Group or Workspace per visit, so a profile that also
@@ -639,7 +639,7 @@ function markToNode(mark) {
  * bookmark whose URL is already a favorite left out, and every folder that
  * leaves empty left out with it (import spec §2).
  *
- * Favorites is one tree (decision 0123): the source's toolbar is its top
+ * Favorites is one tree: the source's toolbar is its top
  * level, and the source's menu and other bookmarks are folders in it. A
  * folder holding only one folder is that folder, so a chain of wrappers
  * another browser's import left arrives as its innermost folder.
@@ -745,8 +745,8 @@ export function importableUrl(url) {
 /**
  * Whether a URL is one import carries from a file the user picks: a web
  * address alone. Anyone can write such a file, and a `file:` address it
- * holds would be marked local and open with this device's trust
- * (decision 1372), which belongs to what the user's own browser kept.
+ * holds would be marked local and open with this device's trust,
+ * which belongs to what the user's own browser kept.
  *
  * @param {string} url
  * @returns {boolean}

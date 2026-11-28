@@ -3,7 +3,7 @@
 
 "use strict";
 
-// A JavaScript rule for one host under its site (decision 1980): stored only
+// A JavaScript rule for one host under its site: stored only
 // where it differs from what the host gets without it, and decided in Gecko's
 // domain policy by the most specific name, whatever the default.
 

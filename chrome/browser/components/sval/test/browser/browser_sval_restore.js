@@ -182,7 +182,7 @@ add_task(async function a_node_becomes_a_real_lazy_tab_already_tagged() {
 });
 
 /**
- * The tree decides what a tab shows (decision 0050). A tab restored before it
+ * The tree decides what a tab shows. A tab restored before it
  * loaded, whose node another device has since navigated, is pointed at the
  * node's address, still lazy. A tab that has loaded its page is left on it.
  */
@@ -302,9 +302,9 @@ add_task(
 );
 
 /**
- * An address this device wrote that may not leave it is marked `local`
- * (decision 1372), and restores on this device as the user's own tab, with
- * the system principal, whatever its scheme.
+ * An address this device wrote that may not leave it is marked `local`,
+ * and restores on this device as the user's own tab, with the system
+ * principal, whatever its scheme.
  */
 add_task(async function this_devices_own_browser_page_restores() {
   const { engine, addTab } = await aShownWorkspace();

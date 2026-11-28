@@ -3,7 +3,7 @@ Sval: the sharing indicator opens Sval's site menu
 Firefox's webrtcUI.showSharingDoorhanger, which the global sharing indicator
 and the macOS sharing menu call, opens gPermissionPanel at
 #identity-permission-box, which Sval hides. Sval shows a site's permissions
-and what it captures in its site menu (SvalSiteControls, decision 0132),
+and what it captures in its site menu (SvalSiteControls),
 so the doorhanger is that menu.
 
 diff --git a/browser/modules/webrtcUI.sys.mjs b/browser/modules/webrtcUI.sys.mjs

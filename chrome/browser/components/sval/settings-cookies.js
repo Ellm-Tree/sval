@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Cookies and site data in Privacy and protection (decision 1484), drawn by
+ * Cookies and site data in Privacy and protection, drawn by
  * Firefox's `setting-group` like the rest of its settings: which cookies sites
  * may set, then Firefox's own controls for the data they keep, from
  * `config/privacy.mjs`'s `cookiesAndSiteData2` group (`siteDataSize`,

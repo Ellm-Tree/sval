@@ -978,7 +978,7 @@ add_task(async function tabs_closed_together_leave_the_panel_right() {
  * the panel is the only tab surface, so a tab that browses somewhere has to
  * appear there. The window is handed an empty workspace, as the switcher
  * hands one: on a workspace with tabs the startup tab closes once the
- * workspace's tab is on screen (decision 1997).
+ * workspace's tab is on screen.
  */
 add_task(async function typing_a_url_into_the_startup_tab_files_it() {
   await within(SvalPanel.started, 40_000, "the panel's startup");

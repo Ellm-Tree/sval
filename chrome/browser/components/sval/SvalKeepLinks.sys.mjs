@@ -4,10 +4,10 @@
 /**
  * Keep links in this tab: on a site with the rule on, a link to another of
  * the site's pages that asks for a new tab or window loads in the tab it is
- * in (decision 2499).
+ * in.
  *
- * A rule is for a site, as `siteOf` cuts one, or for a host under it
- * (decision 1980). Each is a pref of its own, `SITE_BRANCH` and the site or
+ * A rule is for a site, as `siteOf` cuts one, or for a host under it.
+ * Each is a pref of its own, `SITE_BRANCH` and the site or
  * host, holding `"on"` or `"off"`, and settings sync carries each as a
  * setting of its own. A name without a rule takes the rule of the nearest
  * name above it, and a site without one has the rule off.

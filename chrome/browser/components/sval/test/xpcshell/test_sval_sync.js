@@ -276,7 +276,7 @@ add_task(async function a_merged_group_reaches_a_peer_whole() {
 
 /**
  * A tab filed into a group another device deleted lands where that group was:
- * in the group's parent, at the group's place (spec §5.2, decision 0121), on
+ * in the group's parent, at the group's place (spec §5.2), on
  * both devices.
  */
 add_task(async function a_tab_filed_into_a_deleted_group_lands_at_its_place() {

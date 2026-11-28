@@ -97,7 +97,7 @@ struct JsFavorite {
     placement_at: Timestamp,
     /// When it was added, which no later write moves.
     added: Option<Timestamp>,
-    /// Whether its address stays on this device (decision 1372).
+    /// Whether its address stays on this device.
     local: bool,
 }
 
@@ -157,7 +157,7 @@ struct JsArchived {
     pane: Option<u32>,
     /// How many ids `restore` takes for this entry.
     restore_ids: usize,
-    /// Whether its address stays on this device (decision 1372).
+    /// Whether its address stays on this device.
     local: bool,
 }
 

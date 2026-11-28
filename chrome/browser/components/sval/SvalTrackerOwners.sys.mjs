@@ -3,7 +3,7 @@
 
 /**
  * Which company owns which domains, so that a company's tracker is not tagged
- * as one on that company's own sites (decision 1051). The tag is the
+ * as one on that company's own sites. The tag is the
  * classification Firefox's cookie blocking reads; blocking is not affected.
  *
  * The groups come from AdGuard's companiesdb and Sval's own additions, each

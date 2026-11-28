@@ -384,8 +384,7 @@ struct FavoriteEditor: View {
                 if let folder = await model.addFavoriteFolder(named: value, in: parent) { onCreated(folder) }
             }
         case .address(let item):
-            // The phone writes only web addresses into synced data
-            // (decision 1372).
+            // The phone writes only web addresses into synced data.
             guard let url = Address.typed(value) else {
                 refused = true
                 return

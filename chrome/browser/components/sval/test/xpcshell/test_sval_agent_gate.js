@@ -1151,7 +1151,7 @@ add_task(async function a_page_on_an_unanswered_site_is_refused() {
 
 /**
  * An upload folder allows the files directly in it, and the files in the
- * folders inside it only when its grant says so (decision 0129).
+ * folders inside it only when its grant says so.
  */
 add_task(async function an_upload_folder_covers_what_its_scope_says() {
   const temp = SvalTestTemp;

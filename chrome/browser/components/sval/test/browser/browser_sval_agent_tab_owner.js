@@ -242,7 +242,7 @@ add_task(async function a_tab_the_tree_files_elsewhere_is_not_the_agents() {
 /**
  * A tab the tree files in another of the app's workspaces, one no session
  * has acted in yet, as a restored session's are, is the agent's as much as
- * one where its tools act (decision 1998).
+ * one where its tools act.
  */
 add_task(
   async function a_tab_in_another_of_the_apps_workspaces_is_the_agents() {

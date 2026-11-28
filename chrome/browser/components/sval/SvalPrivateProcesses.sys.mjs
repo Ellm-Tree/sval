@@ -6,8 +6,8 @@
  * (`about-processes-private-windows.patch`). The page lists each process
  * with the site it serves and, under it, each document with its address and
  * its tab's title. It shows neither for a private session the page is
- * outside of: nothing outside a private session says what it has open
- * (decision 0074). Opened in a normal window that is every private session,
+ * outside of: nothing outside a private session says what it has open.
+ * Opened in a normal window that is every private session,
  * and opened in a private window it is every session but the window's own
  * (`SvalPrivateJars`).
  */

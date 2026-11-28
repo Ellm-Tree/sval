@@ -52,7 +52,7 @@ const FLOW = [
   // The question's two answers choose the path.
   [STEPS.question, () => true],
   [STEPS.joinFolder, a => a.path === "join"],
-  // A key found in the folder (decision 0084) needs no code, and the folder
+  // A key found in the folder needs no code, and the folder
   // step shows it opening the workspaces. The code step waits for the other
   // device's files itself. A user with no other device left takes the key
   // from its backup in the code step's place.

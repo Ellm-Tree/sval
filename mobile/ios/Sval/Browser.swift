@@ -418,7 +418,7 @@ final class Browser {
 
     /// Whether tab `id` is in front of the user: the tab in front, a pane
     /// shown beside it, or one in Picture in Picture or a call. Another
-    /// device's close never takes such a tab (decision 2237).
+    /// device's close never takes such a tab.
     func isInFront(_ id: String) -> Bool {
         if id == currentTabId || splitInFront?.slots.contains(id) == true { return true }
         guard let page = pages[id] else { return false }

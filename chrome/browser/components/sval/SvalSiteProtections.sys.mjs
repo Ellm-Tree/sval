@@ -9,7 +9,7 @@
  *
  * **Each site's choices are a pref of their own,** `SITE_BRANCH` and the site,
  * as `siteOf` cuts one, holding `{protections, media, exceptions}` as JSON.
- * A host under a site has a pref of its own too (decision 1980), and each
+ * A host under a site has a pref of its own too, and each
  * field resolves on its own along the host's scope chain (`scopeChain`): the
  * most specific name holding that field decides it. A host may hold
  * `protections: "on"` or `exceptions: []`, which a site never stores, to

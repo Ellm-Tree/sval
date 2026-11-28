@@ -140,8 +140,7 @@
   min-width: 0;
 }
 
-/* The workspace of a page's latest visit, under All Workspaces
- * (decision 1287). */
+/* The workspace of a page's latest visit, under All Workspaces. */
 #historyTree > treecols > #sval-workspace {
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
   flex: 0 100 8em;

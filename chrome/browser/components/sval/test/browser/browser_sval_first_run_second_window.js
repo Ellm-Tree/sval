@@ -88,7 +88,7 @@ add_task(async function other_windows_wait_for_the_first_windows_first_run() {
     !Services.prefs.getBoolPref("browser.sval.agents.pageTools.enabled"),
     "and sites' tools"
   );
-  // A workspace has at most one window (decision 0079), so the second window
+  // A workspace has at most one window, so the second window
   // takes a workspace of its own once first run has made the first one.
   const workspaces = await workspacesInEngine();
   Assert.equal(workspaces.length, 2, "one workspace per window");

@@ -819,7 +819,7 @@ add_task(async function each_folder_gets_the_sealed_key_copy() {
 
 /**
  * A new Mac, which holds no sealed copy it can open, finds the sync key in
- * iCloud Keychain and joins with no code (decision 0084). A key there that
+ * iCloud Keychain and joins with no code. A key there that
  * opens nothing in this folder is not taken.
  *
  * iCloud Keychain is reached through the Security framework with this

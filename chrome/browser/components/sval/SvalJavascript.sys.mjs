@@ -14,8 +14,8 @@
  * a page with script off parses `<noscript>` as a browser with script off
  * does.
  *
- * A rule is for a site, as `siteOf` cuts one, or for a host under it
- * (decision 1980), and lives in the super lists, so it covers every name
+ * A rule is for a site, as `siteOf` cuts one, or for a host under it,
+ * and lives in the super lists, so it covers every name
  * under it. Gecko takes the entry of the most specific name in either
  * direction (Sval's `script-policy-most-specific` patch), so a host's rule
  * beats its site's whatever the default. A site that is itself a public

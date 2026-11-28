@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * The site controls' live fill (decision 1985): what happens on the page now
+ * The site controls' live fill: what happens on the page now
  * draws one chip, the same size, colours and ink on every control. A camera
  * in use, location in use, media playing and a translated page each take it.
  */

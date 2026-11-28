@@ -7,7 +7,7 @@
 /* import-globals-from sval_blocking_helpers.js */
 
 // With the content classifier blocking, the URL classifier keeps the one
-// feature it does not replace (protections spec §1.1, decision 1051):
+// feature it does not replace (protections spec §1.1):
 // Mozilla's harmful add-on protection still blocks.
 
 Services.scriptloader.loadSubScript(

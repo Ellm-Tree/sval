@@ -5,7 +5,7 @@ import Foundation
 import WebKit
 
 /// How a private tab spends Kagi Privacy Pass tokens, as `SvalKagi.sys.mjs`
-/// does in the desktop's private windows (decisions 0081 and 0091).
+/// does in the desktop's private windows.
 ///
 /// A token goes to `kagi.com` itself over https, on one of Kagi's own pages
 /// (`pages`), and only on requests the user or Kagi started: a top-level

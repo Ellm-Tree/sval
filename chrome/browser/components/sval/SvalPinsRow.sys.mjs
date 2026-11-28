@@ -1069,7 +1069,7 @@ export class SvalPinsRow {
   }
 
   /**
-   * ⌘1–9 select pins in place of Firefox's tabs (§3, decision 0137). Its
+   * ⌘1–9 select pins in place of Firefox's tabs (§3). Its
    * keys run as `command` events on `<key>` elements in `mainKeyset`, whose
    * own listener selects tabs (`browser-sets.js`); this captures them first.
    * A private window and an agent's workspace keep Firefox's.

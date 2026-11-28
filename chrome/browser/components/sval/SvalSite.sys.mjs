@@ -2,8 +2,8 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * What a site is, and the names a choice for one can be saved under
- * (decision 1980). A site is a registrable domain by the Public Suffix List,
+ * What a site is, and the names a choice for one can be saved under.
+ * A site is a registrable domain by the Public Suffix List,
  * so `www.ebay.co.uk` and `pay.ebay.co.uk` are one. Hosts with no registrable
  * domain (IP literals, `localhost`, single-label intranet names) are their
  * own site. Only http and https addresses have one.
@@ -46,8 +46,8 @@ function siteOfHost(uriHost) {
 }
 
 /**
- * The scopes a choice made on a page of `uriHost` can be saved at
- * (decision 1980): the host, and the site above it. A host offers the
+ * The scopes a choice made on a page of `uriHost` can be saved at:
+ * the host, and the site above it. A host offers the
  * choice only when it differs from its site. `www.` of a site is the site,
  * and an IP address, `localhost` and a public suffix are their own sites,
  * so none of them offers it.

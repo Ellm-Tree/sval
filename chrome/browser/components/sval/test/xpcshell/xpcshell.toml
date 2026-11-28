@@ -8,7 +8,7 @@
 # it. They get twice the time.
 
 # First run is off for every suite, as every harness profile is a fresh one.
-# A device publishes nothing before its first time reading (decision 1714),
+# A device publishes nothing before its first time reading,
 # and the harness reaches no Remote Settings server, so every profile starts
 # with a reading of no difference.
 [DEFAULT]

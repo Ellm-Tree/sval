@@ -3,7 +3,7 @@
 
 /**
  * Each extension's switch for each site or host (extension controls spec,
- * Part 2; decision 1980): off there, the extension reaches nothing in a tab
+ * Part 2): off there, the extension reaches nothing in a tab
  * showing a page of it. A site is `siteOf`'s, and a host rule covers the
  * names under it. The switches are one synced pref per site or host holding
  * a sorted list: the id of each extension off there, and `~id` for one on

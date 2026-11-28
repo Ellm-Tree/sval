@@ -9,7 +9,7 @@
 
 /**
  * A tab's address in the tree is the one it was opened at, then each page it
- * commits (decision 0050). A load that is refused or cancelled before its
+ * commits. A load that is refused or cancelled before its
  * page commits leaves the tab on the blank document every browser starts
  * with, and that blank page was never the user's: the node keeps its
  * address, and the next restore brings the page back.

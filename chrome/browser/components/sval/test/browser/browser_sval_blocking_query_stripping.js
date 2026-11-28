@@ -9,7 +9,7 @@
 // Every level but Off turns on Firefox's query stripping in normal and private
 // windows, with the parameters the level's lists strip on every site; Off puts
 // it back, and a value the user set wins at every level, Firefox's Strict
-// category among them (decision 0104).
+// category among them.
 
 Services.scriptloader.loadSubScript(
   getRootDirectory(gTestPath) + "sval_blocking_helpers.js",

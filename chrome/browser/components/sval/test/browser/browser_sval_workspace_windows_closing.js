@@ -85,7 +85,7 @@ async function withNewWindowOnNewWorkspace() {
 
 /**
  * Closing that window deletes its workspace and the home tab with it, because
- * nobody touched them (decision 0101). Left in the document, every such
+ * nobody touched them. Left in the document, every such
  * window would add an empty workspace on every device.
  */
 for (const how of ["window", "lastTab"]) {
@@ -261,7 +261,7 @@ for (const touch of ["browse", "rename", "colour", "emoji", "isolate"]) {
 
 /**
  * A window the session brings back still owns the workspace it created, so
- * closing it deletes that workspace if nobody touched it (decision 0101). The
+ * closing it deletes that workspace if nobody touched it. The
  * session store carries the record, as it carries the workspace the window
  * shows; Sval stopping without closing the window is the case it is for.
  * `undoCloseWindow` brings the window back the same way, through its
@@ -333,8 +333,7 @@ add_task(
 
 /**
  * A nameless, empty workspace the user made outlives the window it was opened
- * in: only a workspace a window created for itself is its own to delete
- * (decision 0101).
+ * in: only a workspace a window created for itself is its own to delete.
  */
 for (const how of ["window", "lastTab"]) {
   add_task(async function closing_a_made_empty_workspaces_window_keeps_it() {

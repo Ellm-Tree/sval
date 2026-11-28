@@ -5,7 +5,7 @@
  * Each device's icons for its favorites (favorites-native spec §5.4): a file
  * in the profile from a favorite's address to a small `data:` icon, which the
  * Favorites menu, pins, home tiles and the address bar read before
- * `page-icon:`. It never syncs (decision 0108).
+ * `page-icon:`. It never syncs.
  *
  * Places keeps an icon only for a page in its history, and only while the
  * history lasts, so a favorite saved as `gmail.com`, never visited by that

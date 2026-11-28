@@ -51,10 +51,10 @@ class SvalLocalSettingsStore {
     // its own directory if it moves, and keeps `flush` from writing a path
     // the user never picked.
     this._sharedFolder = null;
-    // The synced keys this profile has seeded (settings-sync spec §4.2, as
-    // decision 0113 amends it), by name, so a key a later build adds is
-    // seeded too. Once a key is seeded, the pref observer writes every change
-    // to it, so it is never seeded again.
+    // The synced keys this profile has seeded (settings-sync spec §4.2), by
+    // name, so a key a later build adds is seeded too. Once a key is seeded,
+    // the pref observer writes every change to it, so it is never seeded
+    // again.
     this._seededSettings = new Set();
     // Whether first run has begun and whether it has ended on this profile
     // (first-run spec §3.3). Begun and not ended is a first run interrupted by

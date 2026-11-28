@@ -21,7 +21,7 @@ export const KEY_PREFIX = "sval.device.name.";
 
 /**
  * The setting a phone or tablet says which it is under: `"phone"` or
- * `"tablet"`, so its Workspace wears that device's mark (decision 2254).
+ * `"tablet"`, so its Workspace wears that device's mark.
  */
 export const KIND_PREFIX = "sval.device.kind.";
 

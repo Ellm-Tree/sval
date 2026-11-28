@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Performance recordings (decision 2428): Gecko's profiler, started in the
+ * Performance recordings: Gecko's profiler, started in the
  * running Sval and saved as a gzipped profile in the download folder, which
  * the system's file manager then shows. Nothing is uploaded, and a saved
  * profile goes nowhere Sval sends things: it holds the addresses of the

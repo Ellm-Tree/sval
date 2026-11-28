@@ -9,7 +9,7 @@
 
 /**
  * Take control hands an agent's workspace to the user (agent-control spec
- * §6, decision 0107): it needs the button, pauses the agent on
+ * §6): it needs the button, pauses the agent on
  * every tab and wins over a tool already running there. Its tabs, their
  * downloads, their loads and what they open are the user's until they give
  * it back, and a write or load the agent set off before the take is still the
@@ -493,7 +493,7 @@ add_task(async function a_write_the_agents_click_set_off_is_still_held() {
 /**
  * A write alert already up when the user takes the tab still decides the
  * writes it holds. The agent's click then answers as every tool in a taken
- * tab does, and says nothing of the page the user is on (decision 0107).
+ * tab does, and says nothing of the page the user is on.
  */
 add_task(async function a_write_alert_up_at_the_take_still_decides() {
   const { call, tab, browser, win } = await layerSetup({

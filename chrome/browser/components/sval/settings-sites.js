@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The Sites category's list (decision 1484): every site with a choice, in
+ * The Sites category's list: every site with a choice, in
  * `SvalSiteProtections`, a JavaScript rule of its own, a permission, an
  * extension switch or a line in My filters, each row saying what differs from the defaults, with
  * search, a filter, Add site and a reset per site. A row leads to the site's
@@ -151,8 +151,7 @@
     /**
      * Every site and host the list shows: those holding a choice
      * (`SvalSiteChoices`), and every site something is stored for on this
-     * device. A host's site is listed too, since its row holds the host's
-     * (decision 1980).
+     * device. A host's site is listed too, since its row holds the host's.
      *
      * @returns {Map<string, object>} What each holds itself, by site or
      *   host, as `SiteChoiceReading.at` answers.

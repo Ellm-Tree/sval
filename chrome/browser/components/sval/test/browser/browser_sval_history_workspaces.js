@@ -7,7 +7,7 @@
 /* import-globals-from head.js */
 
 /**
- * Each visit records the workspace it was made in (decision 1287): a tab's
+ * Each visit records the workspace it was made in: a tab's
  * is its workspace's, a Quick Peek's is its tab's, a page from another app in
  * a Peek has none until it is moved into a workspace, and a private
  * window records no visit.

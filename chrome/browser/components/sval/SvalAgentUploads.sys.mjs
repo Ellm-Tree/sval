@@ -548,8 +548,8 @@ function isHiddenEntry(entry) {
 }
 
 /**
- * Whether every file lies in one of the folders an upload grant names
- * (decision 0129): directly in a folder, or, for a folder whose grant covers
+ * Whether every file lies in one of the folders an upload grant names:
+ * directly in a folder, or, for a folder whose grant covers
  * the folders inside it, anywhere under it as Gecko's `nsIFile.contains`
  * judges it. A grant never covers a hidden file, or a file in a hidden
  * folder below the granted one, because the home folder keeps its keys and

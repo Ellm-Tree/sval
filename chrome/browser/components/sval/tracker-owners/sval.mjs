@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Sval's own additions to the map of trackers' owners (decision 1051): the
+ * Sval's own additions to the map of trackers' owners: the
  * companies the bundled sources lack, compiled from primary sources and never
  * from a NonCommercial dataset. Each entry is one company:
  *

@@ -151,7 +151,7 @@ const SvalDialogPage = {
       return;
     }
     const focused = document.activeElement;
-    // A field's `focus()` selects its text (decision 2713), and the user may
+    // A field's `focus()` selects its text, and the user may
     // be typing in it, so the caret and selection are put back as they were.
     const field = focused?.localName === "sval-field" ? focused : null;
     const range = field && [

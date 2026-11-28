@@ -2,7 +2,7 @@ Sval: unsigned add-on warnings that only automation can hide
 
 `ExtensionsUI` and about:addons let `extensions.ui.disableUnsignedWarnings`
 hide the unsigned add-on warnings in automation and in any build without
-MOZILLA_OFFICIAL. Sval never sets MOZILLA_OFFICIAL (decision 0063), and on
+MOZILLA_OFFICIAL. Sval never sets MOZILLA_OFFICIAL, and on
 ESR a user can turn off `xpinstall.signatures.required`
 (`AddonSettings.REQUIRE_SIGNING`), so one about:config pref would have
 hidden that an installed add-on is unsigned. Tests keep the pref, through

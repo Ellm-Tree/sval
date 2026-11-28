@@ -643,7 +643,7 @@ add_task(async function an_interrupted_adoption_settles_on_the_stored_key() {
 
 /**
  * Every stored sync key also goes to iCloud Keychain, where a signed build
- * can reach it, and the key is stored whatever that answers (decision 0084).
+ * can reach it, and the key is stored whatever that answers.
  */
 add_task(async function a_stored_key_also_goes_to_icloud_keychain() {
   const { SvalICloudKeychain } = ChromeUtils.importESModule(

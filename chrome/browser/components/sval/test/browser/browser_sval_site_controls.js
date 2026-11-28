@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * The site controls (decision 0132): the media button's states, its
+ * The site controls: the media button's states, its
  * allowance and its stop for a visit, which end when the tab leaves the
  * site; the site menu's saved media choice, its JavaScript switch and the
  * site's permissions; a device in use shown in the address pill; and the

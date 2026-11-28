@@ -28,7 +28,7 @@ Services.scriptloader.loadSubScript(
 function typeMessage(form, text) {
   const { message } = formParts(form);
   message.focus();
-  // focus() selects what the message holds (decision 2713), and a person
+  // focus() selects what the message holds, and a person
   // typing on adds to it.
   message.setSelectionRange(message.value.length, message.value.length);
   EventUtils.sendString(text, window);

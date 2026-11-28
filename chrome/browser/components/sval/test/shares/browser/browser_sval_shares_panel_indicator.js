@@ -44,7 +44,7 @@ for (const share of ["nfs", "smb"]) {
       const { indicator, syncLabel } = SvalPanel._els;
       // A dropped share reads as unreachable or as gone. The pass that found
       // it was one the test waited on, as Sync now is, so the indicator
-      // shows it at once (decision 0032).
+      // shows it at once.
       const away = ["offline", "warning"];
       Assert.ok(
         away.includes(indicator.dataset.severity),

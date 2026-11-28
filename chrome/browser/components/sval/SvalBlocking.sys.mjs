@@ -3,7 +3,7 @@
 
 /**
  * Ad and tracker blocking on Gecko's content classifier (protections spec
- * §1.1 to §1.3, decision 0102).
+ * §1.1 to §1.3).
  *
  * The user's level is `browser.sval.adblock.level`. Off, Balanced and Strict
  * are list sets Sval curates; Custom is the user's own set,
@@ -13,8 +13,8 @@
  * excepted on every site at every level. The user's own rules, a pref per
  * line under `MY_FILTER_BRANCH` (`SvalMyFilters`), are one more list beside the level's at
  * every level but Off. The `my-filters` engine holds them alone at every
- * level and serves only page rules, for the pages the lists' rules skip
- * (decision 1993). All of these sync (settings-sync spec), each entry of a
+ * level and serves only page rules, for the pages the lists' rules skip.
+ * All of these sync (settings-sync spec), each entry of a
  * branch as a setting of its own.
  *
  * uBlock Origin's trusted scriptlets can set cookies, click and rewrite
@@ -175,8 +175,7 @@ const STRICT = Object.freeze([
   "sval-curben-phishing",
   "sval-ublock-annoyances-others",
   "sval-fanboy-social",
-  // The cookie banner lists work by hiding elements, which page rules apply
-  // (decision 0102).
+  // The cookie banner lists work by hiding elements, which page rules apply.
   "sval-easylist-cookie",
   "sval-ublock-cookies",
 ]);

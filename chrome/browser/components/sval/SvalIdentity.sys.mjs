@@ -853,7 +853,7 @@ export const SvalIdentity = {
     await lazy.SvalSecretStore.write(SYNC_KEY_SECRET, bytes);
     await this._recordSyncKey(await fingerprintOf(bytes));
     // Also into iCloud Keychain, where a signed build can reach it, so a new
-    // Mac or an iPhone finds it (decision 0084). Never a reason to fail: the
+    // Mac or an iPhone finds it. Never a reason to fail: the
     // key is stored above whatever this answers.
     lazy.SvalICloudKeychain.store(bytes);
   },

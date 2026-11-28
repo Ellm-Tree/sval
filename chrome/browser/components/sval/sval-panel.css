@@ -2046,7 +2046,7 @@
  * untinted one does (`sval-header.css`, tokens).
  *
  * A tinted window's colours are `SvalColor`'s, solved for the window in the
- * system's appearance and contrast (decision 0057), and its text is light or
+ * system's appearance and contrast, and its text is light or
  * dark as the colour needs (`data-sval-ink`), whatever the system's
  * appearance: its native widgets take the scheme of that text. */
 @media not (forced-colors) {

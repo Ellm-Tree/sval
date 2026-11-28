@@ -55,7 +55,7 @@ actor Syncer {
         local = Folder(root: root)
         // No own copy yet, as on first run, after leaving the folder or after
         // the app is deleted and installed again. The Keychain's id outlives
-        // the copy, and the phone keeps it (decision 2232).
+        // the copy, and the phone keeps it.
         let fresh = !local.exists(topDir)
         deviceId = try secrets.deviceId()
         if fresh { Diagnostics.log("sync: no own copy yet") }
@@ -220,7 +220,7 @@ actor Syncer {
             throw SyncError.ownFileUnreadable
         } catch {
             // A pass that stops short saw no document's own file, and time
-            // the folder is out of reach does not count (decision 1144).
+            // the folder is out of reach does not count.
             await clearOwnUnread(except: nil)
             throw error
         }
@@ -267,7 +267,7 @@ actor Syncer {
     private var ownUnread = OwnFileWatch()
 
     /// How long this device's own file may stay unreadable before it is
-    /// set aside (`OWN_FILE_SET_ASIDE_MS`, decision 1144): the time covers
+    /// set aside (`OWN_FILE_SET_ASIDE_MS`): the time covers
     /// a cloud provider still downloading it.
     static let ownFileSetAside: TimeInterval = 10 * 60
 
@@ -289,7 +289,7 @@ actor Syncer {
     /// Renames this device's own file of document `name` to
     /// `<name>.damaged-<time>` once it has stayed unreadable for
     /// `ownFileSetAside`, so the next pass writes a fresh one from the own
-    /// copy, which holds everything it did (decision 1144). Nothing is
+    /// copy, which holds everything it did. Nothing is
     /// replaced or deleted, so each set-aside keeps a copy of its own. The
     /// name ends past the suffix every device file shares, so no pass reads
     /// it as a device's file. The user is told nothing: only Sval can
@@ -466,7 +466,7 @@ actor Syncer {
     }
 
     /// This device's id in hex, as settings and visits name a device.
-    /// This device's id, which marks its own Workspace (decision 2254).
+    /// This device's id, which marks its own Workspace.
     nonisolated var device: Data { deviceId }
 
     nonisolated var deviceHex: String { deviceId.map { String(format: "%02x", $0) }.joined() }
@@ -529,7 +529,7 @@ struct SyncReport: Decodable {
     var errors: [Problem]
     var schemaTooNew: [Problem]
     /// This device's own watermark once the pass is done, which its next
-    /// stamps stay above (decision 1714).
+    /// stamps stay above.
     var ownWatermark: Double
     /// This device's own file exists and could not be read, so the pass
     /// wrote nothing over it.

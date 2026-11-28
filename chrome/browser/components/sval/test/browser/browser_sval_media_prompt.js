@@ -5,7 +5,7 @@
 
 /**
  * On a site set to Ask first, a play the media gate blocks opens a prompt
- * from the media button, once a visit (decision 0132), and each answer does
+ * from the media button, once a visit, and each answer does
  * what it says.
  */
 

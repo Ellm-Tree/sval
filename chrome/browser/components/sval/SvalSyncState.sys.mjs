@@ -25,7 +25,7 @@ export class SvalSyncState {
   /**
    * What the shared folder last answered: "none" when none is chosen,
    * "reached", "unreachable" (local-copy spec §4.3), or "too-large" when it
-   * holds more than a step reads (decision 0032).
+   * holds more than a step reads.
    */
   folderState = "none";
 
@@ -52,7 +52,7 @@ export class SvalSyncState {
    * Whether a pass someone waited on (`SvalPanel.syncWithFolder`) found the
    * folder unreachable. A person who asks what the folder says gets its
    * answer, so the indicator shows the outage without waiting for a second
-   * step (decision 0032). Cleared once a step reaches the folder.
+   * step. Cleared once a step reaches the folder.
    */
   failureAsked = false;
 

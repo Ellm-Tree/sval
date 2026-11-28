@@ -1078,7 +1078,7 @@ const workspaceIdOf = reply =>
 /**
  * Every session of an app connects as the one agent the user allowed, with
  * no alert, and has no workspace until it makes one: its own, beside the
- * first session's (decision 1998).
+ * first session's.
  */
 add_task(async function a_second_session_makes_a_workspace_of_its_own() {
   await freshListener();

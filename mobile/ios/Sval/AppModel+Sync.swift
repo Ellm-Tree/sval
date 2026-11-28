@@ -81,7 +81,7 @@ extension AppModel {
     }
 
     /// Gives back each tab another device's close took while it is in
-    /// front here, under its own id (decision 2237): at its parent when the
+    /// front here, under its own id: at its parent when the
     /// tree still holds that in the tab's Workspace, beside it for a split,
     /// and at the top of the Workspace otherwise. Every peer reads the node
     /// as news, so the tab returns on the device that closed it. Run as the

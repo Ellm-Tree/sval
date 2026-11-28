@@ -6,7 +6,7 @@ import XCTest
 @testable import Sval
 
 /// A visit's Allow Video and Audio covers its site's pages for an hour,
-/// as a desktop visit does (decision 0132).
+/// as a desktop visit does.
 final class MediaVisitTests: XCTestCase {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
     private var visit: Page.Visit { Page.Visit(site: "example.com", since: start) }

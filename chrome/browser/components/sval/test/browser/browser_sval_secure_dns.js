@@ -7,7 +7,7 @@
 /* import-globals-from sval_preferences_helpers.js */
 
 /**
- * Secure DNS (decision 0105): the network's DNS by default, the card's three
+ * Secure DNS: the network's DNS by default, the card's three
  * choices and the mode each writes, the resolver shown only for encrypted
  * DNS, the names that skip it saved through Firefox's dialog, ECH staying on,
  * and Privacy and protection without Firefox's DoH group.

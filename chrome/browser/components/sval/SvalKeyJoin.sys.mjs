@@ -2,14 +2,14 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Joining another device's sync key (spec §6.7, decision 0118): this device's
+ * Joining another device's sync key (spec §6.7): this device's
  * workspaces are published into the other document, the key is stored, and
  * only then is the profile's engine moved onto it, in one step.
  *
  * **The profile's engine is never the one that publishes.** A candidate engine
  * (`SvalEngine#candidate`) loads what this device holds, merges the other
  * document's folder into it and publishes the result; the folder is then read
- * back to confirm it (decision 0043). Throughout, the profile's engine stays
+ * back to confirm it. Throughout, the profile's engine stays
  * on its own key and keeps taking every change the user makes, so every reader
  * of it sees this profile's document at every moment. A join that does not
  * finish drops the candidate, and nothing of the other document has reached
@@ -60,7 +60,7 @@ let inFlight = null;
  *
  * Read from the folder because whether a pass wrote bytes cannot say: a retry
  * after an attempt that published finds the folder already right and writes
- * nothing, and a write can land and its reply still fail (decision 0043).
+ * nothing, and a write can land and its reply still fail.
  *
  * @param {SvalEngine} engine The candidate.
  * @param {string[]} ids The node ids this device brought.

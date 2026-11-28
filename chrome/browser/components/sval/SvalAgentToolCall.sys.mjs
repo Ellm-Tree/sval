@@ -164,7 +164,7 @@ export const ON_PAGE = (args, found) =>
 /**
  * What an input did before the user took its tab, which is all a result
  * there keeps: the tab, the fields it filled and what became of the writes
- * it set off. The page and its dialogs are the user's (decision 0107).
+ * it set off. The page and its dialogs are the user's.
  *
  * @param {object} body
  * @returns {object}
@@ -379,8 +379,7 @@ export class ToolCall {
    * schedules of their own, and can still name the page before.
    *
    * Nothing is shown of a tab the user has taken, which a tool that began
-   * before the take can still be answering about: the page is the user's
-   * (decision 0107).
+   * before the take can still be answering about: the page is the user's.
    *
    * @returns {{url?: string, title?: string}}
    */

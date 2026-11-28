@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Archiving idle tabs (idle-tab archive spec, decision 0136): a tab nobody
+ * Archiving idle tabs (idle-tab archive spec): a tab nobody
  * has used for a while leaves the tree and goes to the Archive, a synced
  * document of its own that keeps each entry for the retention period. The
  * History sidebar lists it (`SvalHistorySidebar`), and a click there brings
@@ -300,7 +300,7 @@ export class SvalArchive {
 
   /**
    * Every entry, newest first (host contract §10), each with `refused` for
-   * an address another device wrote that no device opens (decision 1372),
+   * an address another device wrote that no device opens,
    * which is listed and never restored.
    *
    * @returns {Promise<object[]>}

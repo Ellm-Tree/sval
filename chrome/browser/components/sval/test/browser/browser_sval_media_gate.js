@@ -7,7 +7,7 @@
  * Under media.autoplay.site-permission-only, media plays only where the
  * top-level site's autoplay-media permission is ALLOW, or where it has none
  * and the choice for such sites is Always allow (protections spec §4.1),
- * whatever the user pressed on the page (decision 0132). A permission scoped
+ * whatever the user pressed on the page. A permission scoped
  * to the tab, as SitePermissions' SCOPE_TEMPORARY sets it, allows the site in
  * that tab only. Each blocked
  * case tells the front end through GloballyAutoplayBlocked. An

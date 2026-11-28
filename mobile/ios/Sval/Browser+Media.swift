@@ -378,7 +378,7 @@ extension Browser {
     }
 
     /// Allows media on the page in front for this visit, as the desktop's
-    /// media button does (decision 0132): the page is made again to play
+    /// media button does: the page is made again to play
     /// media, and saves nothing.
     func allowMediaForVisit() {
         guard let id = currentTabId, let host = pages[id]?.view.url?.host() else { return }
@@ -569,7 +569,7 @@ extension Browser {
 
     /// The tab's address, if this app opens it. An address another device
     /// wrote is opened only when it is a web page: the desktop refuses
-    /// addresses that may not leave a device (decision 1372), and an iPhone
+    /// addresses that may not leave a device, and an iPhone
     /// opens nothing but the web.
     nonisolated static func openable(_ row: OutlineRow) -> URL? {
         guard let address = row.url, let url = URL(string: address),

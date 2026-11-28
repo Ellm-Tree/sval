@@ -14,7 +14,7 @@
  * its Strict level sets (`ContentBlockingPrefs.setPrefExpectations`) and
  * the ones its Enhanced Tracking Protection pages reached, which Sval's
  * cards replace (protections spec §3.3), apart from those that ran on
- * Disconnect's lists, which Sval does not run (decision 1051). Each switch's
+ * Disconnect's lists, which Sval does not run. Each switch's
  * id, then every pref it writes with its value on and off. A switch is on
  * while every pref it writes reads on.
  */

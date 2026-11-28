@@ -186,7 +186,7 @@ add_task(async function paired_agents_are_listed() {
 
 /**
  * The user deletes an agent's workspace from the panel. The agent stays
- * paired and listed, with that workspace gone from it (decision 1998).
+ * paired and listed, with that workspace gone from it.
  */
 add_task(async function deleting_an_agents_workspace_leaves_it_paired() {
   const store = SvalAgents.store;

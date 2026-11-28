@@ -536,7 +536,7 @@ export class SvalPanelSwitcher {
 
   /**
    * The switcher's entries: the user's own workspaces, then the phones'
-   * and tablets' (decision 2254), then the agents' (agent-control spec
+   * and tablets', then the agents' (agent-control spec
    * §3.5), each part in sibling order. The devices' and the agents' each
    * come under a caption of their own (`appendDevicesCaption`,
    * `appendAgentsCaption`), so the list the user works from is never
@@ -1439,7 +1439,7 @@ export class SvalPanelSwitcher {
   /**
    * "Move to workspace": every workspace of the user's but this window's,
    * then "New workspace…" (import spec §6), then the devices' workspaces
-   * (decision 2254) and the agents' after a caption each, the agents'
+   * and the agents' after a caption each, the agents'
    * grouped by app (`agentApps`). A row moved into an agent's workspace is
    * handed to the agent, once the user has agreed (`moveToWorkspace`), so
    * those entries never mix with the user's. Each is `moveWorkspace:` and

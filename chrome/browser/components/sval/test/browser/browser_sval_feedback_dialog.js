@@ -9,8 +9,8 @@
 /**
  * The Send Feedback form's card is Sval's dialog card (`sval-dialog`), its
  * answers and its rows' View `sval-button`s, and over a window that shows
- * what is behind it the card is frosted as a dialog's is (decision 0057,
- * `SvalDialogBox.frostLook`): the whole shape, the tab, the stem and the
+ * what is behind it the card is frosted as a dialog's is
+ * (`SvalDialogBox.frostLook`): the whole shape, the tab, the stem and the
  * card, blurs what lies under it, the shape wears the `blur` material's
  * colour, and the text is solved on it. Over a window at no transparency, or while the system
  * reduces transparency, the card is solid.

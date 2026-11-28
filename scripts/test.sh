@@ -55,7 +55,7 @@ set -- ${args[@]+"${args[@]}"}
 # The engine a run tests is the wasm last staged and synced, which nothing
 # rebuilds when engine/ changes: sync-files.sh never overwrites a real
 # artifact. build-core-wasm.sh compiles engine/'s tree id at HEAD into it as
-# the string engineVersion() returns (decision 0003), with -dirty for a build
+# the string engineVersion() returns, with -dirty for a build
 # of uncommitted changes, so a wasm that lacks HEAD's id was built from other
 # engine code. The wasm holds other 40-digit hex strings, so the check looks
 # for the id it expects. sync-files.sh's stub is an empty module, eight bytes

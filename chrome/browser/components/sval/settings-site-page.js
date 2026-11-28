@@ -115,7 +115,7 @@
   /**
    * The cards, top to bottom, each a method returning its card or null. Those
    * above `_siteCardWhole`'s heading follow the scope; those below it are the
-   * whole site's (decision 1980).
+   * whole site's.
    */
   const SITE_CARDS = [
     "_siteCardProtections",

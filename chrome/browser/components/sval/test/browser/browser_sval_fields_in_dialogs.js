@@ -14,7 +14,7 @@
  * dialog's focus colour under the pointer, an error draws in the dialog's
  * error colour, and no rule of the in-content sheet `SubDialog` puts in the
  * page reaches it. A dialog that opens with a field focuses it with its text
- * selected (decision 2713).
+ * selected.
  *
  * The window shows what is behind it here as it does on macOS, whatever the
  * platform the test runs on, as in `browser_sval_dialog_frosted.js`.

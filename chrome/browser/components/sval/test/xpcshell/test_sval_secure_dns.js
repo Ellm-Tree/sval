@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * Secure DNS's checks on resolver URLs and synced values (decision 0105):
+ * Secure DNS's checks on resolver URLs and synced values:
  * which resolvers are on the device's own network, the aliases of listed
  * resolvers, and what a synced value must be to apply.
  */

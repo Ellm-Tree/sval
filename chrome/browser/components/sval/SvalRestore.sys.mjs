@@ -59,7 +59,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * address it may not load.
  *
  * An address marked `local` was written on this device and is read from
- * this device's own copy alone (decision 1372), so it restores as the user's
+ * this device's own copy alone, so it restores as the user's
  * own choice of the tab, as Sval's home and settings pages do and as
  * Firefox's session restore reopens a tab with the principal that opened it.
  * The tree records no principal and not which device wrote any other
@@ -261,7 +261,7 @@ const chromeRestoreAdapter = {
    * Points a tab that has not loaded its page at the address its node holds,
    * when the two differ. The session that brought the tab back can predate a
    * navigation another device made in the tab since, and the tree is what
-   * a tab shows (decision 0050). A tab that has loaded a page is the user's
+   * a tab shows. A tab that has loaded a page is the user's
    * to navigate, and is left as it is, as is one whose node's address no tab
    * may restore (`tabState`).
    *

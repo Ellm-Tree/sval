@@ -25,7 +25,7 @@
  *
  * Picking a row goes through the panel's own select (`SvalPanel.goToTab`,
  * called from `launcher-enter.patch`), which changes workspace in the one
- * place a window does (decision 0079). Firefox's own switch-to-tab rows for
+ * place a window does. Firefox's own switch-to-tab rows for
  * a page the tree holds as a tab are dropped (`launcher-tab-rows.patch`), so
  * a tab shows once. A pin's page is no tab of the tree: where `SvalFavorites`
  * lists the pin, its pin's row stands for the page (`SvalLauncherSections`),

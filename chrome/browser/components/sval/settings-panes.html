@@ -14,7 +14,7 @@
 <html>
   <body>
     <!-- Privacy and protection is Firefox's Privacy and security category,
-         renamed (decision 1484). Each of these sections joins it beside
+         renamed. Each of these sections joins it beside
          Firefox's groups, where `settings-pane.js`' SECTIONS puts it. The
          blocking card is `SvalBlocking`'s; the fingerprinting controls are
          Gecko prefs, through `SvalFingerprinting` (protections spec §1.5
@@ -321,7 +321,7 @@
     </section>
 
     <section data-sval-pane="svalBreaches" class="sval-settings">
-      <!-- Breach warnings (decision 0131): the protection panel's breach card. -->
+      <!-- Breach warnings: the protection panel's breach card. -->
       <section
         id="sval-breaches"
         class="sval-card"
@@ -384,7 +384,7 @@
       </section>
     </section>
 
-    <!-- Sites (decision 1484): the defaults every site gets, then every site
+    <!-- Sites: the defaults every site gets, then every site
          with a choice, each leading to its own page. -->
     <section data-sval-pane="svalSites" class="sval-settings">
       <header class="sval-pane-head">
@@ -473,7 +473,7 @@
       <!-- One row per site with a choice: in `SvalSiteProtections`, a
            JavaScript rule, a permission or a line in My filters
            (protections spec §2.3 and §4.3), with a row under it for each
-           host holding a choice of its own (decision 1980), drawn by
+           host holding a choice of its own, drawn by
            `settings-sites.js`. The rows say what differs; the site's page
            changes it. -->
       <section
@@ -2084,7 +2084,7 @@
       </div>
     </section>
 
-    <!-- Extensions (decision 1479), drawn by `settings-extensions.js` from
+    <!-- Extensions, drawn by `settings-extensions.js` from
          the add-on manager. An extension's page takes the site page's form
          and styles, and hides the category's list while it shows. -->
     <section data-sval-pane="svalExtensions" class="sval-settings">
@@ -2338,7 +2338,7 @@
             <option value="43200">12 hours</option>
           </select>
         </div>
-        <!-- Decision 1998: how long an agent Workspace no session has used is
+        <!-- How long an agent Workspace no session has used is
              kept before Sval deletes it. -->
         <div class="sval-page-tools-row">
           <label for="sval-agents-retention" class="sval-page-tools-words">

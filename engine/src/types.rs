@@ -29,7 +29,7 @@ pub const FAVORITE_NAMESPACE: Uuid = Uuid::from_u128(0x3e9a7c51_0d24_4f86_b1e3_5
 
 /// The guids of the favorites document's roots: Favorites, Favorites Menu
 /// and Other Favorites, named as Places names the same roots
-/// (favorites-native spec §5.1), and the pins root (decision 0137). They are
+/// (favorites-native spec §5.1), and the pins root. They are
 /// fixed, so every device derives the same root ids.
 pub const FAVORITE_ROOT_GUIDS: [&str; 4] =
     ["toolbar_____", "menu________", "unfiled_____", PINS_GUID];
@@ -39,7 +39,7 @@ pub const FAVORITE_ROOT_GUIDS: [&str; 4] =
 pub const PINS_GUID: &str = "pins________";
 
 /// The root a stranded favorite is filed under: Favorites, the one root Sval
-/// shows (decision 0123).
+/// shows.
 pub const STRANDED_FAVORITES_GUID: &str = "toolbar_____";
 
 /// The node id of the favorite, folder or separator whose guid is `guid`:
@@ -88,7 +88,7 @@ pub fn shard_id(name: &str) -> NodeId {
 /// archive spec §3.1).
 pub const ARCHIVE_NAMESPACE: Uuid = Uuid::from_u128(0x5f3b9d27_c4e1_4a68_9b0d_8e2f6a1c7d45);
 
-/// The document the Archive syncs under (decision 0136).
+/// The document the Archive syncs under.
 pub const ARCHIVE: &str = "archive";
 
 /// The id of the Archive entry for tab `tab`: UUIDv5 under
@@ -211,9 +211,9 @@ pub enum NodeKind {
     Visit,
     /// One history shard's entry in [`HISTORY_INDEX`], also a root.
     Shard,
-    /// One tab Sval archived for being idle, in the [`ARCHIVE`] document
-    /// (decision 0136). A root, as a visit is. It is never a tab: no merge
-    /// moves a node between documents or changes its kind.
+    /// One tab Sval archived for being idle, in the [`ARCHIVE`] document. A
+    /// root, as a visit is. It is never a tab: no merge moves a node between
+    /// documents or changes its kind.
     Archived,
     /// A kind written by a newer build, held under the name it arrived with.
     Unknown(String),
@@ -338,7 +338,7 @@ pub struct Content {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shares: Option<Vec<f64>>,
     /// Whether the node's address may not leave this device, so the node is
-    /// held in this device's profile copy only (decision 1372). The host sets
+    /// held in this device's profile copy only. The host sets
     /// it on every write that carries an address; the engine never reads an
     /// address to decide it. Content, because the address decides it, so it
     /// is replaced with the address. [`crate::sync::sync_to`] keeps a local
@@ -364,7 +364,7 @@ pub struct Visit {
     pub transition: u32,
     /// The device that made the visit.
     pub device: crate::store::DeviceId,
-    /// The workspace the visit was made in (decision 1287). Absent for a
+    /// The workspace the visit was made in. Absent for a
     /// visit made in none, and for one made before visits recorded it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<NodeId>,
@@ -495,7 +495,7 @@ pub struct Lifecycle {
 /// device that had not seen it.
 ///
 /// `color` is a preset's **token**, a string, or a custom OKLCH colour, an
-/// object (decision 0057). A token lets a theme change repaint every node that
+/// object. A token lets a theme change repaint every node that
 /// uses it. This crate stores whatever value it is handed. Which shapes and
 /// ranges are valid is a presentation concern, checked at `crate::wasm`, the
 /// boundary that can tell a host what it got wrong. A JSON value keeps a
@@ -511,7 +511,7 @@ pub struct Appearance {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<serde_json::Value>,
     /// How much of what is behind a workspace's window shows through its
-    /// colour, from 0 (solid) to 1 (decision 0057).
+    /// colour, from 0 (solid) to 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transparency: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -537,7 +537,7 @@ pub struct AgentMark {
     pub device: crate::store::DeviceId,
 }
 
-/// Marks a workspace as a device's own (decision 2254): the one a phone or
+/// Marks a workspace as a device's own: the one a phone or
 /// tablet keeps for the tabs opened on it, which every device shows under
 /// Devices.
 ///
@@ -587,7 +587,7 @@ pub struct Node {
     pub appearance_by: Option<crate::store::DeviceId>,
 
     /// When and by whom work inside this node was last done, which is an edit
-    /// to the node itself (decision 0106). It holds no value, so it competes
+    /// to the node itself. It holds no value, so it competes
     /// with no fact the user set: a node the user touched elsewhere keeps
     /// every group it had, and only its absence is judged differently.
     ///
@@ -727,7 +727,7 @@ pub struct Document {
     /// When this copy began, empty, under the id that writes it: the time of
     /// the pass that found no file of its own. `0` when unknown. A file showing that
     /// id's writes from before then shows writes this copy never held, which
-    /// its own watermark would otherwise claim (decision 2232).
+    /// its own watermark would otherwise claim.
     /// [`crate::sync::sync_to`] sets it and reads it; `merge` ignores it.
     #[serde(default, skip_serializing_if = "is_unwritten")]
     pub began_at: Timestamp,
@@ -807,7 +807,7 @@ impl Document {
     ///
     /// A host calls this through [`crate::sync::sync_to`] when a device's
     /// first time reading arrives, on stamps taken from a clock that may run
-    /// ahead and that it has never published (decision 1714). On published
+    /// ahead and that it has never published. On published
     /// stamps it would make this device's copy disagree with its peers'.
     pub fn pull_back_own_stamps(&mut self, device: crate::store::DeviceId, now: Timestamp) {
         let pull = |by: &Option<crate::store::DeviceId>, at: &mut Timestamp| {
@@ -855,8 +855,7 @@ impl Document {
     /// document has incorporated. That is safe: a lower watermark makes more
     /// nodes news to us, so a peer keeps a node it would otherwise drop.
     /// Watermarks only rise, so no peer is told we have seen something we
-    /// have not. The cost is a deletion a peer applies at our next real write
-    /// (decision 0018).
+    /// have not. The cost is a deletion a peer applies at our next real write.
     pub fn shared_state_json(&self) -> Result<String, Error> {
         #[derive(Serialize)]
         struct Shared<'a> {
@@ -979,7 +978,7 @@ impl Document {
         id
     }
 
-    /// A device's own workspace (decision 2254), marked as `by`'s.
+    /// A device's own workspace, marked as `by`'s.
     pub fn add_device_workspace(
         &mut self,
         name: impl Into<String>,
@@ -1180,7 +1179,7 @@ impl Document {
 
     /// Stamps `touched_at` and `touched_by` on `id`, and nothing else: work
     /// was done inside it, such as a tab filed under a workspace nobody had
-    /// touched (decision 0106).
+    /// touched.
     ///
     /// The stamp holds no value, so every fact group is left byte-identical
     /// and no edit made elsewhere can be lost to it. What it changes is the
@@ -1273,8 +1272,7 @@ impl Document {
     /// and `after` (favorites-native spec §16). A root is a folder with no
     /// parent. A node already at that id is replaced, so adding the same
     /// guid twice leaves one node, and adding a deleted favorite's guid
-    /// again at a later stamp, as Undo does, is news to every peer
-    /// (decisions 0014, 0016).
+    /// again at a later stamp, as Undo does, is news to every peer.
     #[expect(clippy::too_many_arguments)]
     pub fn add_favorite(
         &mut self,
@@ -1358,7 +1356,7 @@ impl Document {
     }
 
     /// Adds the visit this device, `by`, made to `url` at `visited_at` in
-    /// `workspace`, at [`visit_id`] (history-sync spec §3, decision 1287). A
+    /// `workspace`, at [`visit_id`] (history-sync spec §3). A
     /// visit has no parent and its placement is never written again. A visit
     /// already here is left as it is: a visit never changes, so seeding it
     /// twice writes nothing new.
@@ -1413,7 +1411,7 @@ impl Document {
     }
 
     /// Records in [`HISTORY_INDEX`] that `by` wrote to history shard `name`
-    /// at `now`: adds the shard's node, or stamps its touch (decision 0106),
+    /// at `now`: adds the shard's node, or stamps its touch,
     /// so every device learns the shard changed (history-sync spec §3).
     pub fn touch_shard(
         &mut self,
@@ -3154,8 +3152,7 @@ mod tests {
     }
 
     /// Only this device's stamps later than `now` move: a peer's later stamp
-    /// is the peer's, and an earlier stamp of our own already happened
-    /// (decision 1714).
+    /// is the peer's, and an earlier stamp of our own already happened.
     #[test]
     fn pulling_back_moves_only_our_own_stamps_ahead_of_now() {
         let (me, peer) = (

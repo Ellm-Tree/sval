@@ -199,7 +199,7 @@ add_task(async function the_jar_follows_the_window_between_workspaces() {
 });
 
 /**
- * A popup takes its opener's workspace (decision 0101), so a sign-in popup
+ * A popup takes its opener's workspace, so a sign-in popup
  * from an isolated workspace keeps the jar it inherited and its opener. On
  * any other workspace its tab would be reopened in that one's jar, with no
  * opener to answer to.

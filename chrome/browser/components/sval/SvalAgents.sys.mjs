@@ -115,7 +115,7 @@ const PREF = "browser.sval.agents.enabled";
 
 /**
  * How many days an agent workspace no session has held is kept before Sval
- * deletes it, or 0 to keep it (decision 1998).
+ * deletes it, or 0 to keep it.
  */
 const WORKSPACE_RETENTION_PREF = "browser.sval.agents.workspaceRetentionDays";
 

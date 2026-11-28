@@ -360,7 +360,7 @@ add_task(async function undo_takes_back_a_change_still_being_written() {
 });
 
 /**
- * A pin is not a favorite (decision 0137): the favorite button's questions
+ * A pin is not a favorite: the favorite button's questions
  * and its removal read the Favorites root alone.
  */
 add_task(async function a_pin_is_not_a_favorite() {

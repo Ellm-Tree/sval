@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The workspace each visit was made in (decision 1287).
+ * The workspace each visit was made in.
  *
  * Places keeps it in `sval_visit_workspaces`, a table of Sval's in
  * `places.sqlite`: one row per visit made in a workspace, removed with its

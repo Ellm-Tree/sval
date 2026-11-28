@@ -11,7 +11,7 @@
  * only its owner can open (`makePrivateDirectory`).
  *
  * Each `site` a policy setter takes names the rule it writes: a site, or a
- * host under its site (decision 1980), as `scopeOfHost` names them. The
+ * host under its site, as `scopeOfHost` names them. The
  * policy's lookups walk from a host to its site (`mostSpecificRule`).
  */
 
@@ -152,8 +152,8 @@ function withoutEntry(policy, map, site) {
 }
 
 /**
- * The workspaces an agent's record holds, by id: one per session of its app
- * (decision 1998), each with the task that names it, the model the session
+ * The workspaces an agent's record holds, by id: one per session of its app,
+ * each with the task that names it, the model the session
  * gave, where and when the session's `sval-mcp` started, and when a session
  * last held it. A record written before workspaces were kept per session
  * holds its one workspace in its own fields.
@@ -329,7 +329,7 @@ export class SvalAgentStore {
    * the session that asked, when it has one.
    *
    * An app that pairs again under a launch id an agent already holds is that
-   * agent: `sval-mcp` keeps one secret per app (decision 1998), and saves the
+   * agent: `sval-mcp` keeps one secret per app, and saves the
    * new one over the old, so a second record could never connect again. The
    * agent keeps its id, workspaces and policy, and takes the new secret and
    * the user's new choice of workspace.
@@ -536,7 +536,7 @@ export class SvalAgentStore {
 
   /**
    * Forgets workspace `workspaceId`, which the user or its agent has
-   * deleted. The agent stays paired (decision 1998).
+   * deleted. The agent stays paired.
    *
    * @param {string} workspaceId
    */
@@ -700,7 +700,7 @@ export class SvalAgentStore {
 
   /**
    * Narrows one of a site's upload folders to the files directly in it, or
-   * removes it. Neither ever allows more than before (decision 0129): an
+   * removes it. Neither ever allows more than before: an
    * entry left with no folders is removed, so Sval asks again.
    *
    * @param {string} agentId

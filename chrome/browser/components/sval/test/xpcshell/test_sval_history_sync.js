@@ -773,8 +773,8 @@ add_task(async function a_renamed_device_reaches_names_already_read() {
 });
 
 /**
- * Decision 2254: a phone or tablet says which it is in the settings document,
- * so every device draws its Workspace with that device's mark.
+ * A phone or tablet says which it is in the settings document, so every
+ * device draws its Workspace with that device's mark.
  */
 add_task(async function a_devices_kind_reaches_the_other_devices() {
   const { make } = devices();

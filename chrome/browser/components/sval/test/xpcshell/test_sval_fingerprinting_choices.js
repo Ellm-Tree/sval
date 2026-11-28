@@ -5,7 +5,7 @@
 
 /**
  * The fingerprinting switches that are RFP targets keep one choice each, and
- * the overrides string Gecko reads is composed from them (decision 0114): a
+ * the overrides string Gecko reads is composed from them: a
  * profile's earlier string becomes choices, and a choice arriving from
  * another device leaves this device's own alone.
  */

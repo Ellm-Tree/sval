@@ -15,8 +15,8 @@
  * left the state is the one a retry should run again.
  *
  * A window takes a workspace no other window shows and opens that
- * workspace's tabs (spec §10.7, decision 0079), and closing a window keeps
- * its workspace once a page was browsed in it (decision 0101). A workspace
+ * workspace's tabs (spec §10.7), and closing a window keeps
+ * its workspace once a page was browsed in it. A workspace
  * an earlier file browsed in therefore outlives that file, and the next
  * window any file opens takes it and opens its tabs beside the ones the file
  * put there. Mozilla's tests count a new window's tabs on the premise that a

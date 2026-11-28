@@ -151,7 +151,7 @@ pub fn converter_version() -> String {
 
 /// My filters' page rules alone, as rule lists of at most `MAX_RULES`, for
 /// the pages the lists' rules skip: a site with protections off, and every
-/// page while the level runs no list (decision 1993). My filters' request
+/// page while the level runs no list. My filters' request
 /// blocking follows the lists, so `content_rules` carries it.
 #[uniffi::export]
 pub fn own_page_rules(my_filters: String) -> ContentRules {

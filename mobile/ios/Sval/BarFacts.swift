@@ -60,7 +60,7 @@ extension BarFacts {
         shield = ShieldState(url: url, rules: model.siteRules(private: browser.privateInFront))
         let host = url?.host()
         // My filters' lines that remove something on this site, which
-        // apply at every level and with protections off (decision 1993).
+        // apply at every level and with protections off.
         removals = shield == .plain ? 0 : host.map { model.myFilters.removals(on: $0).count } ?? 0
         javaScriptOff = host.map { !SiteRules(settings: model.settings).javaScriptEnabled(on: $0) } ?? false
         denied = browser.frontDenied

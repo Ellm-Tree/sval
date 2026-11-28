@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The Secure DNS card in Privacy and protection (decision 0105), drawn by
+ * The Secure DNS card in Privacy and protection, drawn by
  * Firefox's `setting-group` like the rest of its settings. The choice is
  * `SvalSecureDns`'s, which the protection button's panel also offers. The
  * resolver, its status, the custom URL and the names that skip encrypted DNS

@@ -6,7 +6,7 @@ PreferenceSheet::Prefs::Load reads for content documents alone. A chrome
 document's scheme comes from the theme: LightweightThemeConsumer sets the
 window's BrowsingContext.prefersColorSchemeOverride and
 browser.theme.toolbar-theme, and for the default theme it picks dark from
-(-moz-system-dark-theme) only. Sval keeps the default theme (decision 0093), so
+(-moz-system-dark-theme) only. Sval keeps the default theme, so
 the window stayed with the system's scheme whatever was chosen.
 
 LightweightThemeConsumer is the one writer of the window's scheme, so the

@@ -4,9 +4,8 @@
 "use strict";
 
 /**
- * Sval runs beside an installed Firefox and never reads or writes its state
- * (decision 1738). These are the directories Gecko would otherwise share
- * with it.
+ * Sval runs beside an installed Firefox and never reads or writes its state.
+ * These are the directories Gecko would otherwise share with it.
  */
 
 function dirOrNull(key) {

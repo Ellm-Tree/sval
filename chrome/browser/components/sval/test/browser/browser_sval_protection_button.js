@@ -723,7 +723,7 @@ add_task(async function an_exception_site_follows_a_global_change() {
 
 add_task(async function an_exception_carries_mozillas_fix_along() {
   reset();
-  // Mozilla's fixes are off by default (decision 1685).
+  // Mozilla's fixes are off by default.
   await SpecialPowers.pushPrefEnv({
     set: [["privacy.fingerprintingProtection.remoteOverrides.enabled", true]],
   });

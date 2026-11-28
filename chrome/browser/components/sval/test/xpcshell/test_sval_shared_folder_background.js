@@ -16,7 +16,7 @@ const { SHARED_INTERVAL_MS, SHARED_RETRY_MS } = ChromeUtils.importESModule(
 );
 
 /**
- * Decision 0032: a step that does not reach the folder is tried again
+ * A step that does not reach the folder is tried again
  * within seconds, once, so a blip is told from an outage quickly. A second
  * failure goes back to the interval, and a step that reaches the folder
  * reports it at once.

@@ -29,7 +29,7 @@ const ALERT_URL = "chrome://browser/content/sval/agent-alert.xhtml";
 
 /**
  * How many seconds a tool call waits for the user's answer to an alert, as
- * Settings › Agents sets it (decision 1880). Read as each call first waits.
+ * Settings › Agents sets it. Read as each call first waits.
  */
 export const APPROVAL_WAIT_PREF = "browser.sval.agents.approvalWaitSeconds";
 

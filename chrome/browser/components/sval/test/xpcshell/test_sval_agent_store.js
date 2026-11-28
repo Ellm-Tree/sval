@@ -102,7 +102,7 @@ add_task(async function a_reopened_store_still_verifies() {
 /**
  * An agent is its app: its client and the kind of workspace the user chose
  * for it are kept with it, and each workspace one of its sessions made is
- * kept with what that session said of itself (decision 1998).
+ * kept with what that session said of itself.
  */
 add_task(async function an_agent_keeps_each_sessions_workspace() {
   const path = freshPath("launch");
@@ -579,7 +579,7 @@ add_task(async function the_default_and_rules_are_edited() {
 /**
  * "Always allow" for uploads records the folders it covers with their scope,
  * adding to those allowed before, keeping the wider scope of a folder named
- * twice, and replaces a denial (decision 0129).
+ * twice, and replaces a denial.
  */
 add_task(async function upload_folders_add_up() {
   const path = freshPath("upload-folders");

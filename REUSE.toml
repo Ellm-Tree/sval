@@ -436,7 +436,7 @@ SPDX-FileCopyrightText = ["The Zen OSS Team", "2026 Ellm Tree, Inc."]
 SPDX-License-Identifier = "MPL-2.0"
 
 # The hosts that hold a public suffix, from the Public Suffix List, as data
-# (scripts/update-tracker-owners.py, decision 1051).
+# (scripts/update-tracker-owners.py).
 [[annotations]]
 path = "chrome/browser/components/sval/tracker-owners/shared-hosting.mjs"
 SPDX-FileCopyrightText = "The Public Suffix List's contributors"
@@ -444,7 +444,7 @@ SPDX-License-Identifier = "MPL-2.0"
 
 # AdGuard's companiesdb, each company's domains, from
 # AdguardTeam/companiesdb's dist/trackers.json, as data
-# (scripts/update-tracker-owners.py, decision 1051).
+# (scripts/update-tracker-owners.py).
 [[annotations]]
 path = "chrome/browser/components/sval/tracker-owners/adguard-companiesdb.mjs"
 SPDX-FileCopyrightText = "AdGuard Software Ltd and the WhoTracks.me contributors"
@@ -463,7 +463,7 @@ SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
 SPDX-License-Identifier = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
 
 # The docs' text and the release notes, which anyone may share or adapt,
-# commercially too, with credit and under the same license (decision 2023).
+# commercially too, with credit and under the same license.
 [[annotations]]
 path = ["website/src/content/docs/**", "website/src/content/releases/**"]
 SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."

@@ -34,7 +34,7 @@ const ADDRESS_WRITES = new Set(["addTab", "setContent", "addFavorite"]);
 
 /**
  * `op` with every address it writes marked `local` where `syncableAddress`
- * refuses it, a batch's operations included (decision 1372). The engine
+ * refuses it, a batch's operations included. The engine
  * stores the mark and never reads an address, so this is the one place a
  * write learns whether it may leave the device.
  *
@@ -75,7 +75,7 @@ export const TOP_DIR = "sval";
 /**
  * The file in an engine's {@link TOP_DIR} that keeps the time this device's first time
  * reading arrived and the documents whose stamps from before it are pulled
- * back (decision 1714). It stays, so a restart between the reading and a
+ * back. It stays, so a restart between the reading and a
  * document's next pass, in this run or a later one, still pulls that
  * document's stamps back before it publishes.
  */
@@ -103,7 +103,7 @@ export const SHARED_INTERVAL_MS = 30000;
 
 /**
  * How soon after a shared step that did not reach the folder the next one is
- * due, once (decision 0032). One failed reach is often a blip, and a quick
+ * due, once. One failed reach is often a blip, and a quick
  * second try tells a blip from an outage in seconds. A second failure in a
  * row is an outage, and the steps go back to {@link SHARED_INTERVAL_MS}.
  */
@@ -111,7 +111,7 @@ export const SHARED_RETRY_MS = 5000;
 
 /**
  * How long this device's own file in the shared folder stays unreadable
- * before it is set aside and written afresh (decision 1144): long enough for
+ * before it is set aside and written afresh: long enough for
  * a cloud client to finish downloading it.
  */
 export const OWN_FILE_SET_ASIDE_MS = 10 * 60 * 1000;
@@ -383,7 +383,7 @@ export class SvalEngine extends SvalWorkerClient {
   /**
    * The corrected time this device's first time reading arrived at, when it
    * arrived in this run, and the documents whose profile pass has pulled
-   * back the stamps taken before it (decision 1714). A document publishes
+   * back the stamps taken before it. A document publishes
    * nothing before that pass.
    */
   #clampFrom = null;
@@ -789,7 +789,7 @@ export class SvalEngine extends SvalWorkerClient {
   /**
    * Waits until `document` may be published as far as the clock goes: once
    * a reading exists, the profile pass that pulls back the stamps taken
-   * before it has run (decision 1714). A pairing publishes this engine's
+   * before it has run. A pairing publishes this engine's
    * document through a candidate, so it calls this first.
    *
    * @param {string} document The document name.
@@ -1404,7 +1404,7 @@ export class SvalEngine extends SvalWorkerClient {
    *   whether the profile held this device's own file when the pass began.
    *   `shared` is `"none"` (no shared folder, or it is the profile),
    *   `"reached"`, `"unreachable"`, `"too-large"` (the folder holds more
-   *   than one step reads, decision 0032), or `"unknown"` (no shared step has
+   *   than one step reads), or `"unknown"` (no shared step has
    *   finished since the folder was set). `sharedReason` is
    *   {@link folderProblem}'s name for why the last step did not reach the
    *   folder, `sharedCause` the helper's own reason, and `sharedFailures` how
@@ -1415,7 +1415,7 @@ export class SvalEngine extends SvalWorkerClient {
    *   `errors` and `schemaTooNew` include the last shared step's per-file
    *   problems until the next shared step replaces them, as `harmedByClock`
    *   does: the hex ids of the devices whose clocks set ahead replaced this
-   *   device's values or brought back what it closed (decision 1714). Null
+   *   device's values or brought back what it closed. Null
    *   when an idle poll was skipped.
    */
   async sync(
@@ -2136,8 +2136,7 @@ export class SvalEngine extends SvalWorkerClient {
     const ownEntry = listed.unreadable.find(file => file.name === layout.mine);
     const ownUnread = ownEntry
       ? !NOT_SET_ASIDE.has(ownEntry.reason)
-      : // A file a newer build wrote is intact, and that build's to replace
-        // (decision 1144).
+      : // A file a newer build wrote is intact, and that build's to replace.
         !!merged.refusedWrite && !merged.schemaTooNew?.some(file => file.own);
     if (ownEntry) {
       // This device's own file is there and does not read, so the merge took
@@ -2185,7 +2184,7 @@ export class SvalEngine extends SvalWorkerClient {
    * Notes that `name`'s own file in the folder did not read at `now`, and
    * once it has not read for `OWN_FILE_SET_ASIDE_MS`, renames it with
    * `.damaged-<now>` appended so that the next step writes a fresh one from
-   * this device's document (decision 1144). Each copy keeps its own name, and
+   * this device's document. Each copy keeps its own name, and
    * the helper never moves over an existing one. The name ends past the
    * suffix every device file shares, so no step reads the copy as a peer's.
    * A move that fails is tried again at the next step.
@@ -2845,7 +2844,7 @@ export class SvalEngine extends SvalWorkerClient {
 
   /**
    * Removes entries from the Archive document `name`, for a site the user
-   * forgot (decision 2376), writing the Archive before it changes, as
+   * forgot, writing the Archive before it changes, as
    * {@link archiveIdle} does.
    *
    * @param {string} name The Archive's document name.

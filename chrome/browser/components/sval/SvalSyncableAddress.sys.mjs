@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Whether an address may leave this device (decision 1372). The writer asks
+ * Whether an address may leave this device. The writer asks
  * it of every tab, pin, favorite and history visit it records, and an address
  * it refuses stays in this device's profile copy. The reader asks it of what
  * another device wrote, and never opens an address it refuses.

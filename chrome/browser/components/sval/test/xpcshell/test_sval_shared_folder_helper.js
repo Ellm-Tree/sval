@@ -7,7 +7,7 @@
 
 /**
  * The helper process that alone touches the shared folder, and the module
- * that supervises it (local-copy spec §3, §4.2, decision 1437): what a helper
+ * that supervises it (local-copy spec §3, §4.2): what a helper
  * answers for an ordinary folder, and how long one lives. The helper's own
  * rules, paths, links and caps among them, are tested in its crate
  * (`tools/sval-folder`).
@@ -250,7 +250,7 @@ async function helpersStartedBy(run) {
 }
 
 /**
- * The requests of one burst share a helper (decision 1437): starting one is
+ * The requests of one burst share a helper: starting one is
  * most of what a request costs.
  */
 add_task(async function a_burst_of_requests_shares_one_helper() {

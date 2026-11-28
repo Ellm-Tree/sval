@@ -269,7 +269,7 @@ add_task(function the_shades_hold_only_colours_that_pass() {
 
 /**
  * Every colour can go to the same transparency: its layer keeps a share of
- * the colour over the material (decision 0057).
+ * the colour over the material.
  */
 add_task(function every_colour_reaches_the_same_transparency() {
   for (const color of [
@@ -607,7 +607,7 @@ add_task(function a_see_through_window_shows_its_colour_over_the_material() {
 /**
  * A custom colour that suits the appearance it was picked in has a
  * counterpart in the other with its hue; one picked against its appearance
- * is the same in both (decision 0057).
+ * is the same in both.
  */
 add_task(function a_custom_colour_has_its_counterpart() {
   const deep = { h: 290, c: 0.12, l: 0.36, mode: "dark" };
@@ -634,7 +634,7 @@ add_task(function a_custom_colour_has_its_counterpart() {
  * window, solid and see-through, in both appearances and with more
  * contrast, from the block at rest
  * through a hovered row to a selected one: the block stops stepping where
- * they would not (decision 0057).
+ * they would not.
  */
 add_task(function a_groups_text_meets_its_target_on_its_block() {
   const failed = [];

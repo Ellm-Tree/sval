@@ -173,7 +173,7 @@ struct BarColors {
 }
 
 /// A Workspace's or group's colour as the tree syncs it: a preset's
-/// token, or a custom colour's JSON (decision 0057). Everything drawn from
+/// token, or a custom colour's JSON. Everything drawn from
 /// it comes from the desktop's maths ([`DesktopColor`]).
 struct WorkspaceTint: Hashable, Identifiable {
     let rawValue: String

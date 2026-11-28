@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The mark on a pin's page (pins spec §5, decision 0137): a real tab of its
+ * The mark on a pin's page (pins spec §5): a real tab of its
  * window that no tree node describes. A pin's icon is its tab, so its page
  * never appears in the tab list, and everything that files or walks a
  * window's tabs (`SvalTabs`) leaves a marked tab alone, as it leaves a

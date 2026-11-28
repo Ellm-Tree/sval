@@ -6,7 +6,7 @@
 /**
  * How a tool call waits for the user's answer to an alert (agent-control
  * spec §5.6): as long as the user takes, up to the wait Settings › Agents
- * sets (decision 1880).
+ * sets.
  */
 
 const {

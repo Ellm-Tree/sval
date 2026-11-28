@@ -204,7 +204,7 @@ export class SvalWindowWorkspace {
 
   /**
    * The workspace the window created for itself, the one workspace its
-   * close may delete (decision 0101). A workspace the user made, or one the
+   * close may delete. A workspace the user made, or one the
    * window was handed, is theirs whatever it holds.
    *
    * @returns {string|null}

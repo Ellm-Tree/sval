@@ -350,7 +350,7 @@ export const SvalFavoritesMenu = {
     const siblings = movable ? shownSiblings(target.item) : [];
     const at = siblings.findIndex(row => row.guid === target?.guid);
     const store = lazy.SvalFavoritesStore.readyInstance;
-    // A pin, as the home page's tiles show one (decision 0137). Its Move to
+    // A pin, as the home page's tiles show one. Its Move to
     // Favorites is the pin menu's, offered where that menu offers it.
     const pin = movable && !!store?.isPinned(target.guid);
     const inRow = pin && target.item.parentGuid === lazy.PINS_ROOT;
@@ -386,8 +386,7 @@ export const SvalFavoritesMenu = {
       newSeparator: !pin,
       export: true,
     };
-    // Another device's address that no device opens can only be deleted
-    // (decision 1372).
+    // Another device's address that no device opens can only be deleted.
     if (target?.item.refused) {
       for (const command of Object.keys(show)) {
         show[command] = command === "delete";

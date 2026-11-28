@@ -240,8 +240,9 @@
 
 /* ---------------------------------------------------------------- address */
 
-/* The address takes its row's whole width. It docks nothing (decision 0132
-   holds in the header row), so its outline reaches only past the shield.
+/* The address takes its row's whole width. It docks nothing (its site
+   controls sit inside its pill in the header row too), so its outline reaches
+   only past the shield.
    `SvalPanelToolbar` reads its narrowest width from here. */
 .sval-set[data-set="address"] {
   --sval-address-min-w: 64px;

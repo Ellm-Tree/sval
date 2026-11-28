@@ -6,7 +6,7 @@
 /* import-globals-from head.js */
 
 /**
- * Performance recordings (decision 2428): a recording started in the running
+ * Performance recordings: a recording started in the running
  * Sval saves a gzipped profile in the download folder, from Help ›
  * Record Performance, about:support's button and about:processes' button on
  * a process, and the file manager is asked to show it.

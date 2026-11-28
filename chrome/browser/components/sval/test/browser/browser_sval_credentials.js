@@ -6,7 +6,7 @@
 /**
  * Firefox's password manager is off and its address and card autofill is not
  * built, so the user's own password manager is the only thing on a page that
- * saves, offers or fills (spec §7.3, decision 0078).
+ * saves, offers or fills (spec §7.3).
  */
 
 const LOGIN_PAGE =
@@ -179,9 +179,9 @@ add_task(async function arrowing_through_the_managers_installs_nothing() {
 
 /**
  * Native messaging, managed storage and PKCS#11 manifests are read from
- * Sval's own folders and never from the Mozilla folders Firefox reads
- * (decision 1738). `NativeManifests` adds the type's own subdirectory to
- * each. test_sval_native_manifests_key.js covers the Windows registry.
+ * Sval's own folders and never from the Mozilla folders Firefox reads.
+ * `NativeManifests` adds the type's own subdirectory to each.
+ * test_sval_native_manifests_key.js covers the Windows registry.
  */
 add_task(
   {

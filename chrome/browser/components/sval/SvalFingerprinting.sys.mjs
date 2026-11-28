@@ -13,7 +13,7 @@
  * **A setting backed by RFP targets is its own pref**, `CHOICE_BRANCH` and
  * its id: `true` or `false` once the user has chosen, no value while it
  * stands at Sval's default. Settings sync carries each such pref as its own
- * setting (decision 0114). Gecko reads the targets from one string,
+ * setting. Gecko reads the targets from one string,
  * `privacy.fingerprintingProtection.overrides`, which
  * `nsRFPService::CreateOverridesFromText` applies on top of
  * `RFPTargetsDefault.inc` token by token; each device composes that string

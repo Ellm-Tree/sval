@@ -2,8 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The agent workspaces the user has taken control of (agent-control spec §6,
- * as decision 0107 has it).
+ * The agent workspaces the user has taken control of (agent-control spec §6).
  *
  * An agent's workspace is the agent's until the user presses Take control in
  * its window. That pauses the agent across the whole workspace, every tab in

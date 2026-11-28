@@ -287,7 +287,7 @@ function solveInk(h, c, S, req, side) {
 }
 
 /**
- * Sval's targets (decision 0057): body text, muted text and lines, each a
+ * Sval's targets: body text, muted text and lines, each a
  * WCAG 2 ratio and an APCA Lc, raised when the system asks for more contrast.
  *
  * @param {boolean} more
@@ -759,7 +759,7 @@ function pillOf(tint, side) {
  * keeps at least 35% over the material, so a window always carries its
  * colour; text is solved on the colour the window shows over the
  * material's middle ({@link apparentOf}), and what is behind the window is
- * not measured (decision 0057).
+ * not measured.
  *
  * @returns {number}
  */
@@ -771,7 +771,7 @@ const MAX_TRANSPARENCY = 0.65;
 
 /**
  * Sval's default window: a Workspace that holds no transparency of its own
- * is this see-through (decision 0057). A transparency the user chose, 0
+ * is this see-through. A transparency the user chose, 0
  * included, is kept as chosen.
  */
 export const DEFAULT_TRANSPARENCY = 0.3;
@@ -1259,7 +1259,7 @@ const boundsCache = new Map();
  * the purest ink of the window's side still meets the body target, at the
  * block's chroma at rest and selected. The block steps off its window as
  * `sval-panel.css`'s formula says, and stops at these, so its text always
- * reads (decision 0057).
+ * reads.
  *
  * @param {string|object} color
  * @param {{l: number, surfaceDark: boolean, dir: number}} on

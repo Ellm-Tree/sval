@@ -638,8 +638,8 @@
       const named = lazy.SvalPanelModel.friendlyFolderName(
         this._sharedRoot() ?? ""
       );
-      // A folder that does not answer is said as the sync indicator says it
-      // (decision 0032), and the look goes on, so the dialog moves on once
+      // A folder that does not answer is said as the sync indicator says it,
+      // and the look goes on, so the dialog moves on once
       // the folder is back.
       if (
         lazy.SvalPanelModel.showsFolderNotice({

@@ -11,7 +11,7 @@
  * run against Sval's `ext-bookmarks.js` over the profile's Favorites
  * (favorites-native spec §8.5). What differs is what Places does and Sval
  * does not: a bookmark created with no parent lands in Favorites
- * (`toolbar_____`, decision 0123), where Places puts it in Other Bookmarks;
+ * (`toolbar_____`), where Places puts it in Other Bookmarks;
  * concurrent creates land in the order they were asked for, each at the end
  * of its folder; search lists in tree order; an unknown folder is "Bookmark
  * not found"; and Places' tags and queries, which Favorites have no
@@ -1844,7 +1844,7 @@ add_task(async function an_extension_saves_only_what_import_would() {
 });
 
 /**
- * A pin is not a favorite (decision 0137): the API's tree, search and lookups
+ * A pin is not a favorite: the API's tree, search and lookups
  * show none, and an extension cannot write into the pins root.
  */
 add_task(async function an_extension_sees_no_pin() {

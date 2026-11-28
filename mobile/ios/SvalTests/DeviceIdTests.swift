@@ -5,8 +5,8 @@ import Foundation
 import XCTest
 @testable import Sval
 
-/// A phone that starts over keeps its device id, and so its own Workspace
-/// (decisions 2232 and 2254). Each test runs the app's own syncer, whose
+/// A phone that starts over keeps its device id, and so its own Workspace.
+/// Each test runs the app's own syncer, whose
 /// copy lives in the test host's container, and leaves no copy behind.
 final class DeviceIdTests: XCTestCase {
     private let syncKey = Data((0..<32).map { _ in UInt8.random(in: 0...255) })

@@ -278,7 +278,7 @@ export const FILE_PERMISSIONS = ["allow", "deny"];
  * The folders an `uploads` entry allows files from, or null when the entry
  * allows none. An entry allows uploads only as `{folders: [...]}`: the
  * folders of the files the user approved with "Always allow", each
- * `{path, subfolders}` (spec §5.2, decision 0129). A folder Sval cannot read
+ * `{path, subfolders}` (spec §5.2). A folder Sval cannot read
  * is left out, and an entry left with none is no decision. A path that is
  * not absolute holds no file (`SvalAgentUploads`, `inUploadFolders`).
  *
@@ -540,7 +540,7 @@ function isRuleName(name) {
  * - A policy with no version Sval can read is given `POLICY_VERSION`.
  * - A default Sval cannot read is `"ask"`, Sval's own default.
  * - An entry is named by a site or by a host under its site, as
- *   `scopeOfHost` names them (decision 1980). One named by anything else,
+ *   `scopeOfHost` names them. One named by anything else,
  *   `www.` of a site included, is deleted, as no lookup reaches it.
  * - A site, download, upload, console or apps entry Sval cannot read is
  *   deleted, so the name follows the names above it (`mostSpecificRule`)

@@ -203,7 +203,7 @@ add_task(
 
 /**
  * Spec §6 test 8, as messages spec §3 draws it: a folder that is not there
- * shows at once, and clears the moment it answers (decision 0032).
+ * shows at once, and clears the moment it answers.
  */
 add_task(async function a_missing_folder_shows_and_clears_when_back() {
   const profile = await freshProfile();

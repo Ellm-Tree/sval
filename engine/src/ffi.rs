@@ -79,7 +79,7 @@ pub struct OutlineRow {
     /// The tab's icon as the content group holds it, which a host writing
     /// the group (`setContent`) sends back unchanged.
     pub icon: Option<String>,
-    /// Whether the address stays on this device (decision 1372), sent back
+    /// Whether the address stays on this device, sent back
     /// as `icon` is.
     pub local: bool,
     pub emoji: Option<String>,
@@ -87,10 +87,10 @@ pub struct OutlineRow {
     /// (spec §5.1).
     pub label: Option<String>,
     /// The colour a Workspace or group carries: a preset's token, such as
-    /// `blue`, or a custom colour's JSON (decision 0057).
+    /// `blue`, or a custom colour's JSON.
     pub color: Option<String>,
     /// How see-through a Workspace's window is, 0...1, which a host that
-    /// writes the appearance group back must carry (decision 0057).
+    /// writes the appearance group back must carry.
     pub transparency: Option<f64>,
     pub pinned: bool,
     /// The label of the agent whose Workspace this is, which the switcher
@@ -101,7 +101,7 @@ pub struct OutlineRow {
     /// bytes; absent for the user's own. Other devices name it after the
     /// agent's label (agent-control spec §3.5).
     pub agent_device: Option<Vec<u8>>,
-    /// The device whose own Workspace this is (decision 2254), as its 16
+    /// The device whose own Workspace this is, as its 16
     /// bytes; absent for every other Workspace.
     pub device: Option<Vec<u8>>,
     /// Whether this Workspace keeps a cookie jar of its own.
@@ -122,7 +122,7 @@ pub struct PinRow {
     pub kind: String,
     pub name: String,
     pub url: Option<String>,
-    /// Whether the address stays on this device (decision 1372).
+    /// Whether the address stays on this device.
     pub local: bool,
     /// The pinned folder a pin sits in, at any depth; absent for a slot of
     /// the row itself.
@@ -645,9 +645,8 @@ fn outline_row(
         local: node.content.local,
         emoji: node.appearance.emoji.clone(),
         label: node.appearance.label.clone(),
-        // A preset's token as it is, and a custom colour, an object
-        // (decision 0057), as its JSON, which the phone draws with the
-        // desktop's own colour maths.
+        // A preset's token as it is, and a custom colour, an object, as its
+        // JSON, which the phone draws with the desktop's own colour maths.
         color: node.appearance.color.as_ref().map(|color| match color {
             serde_json::Value::String(token) => token.clone(),
             other => other.to_string(),
@@ -1787,7 +1786,7 @@ mod tests {
     }
 
     /// A phone that starts again under its old id gets back what it made
-    /// too: the engine takes the id's earlier writes back (decision 2232).
+    /// too: the engine takes the id's earlier writes back.
     #[test]
     fn a_phone_that_starts_again_under_its_old_id_keeps_what_it_made() {
         use std::collections::BTreeMap;

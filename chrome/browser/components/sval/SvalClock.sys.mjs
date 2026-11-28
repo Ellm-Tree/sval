@@ -3,9 +3,9 @@
 
 /**
  * The time Sval stamps synced data with: the wall clock corrected by the
- * difference Remote Settings measures against its server (decision 1714,
- * spec §5.3). Every timestamp the host hands the engine for synced data
- * comes from {@link SvalClock}.
+ * difference Remote Settings measures against its server (spec §5.3).
+ * Every timestamp the host hands the engine for synced data comes from
+ * {@link SvalClock}.
  */
 
 const lazy = {};
@@ -46,7 +46,7 @@ export const NETWORK_UP = new Map([
 
 /**
  * How far past corrected time a device's own watermark may be and still
- * raise its next stamps: decision 0135's margin, `WATERMARK_MARGIN` in
+ * raise its next stamps: `WATERMARK_MARGIN` in
  * `engine/src/sync.rs`, which says why one minute.
  */
 export const OWN_WATERMARK_MARGIN_MS = 60 * 1000;
@@ -58,7 +58,7 @@ export const OWN_WATERMARK_MARGIN_MS = 60 * 1000;
  * per million under NTP (RFC 5905), which is 1.8 s over the hour between
  * Remote Settings polls. Followed, corrected time stays on the wall clock
  * other Sval code and other devices read. A larger move is a change to the
- * wall clock, which waits for the next reading (decision 1714).
+ * wall clock, which waits for the next reading.
  */
 export const FOLLOWED_DRIFT_MS = 2000;
 
@@ -218,7 +218,7 @@ export class CorrectedClock {
 
   /**
    * Keeps every later stamp above `at`, this device's own watermark: what it
-   * last wrote or published under (decision 1714). A peer holding that
+   * last wrote or published under. A peer holding that
    * watermark reads a node stamped below it as one it has already seen, so
    * a restart, or a reading lower than the last, must not stamp below it.
    * A watermark more than {@link OWN_WATERMARK_MARGIN_MS} past corrected

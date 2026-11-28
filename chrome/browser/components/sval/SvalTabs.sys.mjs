@@ -12,8 +12,8 @@
  * commits, and `pagetitlechanged` each title its page sets
  * (`browser/components/tabbrowser/content/tabbrowser.js`).
  *
- * **A tab's content (its url and name) is written in two places only**
- * (decision 0050): the acts Sval files, such as an open, and a page the tab
+ * **A tab's content (its url and name) is written in two places only**:
+ * the acts Sval files, such as an open, and a page the tab
  * commits, with the title that page sets. Nothing reads a tab's address back
  * on any other event. A load refused, cancelled or still restoring, a
  * discard, a blank placeholder and a hidden page commit nothing, so they
@@ -625,8 +625,8 @@ const chromeTabAdapter = {
    * The address `tab` is being opened at, for the act that files it: the
    * address its first load is for while it is still on its first blank
    * document, the one a restore is bringing back while that restore is
-   * outstanding, and otherwise the page it shows. Only an open reads it
-   * (decision 0050); what the tab commits afterwards reaches its node
+   * outstanding, and otherwise the page it shows. Only an open reads it;
+   * what the tab commits afterwards reaches its node
    * through {@link watchNavigation}.
    *
    * `addTab` keeps the address it was given as the browser's
@@ -748,7 +748,7 @@ const chromeTabAdapter = {
    *
    * Reader view commits as the article it shows (`ReaderMode.getOriginalUrl`),
    * as Firefox's tab engine records it, so a tab in reader view keeps an
-   * address another device may open (decision 1372).
+   * address another device may open.
    *
    * @param {DOMWindow} window A chrome window.
    * @param {Function} onCommitted Called with the tab, the committed
@@ -930,7 +930,7 @@ const chromeTabAdapter = {
   /**
    * Whether `tab` is in front of the user: its window's selected tab, or one
    * in a call or in picture-in-picture. Another device's delete never closes
-   * such a tab (decision 2237).
+   * such a tab.
    *
    * @param {object} tab A Firefox tab.
    * @returns {boolean}
@@ -954,8 +954,7 @@ const chromeTabAdapter = {
   },
 
   /**
-   * Whether `tab` is in a call, which keeps its node on this device
-   * (decision 2237).
+   * Whether `tab` is in a call, which keeps its node on this device.
    *
    * @param {object} tab A Firefox tab.
    * @returns {boolean}
@@ -1517,7 +1516,7 @@ function tabIdsChanged() {
 /**
  * What tabs have committed since the last flush, by node id, for each
  * engine: the address of the page each committed last, and the title that
- * page set, as their events carried them (decision 0050). Each fact is the
+ * page set, as their events carried them. Each fact is the
  * event's own, so a flush reads no tab, and a redirect chain and a title that
  * resolves in stages cost one write between them.
  *
@@ -2133,7 +2132,7 @@ class SvalTabObserver {
 
   /**
    * Deletes the workspace this closing window showed, with its one tab, if
-   * nobody touched it (`isUntouchedWorkspace`, decision 0101). A window
+   * nobody touched it (`isUntouchedWorkspace`). A window
    * opened with every workspace already open gets a new one, and closing it
    * would otherwise leave an empty workspace in the document on every device.
    *
@@ -2995,8 +2994,8 @@ class SvalTabObserver {
 
   /**
    * Keeps open each of this window's tabs in front of the user whose node
-   * another device has just deleted (`ids`), and gives the node back
-   * (decision 2237). The user is looking at the tab, or is in a call or a
+   * another device has just deleted (`ids`), and gives the node back.
+   * The user is looking at the tab, or is in a call or a
    * picture-in-picture video in it, and a close made on another device must
    * not take it away. The node returns under its own id, which every peer
    * reads as news (spec §5.4), so the tab comes back on the device that
@@ -3411,9 +3410,9 @@ class SvalTabObserver {
 
   /**
    * Publishes again every tab a call kept on this device when the last
-   * session ended, as no call outlives its session (decision 2237). A local
-   * node whose address `syncableAddress` accepts was marked for a call
-   * alone: decision 1372 marks only addresses it refuses.
+   * session ended, as no call outlives its session. A local node whose
+   * address `syncableAddress` accepts was marked for a call alone: the
+   * writer marks local only an address it refuses.
    */
   async #endCallsOfLastSession() {
     const nodes = await this.#readTree();
@@ -3446,11 +3445,11 @@ class SvalTabObserver {
 
   /**
    * Keeps `tab`'s node on this device while it is in a call, and publishes
-   * it again once the call ends (decision 2237). Firefox reports a change
+   * it again once the call ends. Firefox reports a change
    * of what a tab shares as its `sharing` attribute (`updateBrowserSharing`).
    *
    * Only an address `syncableAddress` accepts is moved either way. One it
-   * refuses keeps the mark decision 1372 gave it: marking one a peer wrote
+   * refuses keeps its `local` mark: marking one a peer wrote
    * would let it open with this device's trust, and clearing one of this
    * device's would publish it.
    *
@@ -4812,7 +4811,7 @@ class SvalTabObserver {
 
   /**
    * Records the page `tab` has committed, with its title, for the next flush
-   * to write (decision 0050).
+   * to write.
    *
    * Nothing is written here. A page load commits more than once, a redirect
    * chain and then the title arriving after the document, and each write is a

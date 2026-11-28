@@ -22,7 +22,7 @@
  *   own date column, which leaves a day's or a site's folder blank.
  * - It lists the history of the workspace its window shows, with the pages
  *   visited in no workspace, or under "All Workspaces" every page, each with
- *   the workspace of its latest visit in a column (decision 1287). Places
+ *   the workspace of its latest visit in a column. Places
  *   holds each visit's workspace, and a query names the one it lists
  *   (`SvalVisitWorkspaces`). A private window records no history and lists
  *   all of it, as Firefox's does.

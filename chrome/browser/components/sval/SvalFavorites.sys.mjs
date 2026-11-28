@@ -367,7 +367,7 @@ export const SvalFavorites = {
    * icon the page settles on, after any redirect, as the favorite's.
    *
    * A favorite whose address another device wrote and no device opens
-   * (the store's `refused`, decision 1372) opens nothing, whoever asks.
+   * (the store's `refused`) opens nothing, whoever asks.
    *
    * A bookmarklet runs only on a page in a web or file content process.
    * `PlacesUIUtils.openNodeIn` triggers it with the system principal, so
@@ -539,7 +539,7 @@ export const SvalFavorites = {
    * Every way Firefox has into its Library window goes through
    * `PlacesCommandHook.showPlacesOrganizer`: the downloads panel's "Show all
    * downloads", history's "Show All History", and the bookmark commands. Sval
-   * has no Library (decision 0099), so each goes where Sval keeps that thing:
+   * has no Library, so each goes where Sval keeps that thing:
    * history to the History sidebar, downloads to `about:downloads`, and
    * bookmarks to the panel's Favorites menu.
    *

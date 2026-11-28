@@ -69,7 +69,7 @@ const SEED_PAGES = 5000;
  * Whether a visit Places recorded here syncs. Firefox's history engine leaves
  * out hidden pages and the transitions `IGNORED_TRANSITIONS_AS_SQL_LIST`
  * names in `PlacesSyncUtils.sys.mjs`. An address that stays on its device
- * (`syncableAddress`, decision 1372) stays in Places alone, as Firefox's
+ * (`syncableAddress`) stays in Places alone, as Firefox's
  * engine keeps `file:` visits to itself.
  *
  * Places also notifies `page-visited` for a visit it does not store, such as
@@ -626,8 +626,8 @@ export class SvalHistorySync {
       waiting: null,
       announced: null,
       changedAt: null,
-      // On the clock the engine stamps the index's announcements with
-      // (decision 1714), so an announcement made after this load is always
+      // On the clock the engine stamps the index's announcements with,
+      // so an announcement made after this load is always
       // later.
       openedAt: SvalClock.now(),
     };
@@ -778,7 +778,7 @@ export class SvalHistorySync {
 
   /**
    * Visits Places recorded here, each written to its week with the workspace
-   * it was made in (decision 1287).
+   * it was made in.
    *
    * @param {object[]} visits `{ url, title, visitedAt, transition, hidden,
    *   visitId }`.
@@ -1040,7 +1040,7 @@ export class SvalHistorySync {
       );
       return;
     }
-    // Each takes the workspace its node names, or none (decision 1287).
+    // Each takes the workspace its node names, or none.
     try {
       await this.#places.recordWorkspaces(theirs);
     } catch (err) {

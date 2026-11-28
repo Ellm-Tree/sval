@@ -4,7 +4,7 @@
 import Foundation
 
 /// The time this phone stamps synced data with, as the desktop's
-/// `CorrectedClock` gives it (decision 1714) with no time reading: the
+/// `CorrectedClock` gives it with no time reading: the
 /// phone contacts no time server, so corrected time is its wall clock.
 /// Every stamp is later than the one before, and later than this device's
 /// own watermark, so a wall clock set back never stamps a change below
@@ -12,7 +12,7 @@ import Foundation
 /// read as one it had seen and dropped.
 struct StampClock {
     /// How far past the wall clock this device's own watermark may be and
-    /// still raise its next stamps: decision 0135's margin, as the desktop's
+    /// still raise its next stamps: the margin of the desktop's
     /// `OWN_WATERMARK_MARGIN_MS` and the engine's `WATERMARK_MARGIN`. A
     /// watermark further ahead is a fast clock's, and following it would
     /// keep every later stamp in the future.

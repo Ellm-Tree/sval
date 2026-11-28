@@ -17,7 +17,7 @@ the History sidebar, renamed Show History, open the same sidebar.
 
 File's Restart (Developer) and its Accel+Alt+R key go with
 `DevelopmentHelpers` and its script. Firefox adds them to any build
-without MOZILLA_OFFICIAL, which Sval never sets (decision 0063), so every
+without MOZILLA_OFFICIAL, which Sval never sets, so every
 Sval would otherwise ship a local build's restart shortcut.
 
 diff --git a/browser/actors/moz.build b/browser/actors/moz.build

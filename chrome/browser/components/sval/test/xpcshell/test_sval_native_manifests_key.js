@@ -6,7 +6,7 @@
 /**
  * On Windows, Sval finds a native messaging host through its own registry
  * key and never through Software\Mozilla, which Firefox reads
- * (decision 1738, patches/native-messaging-manifests.patch).
+ * (patches/native-messaging-manifests.patch).
  */
 
 const { MockRegistry } = ChromeUtils.importESModule(

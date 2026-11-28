@@ -4,8 +4,8 @@
 /**
  * Where an agent may go (agent-control spec §5.2). Site policy is checked
  * twice over. A `site` here is the name the agent's rules are looked up by,
- * `hostOf`'s: a host under its site where it offers a choice of scope
- * (decision 1980), which the policy's lookups walk up to its site. Every
+ * `hostOf`'s: a host under its site where it offers a choice of scope,
+ * which the policy's lookups walk up to its site. Every
  * alert names it, and an answer the user gives is saved for it or, where its
  * "Remember for" menu offers one, for its whole site (`scopeMenuOf`).
  *

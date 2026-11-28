@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
-//! Archiving idle tabs (idle-tab archive spec, decision 0136).
+//! Archiving idle tabs (idle-tab archive spec).
 //!
 //! A tab nobody has used for the period its workspace sets leaves the tree
 //! and gains an entry in the Archive, a document of its own
@@ -79,7 +79,7 @@ pub fn period(choice: &str) -> Result<Option<Timestamp>, ArchiveError> {
 }
 
 /// `at`, or `now` when `at` is later: a time later than this device's clock
-/// counts as now (decision 0135).
+/// counts as now.
 fn no_later_than(at: Timestamp, now: Timestamp) -> Timestamp {
     at.min(now)
 }
@@ -154,8 +154,7 @@ pub fn set_auto_archive(
 pub struct Sweep<'a> {
     /// The global choice, one of [`CHOICES`].
     pub default: &'a str,
-    /// This device's `lastActive` for each tab it has recorded one for
-    /// (decision 0024).
+    /// This device's `lastActive` for each tab it has recorded one for.
     pub last_active: &'a BTreeMap<NodeId, Timestamp>,
     /// Tabs only a live tab can say are in use: shown in a window, playing
     /// audio, in picture-in-picture or a call, using camera or mic, or
@@ -392,7 +391,7 @@ fn archive_units(
             );
             let entry = archive.add_archived(title, url, icon, record, by, now);
             // An entry holds the tab's address, so it stays where the tab
-            // would have (decision 1372).
+            // would have.
             if let Some(node) = archive.node_mut(entry) {
                 node.content.local = local;
             }

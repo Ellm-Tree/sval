@@ -33,7 +33,7 @@ extension AppModel {
 
     /// Every favorite of `url` in Favorites, which the address bar's star
     /// fills for (`SvalFavoritesStore.favoritesWithUrl`): a pin is no
-    /// favorite (decision 0137), nor is an item under another root.
+    /// favorite, nor is an item under another root.
     func favorites(of url: URL) -> [Favorite] {
         guard let root = favoritesRootId else { return [] }
         let address = Self.normalAddress(url)

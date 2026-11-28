@@ -313,7 +313,7 @@ Object.assign(SvalPanel, {
       candidates.push(await SvalSecretStore.unwrap(sealed));
     }
     // A new Mac, or this one with its system store wiped, finds the key in
-    // iCloud Keychain instead (decision 0084).
+    // iCloud Keychain instead.
     candidates.push(SvalICloudKeychain.read());
     const held = this._engine.syncKey;
     const isHeld = keyBytes =>

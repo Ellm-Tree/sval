@@ -296,7 +296,7 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * The workspace a popup shows: its opener's (decision 0101). Its tab
+   * The workspace a popup shows: its opener's. Its tab
    * inherits the opener's jar, which is that workspace's, so a popup filed
    * under any other workspace would have its tab reopened in that one's jar
    * (`SvalTabs` `#keepInJar`), cut off from the page that opened it. An
@@ -519,7 +519,7 @@ Object.assign(SvalPanel, {
       }));
     } else if (!restored && window.toolbar.visible) {
       // Any other new window lands on the workspace it took as a switch to it
-      // does (decision 1997): on the tab this device last looked at there,
+      // does: on the tab this device last looked at there,
       // with the tabs another window kept loaded for it among the
       // workspace's own. Its startup tab goes once there is one of those to
       // show, and stays as the workspace's tab when the workspace has none.

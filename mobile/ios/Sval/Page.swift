@@ -40,7 +40,7 @@ final class Page: NSObject, WKNavigationDelegate {
     var mediaChoice: (@MainActor (String?) -> SiteRules.Media)?
     var onRemake: (@MainActor (URL, String) -> Void)?
     /// Media allowed for a visit, from the bar's Allow Video and Audio. As
-    /// a desktop visit does (decision 0132, `SvalSiteControls`'
+    /// a desktop visit does (`SvalSiteControls`'
     /// `onStateChange`), it covers every page of its site the tab loads,
     /// and the first top-level load of another site ends it, as does the
     /// first load after its grant would have expired. It saves nothing.

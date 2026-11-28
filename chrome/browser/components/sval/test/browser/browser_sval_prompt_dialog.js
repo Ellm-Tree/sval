@@ -10,7 +10,7 @@
  * page is left, and a sign-in. Each answers as toolkit's common dialog does:
  * its buttons, Enter, Escape and its fields set the prompt's result. Over a
  * window that shows what is behind it, a prompt is frosted as every dialog
- * is (decision 0057); over a window at no transparency it is solid.
+ * is; over a window at no transparency it is solid.
  *
  * The window shows what is behind it as it does on macOS, whatever the
  * platform the test runs on. Headless Gecko draws no backdrop filter, so

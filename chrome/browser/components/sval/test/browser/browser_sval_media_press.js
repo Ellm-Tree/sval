@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * A press of play plays the video on a site set to Ask first (decision 0132):
+ * A press of play plays the video on a site set to Ask first:
  * a player's own button that calls play() inside the press, and the video's
  * native controls. The press allows media for the visit, with no reload. A
  * play() the page makes after the press has been handled plays nothing, and

@@ -77,7 +77,7 @@ add_setup(async function () {
   await SpecialPowers.pushPrefEnv({
     set: [["privacy.fingerprintingProtection.remoteOverrides.testing", true]],
   });
-  // Mozilla's fixes are off by default (decision 1685).
+  // Mozilla's fixes are off by default.
   const set = TestUtils.topicObserved("fpp-test:set-overrides-finishes");
   await SpecialPowers.pushPrefEnv({
     set: [["privacy.fingerprintingProtection.remoteOverrides.enabled", true]],

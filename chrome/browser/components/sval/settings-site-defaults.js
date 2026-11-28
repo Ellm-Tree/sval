@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The defaults at the top of Sites (decision 1484), drawn by Firefox's
+ * The defaults at the top of Sites, drawn by Firefox's
  * `setting-group` like the rest of its settings, in the site menu's
  * controls (`SvalSiteControls`): what a site gets until it has a choice of
  * its own. JavaScript is Gecko's `javascript.enabled`, which

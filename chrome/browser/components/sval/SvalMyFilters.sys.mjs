@@ -4,7 +4,7 @@
 /**
  * The user's own filter rules, My filters, kept a pref per line under
  * `MY_FILTER_BRANCH` so that each line syncs as a setting of its own
- * (settings-sync spec §4.5, decision 0117). Two devices that change different
+ * (settings-sync spec §4.5). Two devices that change different
  * lines both keep their change, and a removed line is a reset that stands.
  *
  * A line's pref is named by `lineKey`, the SHA-256 of its text and how many

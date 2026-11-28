@@ -3,7 +3,7 @@
 
 /**
  * The scope dropdown (host-scoped rules spec §4): where a choice made on a
- * page is saved, the page's host or its whole site (decision 1980). A button
+ * page is saved, the page's host or its whole site. A button
  * names the scope, and opens a listbox of the two, each with what it covers.
  * The site menu, the Privacy and Security panel, the extensions menu and the
  * element picker's card draw it, each starting at the host.

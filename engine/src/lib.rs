@@ -27,7 +27,7 @@
 //!
 //! A node also carries a **touch stamp**, `touched_at` and `touched_by`, which
 //! holds no value: it records that work was done inside the node, and counts
-//! toward the absence rule like a group does (decision 0106).
+//! toward the absence rule like a group does.
 //!
 //! [`merge::merge`] decides each group **separately**: the side whose timestamp
 //! for that group is greater wins that group outright. Each group is a
@@ -160,7 +160,7 @@ uniffi::setup_scaffolding!();
 /// stay readable because unknown fields survive a round trip.
 ///
 /// `2`: a custom colour, an object, in `Appearance::color`, and
-/// `Appearance::transparency` (decision 0057). A 1.x build parses
+/// `Appearance::transparency`. A 1.x build parses
 /// `Appearance::color` as a string and would fail on an object colour, so it
 /// refuses a 2.x file instead (rule 11), and never reads or rewrites one.
 /// This build reads every 1.x file.
@@ -196,12 +196,12 @@ pub const SCHEMA_MAJOR: u32 = 2;
 /// still wins over it until the build updates.
 ///
 /// `6`: the `favorite`, `folder` and `separator` kinds, `Content::guid` and
-/// `Lifecycle::home_order` (favorites-native spec §16, decision 0108). Additive
+/// `Lifecycle::home_order` (favorites-native spec §16). Additive
 /// both ways: a 1.5 build holds the kinds as unknown and the fields in its
 /// group buckets, writing all of them back verbatim.
 ///
 /// `7`: the `visit` and `shard` kinds and `Content::visit` (history-sync spec
-/// §3, decision 0109). Additive both ways: a 1.6 build holds the kinds as
+/// §3). Additive both ways: a 1.6 build holds the kinds as
 /// unknown and the field in its content bucket, writing both back verbatim.
 ///
 /// `8`: the `split` kind and `Content::shares` (split-view spec §5). Additive
@@ -209,13 +209,13 @@ pub const SCHEMA_MAJOR: u32 = 2;
 /// its panes unrepaired, and carries `shares` in its content bucket.
 ///
 /// `9`: the `archived` kind, `Content::archived`, `Lifecycle::restored` and
-/// `Lifecycle::auto_archive` (idle-tab archive spec §6.1, decision 0136).
+/// `Lifecycle::auto_archive` (idle-tab archive spec §6.1).
 /// Additive both ways: a 1.8 build holds an entry as an unknown kind and the
 /// fields in its group buckets, writing all of them back verbatim. It reads
 /// no workspace's choice, and archives nothing.
 ///
 /// `10`: `Lifecycle::pin_scope`, the workspaces a pin shows in (pins spec
-/// §7, decision 0137). Additive both ways: a 1.9 build carries it in its
+/// §7). Additive both ways: a 1.9 build carries it in its
 /// lifecycle bucket and writes it back verbatim, and shows every pin in
 /// every workspace.
 ///
@@ -228,7 +228,7 @@ pub const SCHEMA_MAJOR: u32 = 2;
 /// 1372). Only this device's profile copy holds it.
 ///
 /// `13`: the pins root, `pins________`, a root of the favorites document
-/// (pins-root spec §4, decision 0137). A 1.12 build reads it as a stranded
+/// (pins-root spec §4). A 1.12 build reads it as a stranded
 /// folder and files it under Favorites.
 ///
 /// Major 2 starts again at minor `0`.

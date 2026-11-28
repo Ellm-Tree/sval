@@ -9,7 +9,7 @@
  * private window's violet and an agent's window's navy, whatever the caller
  * passes, with its text at WCAG 2's ratios, and the box round the card the
  * card's colour, solid. On a Workspace's colour the card's text is solved
- * (`SvalDialogBox.paintTint`) and meets all of decision 0057's targets.
+ * (`SvalDialogBox.paintTint`) and meets its APCA and WCAG 2 targets.
  */
 
 const { openSvalDialog } = ChromeUtils.importESModule(

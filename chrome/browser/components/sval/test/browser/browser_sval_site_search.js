@@ -7,7 +7,7 @@
 /* import-globals-from sval_site_page_helpers.js */
 
 /**
- * The Sites list's rows and search (site page spec §3, decision 1484): a site
+ * The Sites list's rows and search (site page spec §3): a site
  * holding only a permission has a row of its own, which opens its page, where
  * the permission changes. `browser_sval_sites_stored.js` covers the sites
  * listed for what they store.

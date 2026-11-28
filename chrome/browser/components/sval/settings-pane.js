@@ -78,7 +78,7 @@
     "category-accessibility",
     "category-languages",
     // Sites holds the permission defaults, and each site's page its
-    // permissions (decision 1484).
+    // permissions.
     "category-permissions-data",
   ];
 
@@ -158,7 +158,7 @@
       category: "paneSearch",
       after: 'setting-group[groupid="searchSuggestions"]',
     },
-    // Privacy and protection, in the order decision 1484 gives: Sval's cards
+    // Privacy and protection, in this order: Sval's cards
     // around Firefox's HTTPS-Only, browsing protection and history groups.
     {
       id: "svalBlocking",
@@ -213,8 +213,8 @@
   const PRIVACY_SECTIONS = new Set(["tracking", "secureDns"]);
 
   /**
-   * `#svalProtections-site?host=…` names a site's page, which is in Sites
-   * (decision 1484). `LegacyPaneMappings` maps a category, and would drop the
+   * `#svalProtections-site?host=…` names a site's page, which is in Sites.
+   * `LegacyPaneMappings` maps a category, and would drop the
    * site, so the address is rewritten before `gotoPref` reads it: at load,
    * and on `hashchange`, whose listener here is added before `init_all` adds
    * Firefox's.
@@ -405,7 +405,7 @@
     }
 
     // The Extensions category takes the place of Firefox's footer link to
-    // add-ons (decision 1479). The link is hidden rather than removed:
+    // add-ons. The link is hidden rather than removed:
     // `init_all` adds its click listener by id once the first pane shows.
     const addons = document.getElementById("addonsButton");
     if (addons) {

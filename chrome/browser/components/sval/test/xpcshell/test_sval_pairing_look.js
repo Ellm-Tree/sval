@@ -91,8 +91,7 @@ add_task(async function a_code_looked_for_again_is_claimed_once() {
 
 /**
  * A folder that does not answer is counted claim by claim, so the page can
- * tell a blip from an outage (decision 0032), and an answer starts the count
- * again.
+ * tell a blip from an outage, and an answer starts the count again.
  */
 add_task(async function a_folder_that_does_not_answer_is_counted() {
   const look = new SvalPairingLook({ pollMs: 0 });

@@ -7,7 +7,7 @@
  *
  * The store reads the document after each pass that changed it and after
  * each of its own writes, and keeps that read whole, as the panel keeps the
- * tree's (decision 0055). It never edits the read: every answer comes from
+ * tree's. It never edits the read: every answer comes from
  * the last one, and every change is one engine batch, after which the
  * document is read again.
  *
@@ -38,8 +38,8 @@ export const FAVORITES_CHANGED_TOPIC = "sval-favorites-changed";
 export const FAVORITES_DOCUMENT = "favorites";
 
 /**
- * The document's roots: Favorites, the one Sval shows (decision 0123), two
- * kept empty, and the pins root, whose nodes are the pins (decision 0137).
+ * The document's roots: Favorites, the one Sval shows, two
+ * kept empty, and the pins root, whose nodes are the pins.
  * The first three are Places' guids for the same roots, which a bookmarks
  * HTML file and the extensions' API still speak of.
  */
@@ -255,7 +255,7 @@ export class SvalFavoritesStore {
    * @returns {object|null} The row: `{ guid, id, kind, parentGuid, index,
    *   name, url, pinScope, added, contentAt, placementAt, local, refused }`, the stamps in milliseconds since the
    *   epoch. `local` is an address that stays on this device, and `refused`
-   *   one another device wrote that no device opens (decision 1372), which
+   *   one another device wrote that no device opens, which
    *   only the Favorites menu shows, so it can be deleted.
    */
   get(guid) {
@@ -278,7 +278,7 @@ export class SvalFavoritesStore {
   /**
    * @param {string|URL} url
    * @returns {object[]} The favorites in Favorites whose address is `url`,
-   *   refused ones left out. A pin is not a favorite (decision 0137).
+   *   refused ones left out. A pin is not a favorite.
    */
   favoritesWithUrl(url) {
     return this.#withUrl(url, FAVORITES_ROOT);

@@ -8,7 +8,7 @@
  * Firefox's parts go through `Services.clearData` with Forget About This
  * Site's flags, in every jar. Sval's are its stored choices, its My filters
  * lines, its Favorites and pins and its archived tabs, each the site's own
- * and those of every host under it (decision 1980). The choices are the site's rules, its site
+ * and those of every host under it. The choices are the site's rules, its site
  * styles, the link rules that name it and the allowed domains of it. The
  * rules paired agents hold for the site go with its permissions. A private
  * window's own state is none of

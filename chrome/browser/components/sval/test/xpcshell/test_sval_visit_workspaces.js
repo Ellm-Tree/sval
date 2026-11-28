@@ -3,7 +3,7 @@
 
 "use strict";
 
-// The workspace each visit was made in, as Places keeps it (decision 1287):
+// The workspace each visit was made in, as Places keeps it:
 // the table, what removes its rows, and the queries a workspace scopes.
 
 const { SvalVisitWorkspaces, TABLE } = ChromeUtils.importESModule(

@@ -11,7 +11,7 @@
 # document moves only when a test acts; a task about those passes turns them
 # on for itself. Allow and Pair stay disabled for the dialog delay; the tasks
 # about that delay set it back for themselves. A device publishes nothing
-# before its first time reading (decision 1714), and the harness reaches no
+# before its first time reading, and the harness reaches no
 # Remote Settings server, so every profile starts with a reading of no
 # difference. The harness drives the browser through Marionette, which draws
 # the address bar's remote-control cue (`gRemoteControl`), a button no window

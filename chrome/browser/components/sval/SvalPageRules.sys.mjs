@@ -3,7 +3,7 @@
 
 /**
  * Page rules: the element hiding, procedural actions and scriptlets in Sval's
- * filter lists, applied in each page (protections spec §5, decision 0102).
+ * filter lists, applied in each page (protections spec §5).
  *
  * adblock-rust answers for pages from the same engines that block requests
  * (`nsIContentClassifierService.pageRules` and `hiddenClassIdSelectors`, the
@@ -15,7 +15,7 @@
  * `browser.sval.adblock.pageRules` turns page rules off while leaving request
  * blocking on. The protection button's site exception and the Off level turn
  * off the lists' rules and leave the user's own, My filters, which the
- * `my-filters` engine serves alone (decision 1993).
+ * `my-filters` engine serves alone.
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";

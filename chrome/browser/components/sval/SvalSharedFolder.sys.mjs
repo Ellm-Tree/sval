@@ -8,7 +8,7 @@
  * (`xpcom/ioutils/IOUtils.cpp`, `IOUtils::EventQueue`), so one read stuck on
  * a hung network mount would stall every file operation in the browser. The
  * shared folder is therefore read and written by `sval-folder`, a program
- * beside the browser binary (decision 1437). This module starts it through
+ * beside the browser binary. This module starts it through
  * `Subprocess`, whose worker reads its pipes without blocking, talks to it in
  * frames over its stdin and stdout, and stops waiting at each request's
  * deadline. Nothing here calls `IOUtils` on a path in the shared folder.
@@ -21,7 +21,7 @@
  * it is stuck), and one that runs past it has the helper killed, its pipes
  * closed and the helper abandoned, and answers "timeout". The next request
  * starts a fresh helper once that one has gone, so there is never more than
- * one (decision 0033).
+ * one.
  *
  * File contents travel through one directory in the profile (`requestDir`):
  * a write's bytes as payload files, and every file a listing reads as the

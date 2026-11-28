@@ -948,8 +948,7 @@ add_task(async function a_reload_without_its_title_yet_writes_nothing() {
  * A tab whose load is refused, cancelled or still restoring commits nothing,
  * and its browser shows the blank page it started on while its label carries
  * the title a restore remembers. None of that is the user's page, so the node
- * keeps its address and name, and the next restore brings the page back
- * (decision 0050).
+ * keeps its address and name, and the next restore brings the page back.
  */
 add_task(async function a_tab_that_commits_nothing_keeps_its_node() {
   const { engine, window, observer } = await harness();
@@ -1466,13 +1465,13 @@ add_task(async function the_shutdown_blocker_waits_for_a_detach_in_flight() {
 
 /**
  * A workspace another device took up and worked in while offline survives the
- * first device closing its window on it untouched (decision 0101).
+ * first device closing its window on it untouched.
  *
  * Device A opens a window on a new, untouched workspace W, and both devices
  * sync. Device B, offline, shows W in a window of its own and browses in it.
  * A then closes its W window, which deletes W, because nothing A can see has
  * touched it. B's browsing is an edit to W that A never saw, so when the two
- * sync, W comes back with B's tab still in it (decision 0017).
+ * sync, W comes back with B's tab still in it.
  */
 add_task(
   async function a_workspace_another_device_worked_in_survives_the_close() {
@@ -1595,7 +1594,7 @@ add_task(
 /**
  * A window closed straight after a page loads in its new workspace keeps
  * that workspace when another window's flush took the page's address and
- * is still writing it as the close judges the workspace (decision 0101).
+ * is still writing it as the close judges the workspace.
  */
 add_task(
   async function a_close_waits_for_its_commit_written_by_another_window() {
@@ -1722,7 +1721,7 @@ add_task(async function a_tab_that_touches_a_workspace_stamps_it() {
 });
 
 /**
- * The touch costs no edit made elsewhere (decision 0106). Device A colours W
+ * The touch costs no edit made elsewhere. Device A colours W
  * and gives it an emoji while device B, offline, browses in it. When the two
  * sync, W keeps A's colour and emoji, and carries B's touch.
  */

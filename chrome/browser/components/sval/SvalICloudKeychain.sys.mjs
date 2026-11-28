@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The sync key in iCloud Keychain, on macOS (decision 0084, key-storage spec
+ * The sync key in iCloud Keychain, on macOS (key-storage spec
  * "Installing again").
  *
  * A synchronizable password item in the data-protection keychain, under the

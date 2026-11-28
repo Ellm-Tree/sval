@@ -256,8 +256,8 @@ add_task(async function the_home_page_holds_only_the_search_field() {
 });
 
 /**
- * Search suggestions are on by default, from the engine the user chose
- * (decision 0098); private windows keep Firefox's default of off.
+ * Search suggestions are on by default, from the engine the user chose;
+ * private windows keep Firefox's default of off.
  */
 add_task(
   async function suggestions_are_on_by_default_outside_private_windows() {

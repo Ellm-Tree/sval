@@ -86,7 +86,7 @@ function write(text) {
 
 /**
  * Writes the rules the picker's child asks for. The child names the scope,
- * the page's host or its site (decision 1980), and the parent takes it only
+ * the page's host or its site, and the parent takes it only
  * where it is one of the two its own record of the document gives
  * (`scopeOf`). Every write checks availability again, because the window or
  * the site's protections can change while the picker is open.

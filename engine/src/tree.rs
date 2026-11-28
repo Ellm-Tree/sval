@@ -273,7 +273,7 @@ fn validate_move(doc: &Document, id: NodeId, new_parent: NodeId) -> Result<(), M
 /// only into a workspace or a group (split-view spec §5.2).
 ///
 /// A local-edit rule only, like the rest of [`move_node`]'s refusals:
-/// [`crate::merge::merge`] validates nothing (decision 0020).
+/// [`crate::merge::merge`] validates nothing.
 pub fn validate_parent(
     doc: &Document,
     id: Option<NodeId>,
@@ -350,7 +350,7 @@ pub fn remove_keeping_children(
 
 /// Where each group and split stood in the documents one sync pass read, so
 /// that [`repair_unreachable_ancestry_knowing`] can file what a peer put in
-/// one another device deleted at its place (spec §5.2, decision 0121,
+/// one another device deleted at its place (spec §5.2,
 /// split-view spec §5.3).
 ///
 /// A deletion leaves no record (spec §5.4), but the file that brings in a
@@ -488,10 +488,9 @@ impl KnownPlaces {
 ///   into a group another device deleted. It loses to the kept stamp, so it
 ///   cannot win the next merge where nothing would repair it, and every
 ///   device settles on the same tree whatever order they synced in
-///   (decision 0121, split-view spec §5.3);
+///   (split-view spec §5.3);
 /// - **its news stays news.** A node a peer deleted without seeing this
-///   write comes back, as it would without the repair (spec §5.4,
-///   decision 0017).
+///   write comes back, as it would without the repair (spec §5.4).
 ///
 /// An unrepaired peer holding the same write ties with the repaired copy on
 /// time and writer, the canonical-bytes tie-break picks one, and if it picks
@@ -845,7 +844,7 @@ fn is_a_root(id: NodeId, kind: &NodeKind) -> bool {
 }
 
 /// Where a stranded favorite, folder or separator goes: Favorites, the root
-/// Sval shows (decision 0123), else another Favorites root, lowest id first. A
+/// Sval shows, else another Favorites root, lowest id first. A
 /// favorite is never filed under a workspace, nor a tab under a folder. A root
 /// whose ancestry leads back to `for_node` is skipped, as [`pick_target`]
 /// skips such a workspace. With no root to take it, the node stays detached.

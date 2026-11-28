@@ -4,9 +4,8 @@
 import XCTest
 @testable import Sval
 
-/// The phone's stamps only move forward, as decision 1714 asks of every
-/// device: a wall clock set back stamps nothing below what a peer has
-/// seen from this device.
+/// The phone's stamps only move forward, as every device's do: a wall clock
+/// set back stamps nothing below what a peer has seen from this device.
 final class StampClockTests: XCTestCase {
     /// A wall clock the test sets, in milliseconds since the epoch.
     private final class Wall {

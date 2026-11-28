@@ -5,7 +5,7 @@
 
 /**
  * Protections, video and audio, and fingerprinting exceptions for one host
- * under its site (decision 1980): each field resolves on its own from the
+ * under its site: each field resolves on its own from the
  * most specific name holding it, and Gecko's stores give each origin that
  * name's choice.
  */

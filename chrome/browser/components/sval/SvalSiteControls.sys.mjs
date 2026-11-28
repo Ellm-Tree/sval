@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The site controls at the address pill's end (decision 0132): what the
+ * The site controls at the address pill's end: what the
  * selected tab's site may do, as the Privacy and Security button
  * (`SvalProtectionButton`) is what Sval does to protect it.
  *
@@ -918,7 +918,7 @@ class SiteControls {
       onBlocked
     );
     // The gate let a press on a video play it, which only Ask first does, so
-    // the press answers the prompt's "Allow for this visit" (decision 0132).
+    // the press answers the prompt's "Allow for this visit".
     // The video already plays, so nothing reloads.
     const onPressPlayed = event => {
       const browser = event.target;
@@ -1073,8 +1073,8 @@ class SiteControls {
 
   /**
    * Asks whether the page may play, from the media button, once a visit:
-   * on a site set to Ask first, a play the gate blocked waits for this answer
-   * (decision 0132). A tab not showing asks once it is selected
+   * on a site set to Ask first, a play the gate blocked waits for this answer.
+   * A tab not showing asks once it is selected
    * (`PopupNotifications`).
    *
    * @param {Element} browser

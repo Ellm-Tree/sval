@@ -45,7 +45,7 @@ export const ISOLATED_TEXT =
 export const AGENT_TEXT = "Agent Workspace";
 
 /**
- * The phone that marks a phone's own workspace (decision 2254), and the
+ * The phone that marks a phone's own workspace, and the
  * devices' heading. A tablet's wears {@link DEVICE_TABLET_URL}.
  */
 const DEVICE_PHONE_URL = "chrome://browser/content/sval/device-phone.svg";
@@ -384,8 +384,8 @@ export function switcherItemLabel(item) {
 
 /**
  * What a `switcherItems` entry is called: the workspace's own name, which
- * for an agent's workspace is its task (decision 0125). An app's
- * sessions each have a workspace (decision 1998), so the app's name
+ * for an agent's workspace is its task. An app's
+ * sessions each have a workspace, so the app's name
  * tells them apart nowhere.
  *
  * @param {object} item

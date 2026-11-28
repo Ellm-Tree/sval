@@ -278,7 +278,7 @@ impl Model {
 
     /// Takes on every file `reader` read in a pass that ran at `now` and
     /// merged its peers: one that opens, names the device its path names,
-    /// and was written no later than `now` (decision 0135).
+    /// and was written no later than `now`.
     fn read(&mut self, reader: usize, key: &Key, reads: &[(String, Vec<u8>)], now: Timestamp) {
         let me = peer_device(reader);
         let dir = store::workspace_dir(key, WS);

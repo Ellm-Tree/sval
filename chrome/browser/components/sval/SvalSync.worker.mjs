@@ -365,7 +365,7 @@ class SvalSyncWorker {
    *   (host contract §10, "The Archive").
    * @param {number} [options.clampFrom] When this device's first time
    *   reading arrived, on this document's first pass since: the engine pulls
-   *   back the stamps taken before it (decision 1714).
+   *   back the stamps taken before it.
    * @returns {Promise<object>} the engine's report, plus `wrote` and
    *   `unreadable`.
    */
@@ -933,15 +933,15 @@ class SvalSyncWorker {
   /**
    * Touches each workspace of the tree that was untouched when last looked at
    * and is touched at this merge, so that the work which touched it is an
-   * edit to the workspace (decision 0106). Run inside every merge, before it,
+   * edit to the workspace. Run inside every merge, before it,
    * so no merge takes in a peer's file, and no file is published, without it.
    *
    * Another device can show the same workspace while it is untouched, and
    * close its window on it before this device's work there reaches it. That
-   * close deletes the workspace (decision 0101). Tabs and groups filed under
+   * close deletes the workspace. Tabs and groups filed under
    * it are not edits to the workspace, so without the touch the delete would
    * win, and repair would move them to another workspace (spec §5.2). A touch
-   * the deleting device never saw wins over its delete (decision 0017). A
+   * the deleting device never saw wins over its delete. A
    * device that has seen the touch has seen the work with it, and judges the
    * workspace touched.
    *
@@ -1212,8 +1212,8 @@ class SvalSyncWorker {
   }
 
   /**
-   * Removes entries from the Archive `archive`, for a site the user forgot
-   * (decision 2376). It runs on a copy, which is written to this device's
+   * Removes entries from the Archive `archive`, for a site the user forgot.
+   * It runs on a copy, which is written to this device's
    * file before it takes the Archive's place, as {@link importArchived}
    * writes its copy. An id the Archive does not hold is passed over.
    *

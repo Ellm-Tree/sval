@@ -13,7 +13,7 @@
  * popovers' one shape (`SvalStem`), growing sideways from the tab. The box
  * is Sval's dialog card (`sval-dialog`), its answers `sval-button`s, and
  * over a window that shows what is behind it the card is frosted as a
- * dialog's is (decision 0057, `SvalDialogBox.frostLook`).
+ * dialog's is (`SvalDialogBox.frostLook`).
  *
  * The report is `SvalFeedback`'s: built once as the form opens, viewed and
  * posted as built (spec §4).

@@ -9,7 +9,7 @@
  * one.
  *
  * The styles are one synced setting, a JSON list in {@link STYLES_PREF}, of
- * plain values per scope (decision 1980): a host or a site. The most specific
+ * plain values per scope: a host or a site. The most specific
  * scope holding a style decides for a page, whole.
  *
  * Gecko paints a page's colors through its style (`SvalSiteStyleColors.cpp`),

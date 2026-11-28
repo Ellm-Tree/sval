@@ -56,11 +56,11 @@ const COLOR_TOKENS: [&str; 10] = [
 ];
 
 /// The keys of a workspace's custom colour: OKLCH hue, chroma and lightness,
-/// and the appearance it was picked in (decision 0057).
+/// and the appearance it was picked in.
 const WORKSPACE_COLOR_KEYS: [&str; 4] = ["c", "h", "l", "mode"];
 
 /// The keys of a group's custom colour: OKLCH hue and chroma. Its window sets
-/// its lightness (decision 0057).
+/// its lightness.
 const GROUP_COLOR_KEYS: [&str; 2] = ["c", "h"];
 
 /// The largest chroma a custom colour may carry, past the most any sRGB
@@ -80,7 +80,7 @@ fn parse_agent_label(label: &str) -> Result<String, Invalid> {
 }
 
 /// Checks `color` for a node of `kind`: a preset token on any node, or a
-/// custom colour object in the shape its kind takes (decision 0057). `None`
+/// custom colour object in the shape its kind takes. `None`
 /// clears the colour and is always accepted.
 ///
 /// A custom colour is rebuilt from its parsed numbers, so a whole number a
@@ -159,7 +159,7 @@ fn parse_color(
 }
 
 /// Checks a transparency for a node of `kind`: only a workspace's window
-/// shows what is behind it (decision 0057). `None` is solid and always
+/// shows what is behind it. `None` is solid and always
 /// accepted.
 fn parse_transparency(kind: &NodeKind, transparency: Option<f64>) -> Result<Option<f64>, Invalid> {
     let Some(t) = transparency else {
@@ -384,7 +384,7 @@ pub(crate) enum Op {
         id: String,
         isolated: Option<bool>,
     },
-    /// A device's own workspace (decision 2254), marked with the writing
+    /// A device's own workspace, marked with the writing
     /// device.
     AddDeviceWorkspace { name: String, id: String },
     /// Whether a workspace's tabs use a cookie jar of their own (isolated
@@ -444,7 +444,7 @@ pub(crate) enum Op {
     /// Merge replaces a fact group entire, so whatever a host leaves out is
     /// cleared, and following a tab as it navigates is a read-modify-write
     /// by the host (`docs/host-contract.md` §3). `local` marks an address
-    /// that stays on this device (decision 1372), and only a write with an
+    /// that stays on this device, and only a write with an
     /// address can carry it.
     SetContent {
         id: String,
@@ -456,7 +456,7 @@ pub(crate) enum Op {
         local: bool,
     },
     /// The `local` mark alone, address kept, for a node the host holds back
-    /// for a reason other than its address (decision 2237). A change stamps
+    /// for a reason other than its address. A change stamps
     /// the content group, and a mark already as asked writes nothing.
     SetLocal {
         id: String,
@@ -492,7 +492,7 @@ pub(crate) enum Op {
     /// A value this device held before its key synced: a `SetSetting` while
     /// the document holds nothing for the key, a reset included, and nothing
     /// otherwise, so a seed never replaces what another device chose
-    /// (settings-sync spec §4.2, decision 0113).
+    /// (settings-sync spec §4.2).
     SeedSetting {
         key: String,
         value_json: Option<String>,
@@ -526,9 +526,9 @@ pub(crate) enum Op {
     /// parent, in their order, at its place (spec §5.4).
     RemoveKeepingChildren { id: String },
     /// A visit the writing device made, in its week's document
-    /// (history-sync spec §3), with the workspace it was made in or none
-    /// (decision 1287). Its id derives from the device, the page and the
-    /// moment, so adding it twice changes nothing.
+    /// (history-sync spec §3), with the workspace it was made in or none.
+    /// Its id derives from the device, the page and the moment, so adding it
+    /// twice changes nothing.
     AddVisit {
         url: String,
         #[serde(default, deserialize_with = "null_as_default")]
@@ -641,7 +641,7 @@ pub(crate) fn apply_op(
             Ok(Applied::added(id))
         }
         Op::AddDeviceWorkspace { name, id } => {
-            // A device's own workspace (decision 2254). The device in the
+            // A device's own workspace. The device in the
             // mark is `by`, the device that made it.
             let id = parse_id(&id)?;
             require_unused(doc, id)?;
@@ -763,7 +763,7 @@ pub(crate) fn apply_op(
                 check_shares(doc, id, shares)?;
             }
             require_address_if_local(url.as_deref(), local)?;
-            // The mark follows the address (decision 1372): a write that sends
+            // The mark follows the address: a write that sends
             // back the address the node holds keeps the node's mark, so one
             // another device wrote stays refused however it is re-sent.
             let local = match doc.node(id) {
@@ -780,7 +780,7 @@ pub(crate) fn apply_op(
             if let Some(content) = content.filter(|content| content.local != local) {
                 require_address_if_local(content.url.as_deref(), local)?;
                 // Stamped now, so a node coming back is news to every peer,
-                // as an address crossing back is (decision 1372).
+                // as an address crossing back is.
                 doc.set_content(
                     id,
                     content.name,
@@ -962,7 +962,7 @@ fn check_shares(doc: &Document, id: NodeId, shares: &[f64]) -> Result<(), Failur
 }
 
 /// Refuses a `local` mark on a write that carries no address: only an
-/// address can keep a node on this device (decision 1372), and a workspace
+/// address can keep a node on this device, and a workspace
 /// or folder held back from the shared folder would take its children's
 /// parent from every peer.
 fn require_address_if_local(url: Option<&str>, local: bool) -> Result<(), Failure> {

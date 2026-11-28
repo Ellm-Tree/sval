@@ -8,7 +8,7 @@
 /* import-globals-from sval_switcher_helpers.js */
 
 /**
- * A phone's or tablet's own Workspace on the desktop (decision 2254): the
+ * A phone's or tablet's own Workspace on the desktop: the
  * switcher lists it under Devices with its tab count, the strip draws it
  * after a divider, a new window never takes it while the user has a
  * Workspace of their own, and it opens as any Workspace does.

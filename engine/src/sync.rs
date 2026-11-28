@@ -54,25 +54,25 @@ pub struct SyncReport {
     /// too.
     pub removed: Vec<NodeId>,
     /// Devices whose clock set ahead cost this device something in this
-    /// pass, so a host can tell the user (decision 1714). A device counts
+    /// pass, so a host can tell the user. A device counts
     /// when its file was written more than [`CLOCK_AHEAD_MARGIN`] after
     /// `now`, and merging that file either replaced a value this device held
     /// with one of its facts stamped after `now`, or brought back a node this
     /// device's own file holds and its document had closed, carrying a stamp
     /// after `now`. A file that is ahead and changes nothing is merged and
     /// not listed. Everything in such a file is merged, and its `written_at`
-    /// is no watermark (decision 0135).
+    /// is no watermark.
     pub harmed_by_clock: Vec<DeviceId>,
     /// This device's own watermark once the pass is done, `seen[device]`:
     /// the latest time it has written under, or published, which a host
-    /// keeps its next stamps above (decision 1714). `0` when it has none.
+    /// keeps its next stamps above. `0` when it has none.
     pub own_watermark: Timestamp,
 }
 
 /// How far past `now` a peer's `written_at` may be before [`sync_to`] takes
 /// its device's clock for one set ahead ([`SyncReport::harmed_by_clock`]):
 /// ten minutes, far wider than the few seconds between two devices stamping
-/// with corrected time (decision 1714).
+/// with corrected time.
 pub const CLOCK_AHEAD_MARGIN: Timestamp = 10 * 60 * 1000;
 
 /// One file [`sync_to`] could not use, and why.
@@ -133,8 +133,7 @@ fn read_document(json: &str, source: Source, report: &mut SyncReport) -> Option<
 /// A file naming another writer is damaged: merged, it would record its
 /// `written_at` as that device's watermark, and under our own name it would
 /// be spared the drop half of the merge as our own past self (spec §5.4). A
-/// document with no writer predates attribution and is read as it is
-/// (decision 0019).
+/// document with no writer predates attribution and is read as it is.
 fn written_by_its_path(remote: &Document, source: Source, report: &mut SyncReport) -> bool {
     match remote.written_by {
         Some(writer) if writer != source.device => {
@@ -165,7 +164,7 @@ fn merge_in(
 /// writes up to `earlier_to` from files, and `remote`'s watermark for
 /// `device` falls between the two. Its own watermark covers those writes, so
 /// merging `remote` treats the id's stamps before `began_at` as news, and
-/// `doc` then holds them up to `remote`'s watermark (decision 2232). Every
+/// `doc` then holds them up to `remote`'s watermark. Every
 /// file `device` wrote carries a watermark for it, its own included.
 fn take_unheld(
     doc: &mut Document,
@@ -196,11 +195,11 @@ fn take_unheld(
 /// device's next write. A truthful claim that is ahead only because the
 /// device's newer file has not reached this folder yet is dropped too, which
 /// makes more nodes news and so keeps them: the same direction as a
-/// watermark published late (decision 0018), and lifted on the pass that
+/// watermark published late, and lifted on the pass that
 /// sees the newer file.
 ///
 /// A watermark more than [`WATERMARK_MARGIN`] later than `now`, this
-/// device's corrected time, is dropped as well (decision 0135). It is a fast
+/// device's corrected time, is dropped as well. It is a fast
 /// clock's reading, and taken on it would make every node its device writes
 /// once the clock is put right not news, until real time passed it. Dropping
 /// it is the keep direction again: what the fast device closes lingers here
@@ -218,11 +217,11 @@ fn bound_watermarks(
     });
 }
 
-/// How far past `now` a watermark may be and still be taken (decision 0135):
+/// How far past `now` a watermark may be and still be taken:
 /// one minute. Two devices on corrected time differ by the `Date` header's
-/// one-second precision and the request's latency (decision 1714), so a
+/// one-second precision and the request's latency, so a
 /// truthful watermark is seconds ahead at most. A fast clock less than this
-/// ahead costs at most this long of the harm decision 0135 guards against.
+/// ahead costs at most this long of its new nodes going unseen as news.
 pub const WATERMARK_MARGIN: Timestamp = 60 * 1000;
 
 /// Leaves a peer's own write out of the version vector when it is more than
@@ -423,7 +422,7 @@ struct OwnCopy {
 }
 
 /// Which copy a pass reads and writes, which decides what happens to the
-/// nodes marked [`crate::types::Content::local`] (decision 1372).
+/// nodes marked [`crate::types::Content::local`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     /// This device's own copy in its profile, which holds every node, local
@@ -480,7 +479,7 @@ fn set_aside_local(doc: &mut Document) -> std::collections::BTreeMap<NodeId, Nod
 ///
 /// Every peer file is read before any is merged, so that each one's `seen`
 /// can be checked against every device file in the folder, and a file is
-/// bound to the device its path names (decision 0134). Both describe what a
+/// bound to the device its path names. Both describe what a
 /// file may claim, so neither depends on the order files are read in.
 ///
 /// The write is skipped when the merged, repaired document's **shared
@@ -496,7 +495,7 @@ fn set_aside_local(doc: &mut Document) -> std::collections::BTreeMap<NodeId, Nod
 /// other would each see a change on every poll and never go quiet. A
 /// watermark advance rides along with the next write that has a real reason
 /// to happen. That is safe because an unpublished watermark only makes a
-/// peer treat more nodes as news and keep them (spec §5.4, decision 0018).
+/// peer treat more nodes as news and keep them (spec §5.4).
 ///
 /// The write is also skipped, whatever the comparison says, when this
 /// device's own stored file declares a newer major schema than this build
@@ -521,7 +520,7 @@ fn set_aside_local(doc: &mut Document) -> std::collections::BTreeMap<NodeId, Nod
 ///
 /// `clamp_from`, the time a device's first time reading arrived, pulls back
 /// the stamps it took before then from a clock that may run ahead, which it
-/// has never published (decision 1714; [`Document::pull_back_own_stamps`]).
+/// has never published ([`Document::pull_back_own_stamps`]).
 /// Its own stored file's stamps later than `clamp_from` go back to
 /// `clamp_from` before that file is merged, so a change made since the
 /// reading, stamped later, still wins over what the file held. Once every
@@ -665,7 +664,7 @@ pub fn sync_remembering<S: StorageProvider>(
             }
         }
         // A copy that has never written under this id begins here, holding
-        // none of the id's earlier writes (decision 2232).
+        // none of the id's earlier writes.
         Err(Error::NotFound(_)) if doc.began_at == 0 && !doc.seen.contains_key(&device) => {
             doc.began_at = now.max(1);
         }
@@ -776,7 +775,7 @@ pub fn sync_remembering<S: StorageProvider>(
             Target::Shared => {
                 let mut view = doc.clone();
                 view.nodes.retain(|_, node| !node.content.local);
-                // When this copy began is a fact about this copy (decision 2232).
+                // When this copy began is a fact about this copy.
                 view.began_at = 0;
                 view.earlier_to = 0;
                 std::borrow::Cow::Owned(view)
@@ -1102,7 +1101,7 @@ mod tests {
         assert_eq!(shared_state(&a), shared_state(&b));
     }
 
-    /// Decision 0135 drops a watermark more than [`WATERMARK_MARGIN`] past
+    /// A reader drops a watermark more than [`WATERMARK_MARGIN`] past
     /// the reader's clock, and a file written exactly that far ahead is
     /// within it: it is incorporated.
     #[test]
@@ -1339,7 +1338,7 @@ mod tests {
         // B's absence of W says nothing: W's groups are attributed to C, and
         // B's watermark *for C* still predates them, so B cannot be read as
         // having seen W. A watermark for another device is not evidence
-        // about C's writes (decision 0015).
+        // about C's writes.
         let store = MemoryStore::new();
         let key = crate::types::test_support::test_key();
         let (dev_a, dev_b, dev_c) = (DeviceId::new(), DeviceId::new(), DeviceId::new());
@@ -1658,8 +1657,8 @@ mod tests {
 
     /// A peer whose file was written more than [`CLOCK_AHEAD_MARGIN`] after
     /// this device's `now`, and which only adds tabs, costs this device
-    /// nothing: everything in it is merged and no device is reported
-    /// (decision 1714). A peer a few minutes ahead is within the margin.
+    /// nothing: everything in it is merged and no device is reported. A peer
+    /// a few minutes ahead is within the margin.
     #[test]
     fn a_peer_far_ahead_that_replaces_nothing_is_not_reported() {
         let store = MemoryStore::new();
@@ -1698,7 +1697,7 @@ mod tests {
         }
         assert!(
             !doc.seen.contains_key(&fast),
-            "the fast device's write is no watermark here (decision 0135)"
+            "the fast device's write is no watermark here"
         );
     }
 
@@ -1719,7 +1718,7 @@ mod tests {
     }
 
     /// The same rename read from the shared folder, as the host's shared
-    /// step reads it, reports the device too (decision 1714).
+    /// step reads it, reports the device too.
     #[test]
     fn a_fast_peers_rename_read_from_the_shared_folder_is_reported() {
         let store = MemoryStore::new();
@@ -1829,7 +1828,7 @@ mod tests {
 
     /// A move, a lifecycle write and a recolour from a device whose clock is set ahead
     /// each replace this device's fact, and that device is reported, as for
-    /// a rename (decision 1714).
+    /// a rename.
     #[test]
     fn a_fast_peers_move_lifecycle_write_or_recolour_is_reported() {
         let far = CLOCK_AHEAD_MARGIN + 60_000;
@@ -1917,7 +1916,7 @@ mod tests {
 
     /// A peer that reads this device's file while its own clock is a little
     /// behind takes the watermark all the same, so the tab it then closes is
-    /// closed here too (decision 0135's margin). Two corrected clocks differ
+    /// closed here too (the watermark margin). Two corrected clocks differ
     /// by a second or two.
     #[test]
     fn a_watermark_slightly_ahead_of_the_readers_now_is_taken() {
@@ -1947,7 +1946,7 @@ mod tests {
     }
 
     /// A pass reports this device's own watermark, which a host keeps its
-    /// next stamps above (decision 1714).
+    /// next stamps above.
     #[test]
     fn a_pass_reports_this_devices_own_watermark() {
         let store = MemoryStore::new();
@@ -1973,8 +1972,7 @@ mod tests {
     /// stamps later than corrected time, in memory and in its profile file.
     /// The pass that clamps them keeps a rename made since the reading, and
     /// the first file it publishes has no stamp of its own later than the
-    /// time it was published. A peer's stamps stay as the peer wrote them
-    /// (decision 1714).
+    /// time it was published. A peer's stamps stay as the peer wrote them.
     #[test]
     fn a_clamping_pass_publishes_no_own_stamp_ahead_of_now() {
         let (profile, shared) = (MemoryStore::new(), MemoryStore::new());
@@ -3268,7 +3266,7 @@ mod tests {
         serde_json::from_str::<serde_json::Value>(&out).expect("export must be valid json");
     }
 
-    // --- a copy that begins under an id with earlier writes (decision 2232)
+    // --- a copy that begins under an id with earlier writes
 
     /// A pass on `store` as `device`, of the copy `target` names.
     fn pass_on(

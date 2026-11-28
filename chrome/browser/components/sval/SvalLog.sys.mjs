@@ -27,8 +27,8 @@
  * - `debug`: per-pass detail: a pass ran and wrote nothing, a retry's wait
  *   grew, an offer that resisted withdrawal.
  *
- * **What Sval keeps or sends never says what the user is browsing**
- * (decision 0061). A warning or an error reaches both the console and
+ * **What Sval keeps or sends never says what the user is browsing**.
+ * A warning or an error reaches both the console and
  * {@link SVAL_LOG_FILE}, and the file's scrubbing ({@link forTheFile})
  * replaces paths, URLs and hosts but cannot recognise a name, so a call site
  * at any level interpolates no

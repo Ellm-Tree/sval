@@ -6,7 +6,7 @@ where the package manifest names it, beside the browser binary:
 - sval-mcp, the shim agents launch (patches/package-sval-mcp.patch,
   sval-mcp-ships-with-sval spec §3);
 - sval-folder, the helper the browser runs to read and write a shared folder
-  (patches/package-sval-folder.patch, decision 1437).
+  (patches/package-sval-folder.patch).
 
 Each is built with the browser's build id and version, so Sval's own
 installer and updater ship it at the browser's build.

@@ -599,7 +599,7 @@ browser.jar:
     content/browser/sval/home/mark-light.svg  (/browser/branding/sval/content/app-icon-unplated-light.svg)
     content/browser/sval/home/mark-private.svg (/browser/branding/sval/content/app-icon-private-unplated.svg)
     content/browser/sval/home/wordmark-light-on-dark.svg (/browser/branding/sval/src/masters/04-wordmark-light-on-dark.svg)
-# The map of trackers' owners (decision 1051): AdGuard's companiesdb under
+# The map of trackers' owners: AdGuard's companiesdb under
 # CC-BY-SA-4.0, Privacy Badger's groups under GPL-3.0-or-later, and Sval's own
 # additions. REUSE.toml lists the first two.
     content/browser/sval/tracker-owners/adguard-companiesdb.mjs (tracker-owners/adguard-companiesdb.mjs)

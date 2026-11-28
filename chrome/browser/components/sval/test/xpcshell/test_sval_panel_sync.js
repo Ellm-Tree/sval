@@ -47,7 +47,7 @@ add_task(function the_last_synced_time_can_say_never() {
 /**
  * A folder that is there and does not answer shows on the second failed
  * step in a row, a missing one on the first, and a failure someone waited
- * on at once (messages spec §3, decision 0032).
+ * on at once (messages spec §3).
  */
 add_task(function an_outage_shows_when_it_repeats() {
   const { showsFolderNotice } = SvalPanelModel;

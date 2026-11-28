@@ -5,7 +5,7 @@
 
 /**
  * Another device's close never takes away a tab the user has in front of
- * them, and a tab in a call stays on this device (decision 2237).
+ * them, and a tab in a call stays on this device.
  *
  * Device A is this window's panel on a shared folder, and device B an engine
  * that keeps that folder as its own location, as in

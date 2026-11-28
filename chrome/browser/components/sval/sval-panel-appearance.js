@@ -195,8 +195,7 @@ Object.assign(SvalPanel, {
 
   /**
    * The material this window shows what is behind it through, or null for
-   * a window that draws its colour solid (`SvalColor.seeThroughMaterial`,
-   * decision 0057).
+   * a window that draws its colour solid (`SvalColor.seeThroughMaterial`).
    *
    * @returns {"hud"|"acrylic"|"blur"|null}
    */

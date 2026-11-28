@@ -3,7 +3,7 @@
 
 "use strict";
 
-// My filters kept a pref per line (settings-sync spec §4.4, decision 0117):
+// My filters kept a pref per line (settings-sync spec §4.4):
 // the orders that place the lines, the writes an edit makes, and the move of
 // rules held as one text.
 

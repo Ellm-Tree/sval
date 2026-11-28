@@ -8,7 +8,7 @@
 /* import-globals-from sval_panel_helpers.js */
 
 /**
- * A Workspace's and a group's colour in the Edit dialog (decision 0057): the
+ * A Workspace's and a group's colour in the Edit dialog: the
  * window this Workspace shows wears each choice while the dialog is open,
  * Cancel and Escape put its colour back, and Save keeps the choice in one
  * write. A custom colour and a transparency are stored as the engine keeps

@@ -2,8 +2,8 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The overlay over an agent's window (agent-control spec §6, as
- * decision 0107 has it). While the agent controls its workspace, one
+ * The overlay over an agent's window (agent-control spec §6).
+ * While the agent controls its workspace, one
  * semi-opaque overlay covers the whole window, panel, toolbar, address bar,
  * page and sidebars alike, through which the window stays visible, and one
  * card at its centre says "<agent> is controlling this workspace", with one

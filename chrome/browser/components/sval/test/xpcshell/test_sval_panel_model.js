@@ -159,8 +159,8 @@ add_task(function offline_before_any_sync_says_so() {
 });
 
 /**
- * Decision 0032: one step that fails to reach a folder that is there is a
- * blip, and the second in a row shows.
+ * One step that fails to reach a folder that is there is a blip, and the
+ * second in a row shows.
  */
 add_task(function offline_shows_on_the_second_failed_step() {
   const { FOLDER_UNAVAILABLE_AFTER_STEPS } = SvalPanelModel;
@@ -338,7 +338,7 @@ add_task(function newer_schema() {
 });
 
 /**
- * Decision 1714: a device whose clock set ahead cost this one something is
+ * A device whose clock set ahead cost this one something is
  * a warning naming it, never shown on a device with no time reading, whose
  * own clock may be the wrong one.
  */

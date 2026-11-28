@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * The Privacy and Security button's connection (decision 0131): the colour
+ * The Privacy and Security button's connection: the colour
  * and word a wrong connection gives the button, the panel's connection line
  * and warning, the certificate view it opens, a site's breach from Have I
  * Been Pwned's list with its source named, and clearing a site's data.

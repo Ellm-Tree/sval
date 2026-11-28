@@ -6,7 +6,7 @@ import Foundation
 
 /// The user's own filter rules, My filters, as the desktop keeps them: a
 /// synced setting per line under `branch`, each a JSON `{line, order}`
-/// (`SvalMyFilters.sys.mjs`, decision 0117). The lines sort by `order`, then
+/// (`SvalMyFilters.sys.mjs`). The lines sort by `order`, then
 /// by key, both compared as bytes.
 enum MyFilters {
     static let branch = "browser.sval.adblock.myFilter."

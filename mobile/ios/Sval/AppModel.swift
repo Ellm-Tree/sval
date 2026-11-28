@@ -131,7 +131,7 @@ final class AppModel {
     /// When the folder stopped answering, while it hasn't since.
     var unreachableSince: Date?
     /// How long the folder may go unanswered before the app says so, as the
-    /// desktop's `FOLDER_UNAVAILABLE_AFTER_MS` (decision 0032): blips are
+    /// desktop's `FOLDER_UNAVAILABLE_AFTER_MS`: blips are
     /// normal on every folder Sval supports.
     static let unavailableAfter: TimeInterval = 3 * 60
     /// Whether a change arrived during a pass, which then runs again.
@@ -354,7 +354,7 @@ final class AppModel {
     /// The id it writes under, made for the session and never saved.
     @ObservationIgnored var privateDevice = Data()
     /// The private session's stamps, which only move forward as every
-    /// device's do (decision 1714).
+    /// device's do.
     @ObservationIgnored var privateClock = StampClock()
     /// The private session's Workspace.
     var privateWorkspace: String?

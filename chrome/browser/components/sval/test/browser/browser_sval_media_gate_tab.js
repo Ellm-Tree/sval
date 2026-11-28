@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * The media gate across a tab's life (protections spec §4.1, decision 0132): a
+ * The media gate across a tab's life (protections spec §4.1): a
  * click on the page lets nothing play, a blocked press of play is reported
  * again so the media button lights up, the media button's allowance plays
  * the page, a redirect to another origin of an Always site plays from its
@@ -549,7 +549,7 @@ function attemptCount() {
 
 /**
  * A page that calls play() over and over plays nothing after a click on its
- * text: a click on the page is no allowance (decision 0132), and the blocked
+ * text: a click on the page is no allowance, and the blocked
  * attempts made with it are reported as presses of play.
  */
 add_task(async function a_click_on_the_page_plays_nothing() {

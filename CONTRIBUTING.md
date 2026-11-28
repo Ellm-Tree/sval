@@ -136,15 +136,17 @@ The sections below are the project's working rules. Code comments cite them as
 
 A comment earns its line: without it, a reader of this file would get
 something wrong. Say why the present code is as it is: the invariant it keeps,
-the outside constraint, or the hazard the code hides. Cite Mozilla by symbol,
-the spec by section and decisions by number. State only what you verified.
+the outside constraint, or the hazard the code hides. Cite Mozilla by symbol
+and the spec by section. State a decision's reason itself and never cite a
+decision record by number, in a comment or a patch header. State only what
+you verified.
 Later readers take comments as fact. Never restate the code or tell the
 history or incident behind it. Never use words that need a diff ("now", "no
 longer") or cite plans or tasks. Never write hedges, contrasts of the form
 `X, not Y`, or counts that drift. Reasoning shared by
 several places lives once, here or in the spec. `scripts/check-comments.py`
-enforces the mechanical bans (em dashes, issue and PR numbers, line numbers,
-intensifiers) and runs first in CI.
+enforces the mechanical bans (em dashes, issue and PR numbers, decision
+numbers, line numbers, intensifiers) and runs first in CI.
 
 ### Commit messages
 

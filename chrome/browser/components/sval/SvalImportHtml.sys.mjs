@@ -10,7 +10,7 @@
  * The file goes through the same model and choices as a browser's
  * bookmarks (Favorites, a workspace, or nothing), so Firefox's
  * `BookmarkHTMLUtils.importFromFile`, which writes straight into Places, is
- * not used. Tags and keywords are not part of Sval (decision 0099), so the
+ * not used. Tags and keywords are not part of Sval, so the
  * `TAGS` and `SHORTCUTURL` attributes are ignored.
  */
 

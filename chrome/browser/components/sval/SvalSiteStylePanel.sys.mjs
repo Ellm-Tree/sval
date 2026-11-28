@@ -9,7 +9,7 @@
  * back the page as the dialog found it.
  *
  * A style is saved at the page's host or its whole site, picked as the site
- * menu picks it (decision 1980). The editor opens at the host and shows the
+ * menu picks it. The editor opens at the host and shows the
  * style that applies there, and Save saves it at the scope in view.
  * Private windows keep nothing, so the editor is not offered there.
  */

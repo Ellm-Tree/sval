@@ -452,7 +452,7 @@ export class SvalFavoritesView {
       icon: iconOf(row.url) ?? undefined,
       className: "menuitem-iconic bookmark-item menuitem-with-favicon",
       // Another device's address that no device opens is drawn so it can be
-      // deleted, and does nothing else (decision 1372).
+      // deleted, and does nothing else.
       disabled: row.refused,
       attributes,
     };

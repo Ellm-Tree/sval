@@ -30,7 +30,7 @@ pub const MAX_FILE_BYTES: u64 = 32 * 1024 * 1024;
 /// The most one listing reads in all; entries past it are unreadable.
 pub const MAX_TOTAL_BYTES: u64 = 128 * 1024 * 1024;
 
-/// The most one `readDirs` reads in all, the limit decision 0032 puts on one
+/// The most one `readDirs` reads in all, the limit on one
 /// shared step: a step reads its documents with one `readDirs`. Past it the
 /// request reads nothing more and answers "too-large": what it copies goes to
 /// the profile and on into the engine's memory, and anyone who can write to
@@ -451,8 +451,7 @@ impl Folder {
                         self.read_listing(&join(root, &parts), listing, &into, Some(&mut step))?;
                     if read["reachable"] != true {
                         // Which directory's own file did not read: the
-                        // browser sets that file aside once it has stayed so
-                        // (decision 1144).
+                        // browser sets that file aside once it has stayed so.
                         if read["reason"] == "own-file-unreadable" {
                             read["dir"] = index.into();
                         }

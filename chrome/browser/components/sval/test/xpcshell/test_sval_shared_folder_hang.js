@@ -172,7 +172,7 @@ add_task(
  * A step queued behind a helper the operating system will not let die waits
  * for its turn only until its own deadline. The first such step asked the
  * folder nothing and says so, and the second in a row reports the folder
- * unreachable (decision 0032); once that helper has gone, the next step
+ * unreachable; once that helper has gone, the next step
  * reaches the folder.
  */
 add_task(

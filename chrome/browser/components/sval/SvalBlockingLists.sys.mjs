@@ -3,7 +3,7 @@
 
 /**
  * The filter lists Sval knows, and the loader that keeps a copy of each one
- * the engine uses (protections spec §1.2, decision 0102).
+ * the engine uses (protections spec §1.2).
  *
  * Sval downloads each list from its publisher and never bundles one. A copy
  * lives in the profile's `sval-blocking` directory beside `lists.json`, which
@@ -55,7 +55,7 @@ export const BLOCKING_TOPIC = "sval-blocking-changed";
 /** The ad feature's list ids, which the content classifier reads. */
 export const ENGINE_LISTS_PREF =
   "privacy.trackingprotection.content.ads.list_ids";
-/** The lists of the `trackers` feature, which blocks (decision 1051). */
+/** The lists of the `trackers` feature, which blocks. */
 export const TRACKER_LISTS_PREF =
   "privacy.trackingprotection.content.trackers.list_ids";
 /**
@@ -353,7 +353,7 @@ function ruleSite(host) {
 
 /**
  * The part of a list's `$removeparam` rules Firefox's query stripping can
- * apply (decision 0104). Its strip list is parameter names stripped on every
+ * apply. Its strip list is parameter names stripped on every
  * site, so only a rule naming one parameter with no other option counts; a
  * rule scoped to sites, request types or a pattern is left out.
  *
@@ -638,7 +638,7 @@ const CURATED = [
 
 /**
  * The regional lists, with the languages uBlock Origin's `assets.json` maps to
- * each, and the license each publisher states (decision 0102 admits no list
+ * each, and the license each publisher states (Sval admits no list
  * without one, or with non-commercial terms).
  */
 const REGIONAL = [

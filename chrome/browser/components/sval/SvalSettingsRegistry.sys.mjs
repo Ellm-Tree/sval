@@ -102,7 +102,7 @@ const ONE_WAY_RULES = Object.fromEntries(
  * reason for every pref left out. To it are added Sval's own settings that are
  * prefs, among them the fingerprinting settings' own
  * (`SvalFingerprinting.SYNCED_PREFS`, protections spec §3.3). Secure DNS syncs
- * too (decision 0105): the choice, the resolver's URL, custom or not, as the
+ * too: the choice, the resolver's URL, custom or not, as the
  * home page's URL does, and the names that skip it. So do the prefs
  * Protections' tracking settings write (protections spec §3.3), which stand
  * in for Enhanced Tracking Protection's.

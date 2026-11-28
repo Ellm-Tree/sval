@@ -13,7 +13,7 @@
 // fetch; the PDF viewer, the site exception, the page-rules switch and a
 // level without lists get none of the lists' rules; private windows get the
 // same (page rules spec §5). My filters' own rules apply where the site
-// exception or a level without lists takes the lists' away (decision 1993). A frame with no origin of its own (about:blank, srcdoc, blob:,
+// exception or a level without lists takes the lists' away. A frame with no origin of its own (about:blank, srcdoc, blob:,
 // data:, sandboxed) gets the rules of the origin that made it, as does a
 // popup the page writes or opens at a blob: address, and none when that site
 // has protections off. A frame the page adds runs the page's scriptlets

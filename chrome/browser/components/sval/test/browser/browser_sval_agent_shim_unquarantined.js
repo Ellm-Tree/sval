@@ -7,7 +7,7 @@
 
 /**
  * The copy of sval-mcp an AI app runs on macOS carries no quarantine, so
- * running it never has Gatekeeper assess anything (decision 2052). It runs in
+ * running it never has Gatekeeper assess anything. It runs in
  * the browser, whose `LSFileQuarantineEnabled` quarantines every file the
  * browser creates, as the bundle's own shim, written here, shows.
  */

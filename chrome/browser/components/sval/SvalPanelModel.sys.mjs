@@ -58,7 +58,7 @@ export const CURRENT_WORKSPACE_KEY = "sval-current-workspace";
 /**
  * The workspace a window created for itself, kept beside
  * {@link CURRENT_WORKSPACE_KEY} in the same store. Closing that window may
- * delete it if nobody touched it (decision 0101), and a window the session
+ * delete it if nobody touched it, and a window the session
  * brings back after Sval stopped without closing it has to know the same.
  */
 export const MADE_WORKSPACE_KEY = "sval-made-workspace";
@@ -172,8 +172,7 @@ export function pendingHandOffs() {
  * The workspaces closed windows may still delete, until each window's last
  * flush has decided (`SvalTabObserver.detach` with `dropUntouched`). The
  * window is gone from the window list by then, and a window that took the
- * workspace meanwhile would be left showing a deleted one (spec §10.7,
- * decision 0101).
+ * workspace meanwhile would be left showing a deleted one (spec §10.7).
  */
 const closingWorkspaces = new Map();
 
@@ -525,7 +524,7 @@ export function altClickSplitOps(nodes, selected, clicked, newId) {
  * agent's window (agent-control spec §6). A window opened for an agent
  * (`SvalAgentTabs`) reaches its workspace as the remembered id. A phone's or
  * tablet's own workspace ({@link isDeviceWorkspace}) is passed over on the
- * same terms: its tabs are the ones opened on that device (decision 2254).
+ * same terms: its tabs are the ones opened on that device.
  *
  * A workspace has one window (spec §10.7), so a workspace another window
  * already shows is never the answer, remembered or not. `null` is the answer
@@ -893,7 +892,7 @@ export function agentLabelOf(nodes, id, devices = null) {
 
 /**
  * Whether `id` is a phone's or tablet's own workspace: one whose node
- * carries the `device_home` mark (decision 2254).
+ * carries the `device_home` mark.
  *
  * @param {object} nodes The document's `nodes` map.
  * @param {string|null} id A node id.
@@ -3233,9 +3232,8 @@ export function fromBackupCode(text) {
 }
 
 /**
- * What Sval says when the sync folder holds more than one step reads
- * (decision 0032). The settings page and the folder picker say it in the
- * same words.
+ * What Sval says when the sync folder holds more than one step reads. The
+ * settings page and the folder picker say it in the same words.
  */
 export const SYNC_FILES_TOO_LARGE =
   "The files in your sync folder are too large to sync.";
@@ -3391,9 +3389,9 @@ function cloudFolder(parts) {
 
 /**
  * How many shared steps in a row must fail to reach a folder that is there
- * before the footer's indicator says the folder is unreachable (spec §3,
- * decision 0032). One failed reach is a blip, which the engine retries within
- * seconds (`SvalEngine.SHARED_RETRY_MS`), and a second is an outage.
+ * before the footer's indicator says the folder is unreachable (spec §3).
+ * One failed reach is a blip, which the engine retries within seconds
+ * (`SvalEngine.SHARED_RETRY_MS`), and a second is an outage.
  */
 export const FOLDER_UNAVAILABLE_AFTER_STEPS = 2;
 
@@ -3520,7 +3518,7 @@ const UNSAVED_WINDOW_DETAIL = {
 
 /**
  * What devices whose clocks are set ahead are costing the user, and how to
- * stop it (decision 1714).
+ * stop it.
  *
  * @param {Array<string|null>} names As `syncIndicator`'s `harmedByClock`.
  * @param {string} platform `AppConstants.platform`.
@@ -3679,7 +3677,7 @@ function unpairedDetail(computer) {
  *   too new for this build.
  * @param {Array<string|null>} [state.harmedByClock] The names of the
  *   devices whose clocks set ahead cost this device something, one entry
- *   each, null for one whose name has not arrived (decision 1714).
+ *   each, null for one whose name has not arrived.
  * @param {boolean} [state.hasReading] Whether this device has a time
  *   reading. Without one, its own clock may be the wrong one, so no device
  *   is blamed.

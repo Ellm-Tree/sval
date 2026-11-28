@@ -6,7 +6,7 @@
 /* import-globals-from shared_folder_head.js */
 
 /**
- * The handshake's protocol check (decision 1437): a helper that speaks the
+ * The handshake's protocol check: a helper that speaks the
  * browser's protocol or the one before is accepted, and any other is refused
  * until Sval restarts. The refusal lasts for this process, so it has a file
  * of its own.

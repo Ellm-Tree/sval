@@ -798,7 +798,8 @@ const SvalImportPicker = (() => {
     }
 
     /**
-     * The suggestions of decision 0087, in this source's name.
+     * The names Sval suggests for a window or workspace that has none, in
+     * this source's name.
      *
      * @param {object} browser `{ source, profiles }`.
      * @returns {{window: Function, workspace: Function}}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
-//! The Archive (idle-tab archive spec, decision 0136): the sweep, restore,
+//! The Archive (idle-tab archive spec): the sweep, restore,
 //! expiry, and how the Archive and the tree converge across devices.
 
 use crate::archive::{

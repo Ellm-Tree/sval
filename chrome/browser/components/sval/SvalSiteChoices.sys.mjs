@@ -9,7 +9,7 @@
  *
  * An entry says only what is saved at a name itself. What applies to a page,
  * with what a host takes from its site, is each store's to answer and
- * differs between them (decision 1980).
+ * differs between them.
  */
 
 import {

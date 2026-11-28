@@ -1,7 +1,7 @@
 Sval: hide settings for features Sval removes
 
-Mozilla's feedback link, data choices, the link to manage themes
-(decision 0093), and any setting whose pref Sval locks (spec §10.9).
+Mozilla's feedback link, data choices, the link to manage themes,
+and any setting whose pref Sval locks (spec §10.9).
 
 diff --git a/browser/components/preferences/config/about-firefox.mjs b/browser/components/preferences/config/about-firefox.mjs
 index 07ee0aefd2..2bdd4ab576 100644
@@ -56,7 +56,7 @@ index d06f6ee6f4..1cf9f20adc 100644
  
  Preferences.addSetting({
    id: "web-appearance-manage-themes-link",
-+  // Sval: Sval installs no themes (Sval decision 0093).
++  // Sval: Sval installs no themes.
 +  visible: () => false,
    onUserClick: e => {
      e.preventDefault();

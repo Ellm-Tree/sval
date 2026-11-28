@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Settings' Extensions category (decision 1479): the installed extensions,
+ * Settings' Extensions category: the installed extensions,
  * each with its on/off switch, and an extension's page at
  * `about:preferences#svalExtensions-extension?id=<id>`, which holds what
  * about:addons' detail view shows: the extension's own settings page, its
@@ -156,7 +156,7 @@
      * Registers the group that asks before a site installs an extension:
      * Firefox's own `warnAddonInstall` and `addonExceptions` settings from
      * `config/permissions-data.mjs`. Firefox's Site permissions category holds
-     * them, and Sval's nav leaves it out (decision 1484).
+     * them, and Sval's nav leaves it out.
      */
     registerInstall() {
       const { SettingGroupManager } = window;

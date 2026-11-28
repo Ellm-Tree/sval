@@ -7,7 +7,7 @@
 /* import-globals-from sval_preferences_helpers.js */
 
 /**
- * Settings › Sites (decision 1484): a category of its own after Privacy and
+ * Settings › Sites: a category of its own after Privacy and
  * protection, with the defaults every site gets above one list of every site
  * with a choice. The defaults are the prefs Firefox's own dialogs and Sval's
  * buttons write, a site with only a JavaScript rule has a row, and a row's

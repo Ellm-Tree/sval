@@ -106,7 +106,7 @@
 
   /**
    * Whether `guid` is the pins root or a pin, which the API never shows: a
-   * pin is not a favorite (decision 0137).
+   * pin is not a favorite.
    *
    * @param {Function} get Answers a row by guid.
    * @param {string} guid

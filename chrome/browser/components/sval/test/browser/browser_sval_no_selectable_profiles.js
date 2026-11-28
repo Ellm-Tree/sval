@@ -8,7 +8,7 @@
 /**
  * Firefox's selectable profiles are not built: no service, no pages, no
  * menus, no profile selector at startup. Sval keeps its data in one
- * directory (decision 1400).
+ * directory.
  */
 
 add_task(function selectable_profiles_do_not_ship() {

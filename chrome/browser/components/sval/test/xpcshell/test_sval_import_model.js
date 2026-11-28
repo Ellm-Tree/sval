@@ -796,10 +796,10 @@ add_task(function pinned_marks_are_pins() {
 });
 
 /**
- * A profile's history goes to the workspace its plain windows landed in
- * (decision 1287), and to none when the profile also keeps Spaces, Tab
- * Groups or Workspaces of its own, which no browser records per visit, or
- * when its windows stayed behind.
+ * A profile's history goes to the workspace its plain windows landed in,
+ * and to none when the profile also keeps Spaces, Tab Groups or Workspaces
+ * of its own, which no browser records per visit, or when its windows stayed
+ * behind.
  */
 add_task(function each_profiles_history_goes_to_its_own_workspace() {
   const harvestOf = windows => ({

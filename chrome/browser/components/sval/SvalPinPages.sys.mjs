@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The pages of one window's pins (pins spec §5, decision 0137).
+ * The pages of one window's pins (pins spec §5).
  *
  * A pin's page is a real tab of the window, marked (`SvalPinTab`) so no tree
  * node describes it and the tab observer leaves it alone, and hidden from

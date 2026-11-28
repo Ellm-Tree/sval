@@ -1,6 +1,6 @@
 Sval: the tab strip stays collapsed in a window Sval shows the tabs of
 
-Sval's panel is where a window's tabs show (decision 0049).
+Sval's panel is where a window's tabs show.
 TabBarVisibility.update assigns TabsToolbar.collapsed on every tab open and
 close, and decides an ordinary window's strip shows. A window whose root
 has svaltabstriphidden (SvalFirefox.hideTabStrip) keeps the strip

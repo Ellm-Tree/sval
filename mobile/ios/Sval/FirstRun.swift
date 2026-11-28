@@ -921,7 +921,7 @@ private struct ArrivalStep: View {
             }
             Spacer()
             // Sval starts on this phone's own Workspace, made once the
-            // folder is read (14l, decision 2254).
+            // folder is read (14l).
             FirstRunStyle.primary("Start Browsing") {
                 if let own = model.ownWorkspace { model.browser.showWorkspace(own.id) }
                 model.welcoming = false

@@ -74,7 +74,7 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 const ALL_SITES_LEVEL = "read-only";
 
 /**
- * The upload alert's choice of what "Always allow" covers (decision 0129),
+ * The upload alert's choice of what "Always allow" covers,
  * "This folder only" first and by default.
  */
 const UPLOAD_SCOPES = Object.freeze({

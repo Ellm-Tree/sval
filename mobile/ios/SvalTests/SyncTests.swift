@@ -177,7 +177,7 @@ final class DeletePageTests: XCTestCase {
 }
 
 /// This device's own file in the folder is set aside once it has stayed
-/// unreadable for ten minutes (decision 1144).
+/// unreadable for ten minutes.
 final class OwnFileSetAsideTests: XCTestCase {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 

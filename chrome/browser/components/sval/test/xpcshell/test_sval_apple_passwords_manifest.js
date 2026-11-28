@@ -6,7 +6,7 @@
 /**
  * On macOS, Sval finds Apple's password helper through the manifest macOS
  * installs in the system Mozilla folder, the one file it reads from a folder
- * Firefox uses (decision 1738, patches/apple-passwords-manifest.patch).
+ * Firefox uses (patches/apple-passwords-manifest.patch).
  */
 
 const { NativeManifests } = ChromeUtils.importESModule(

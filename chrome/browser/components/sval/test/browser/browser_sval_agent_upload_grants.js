@@ -141,7 +141,7 @@ add_task(async function always_allow_covers_only_the_folders_it_named() {
 
 /**
  * "This folder only" leaves the folders inside it asking; "This folder and
- * the folders inside it" covers them (decision 0129).
+ * the folders inside it" covers them.
  */
 add_task(async function the_scope_says_whether_folders_inside_are_covered() {
   const { call, win, alerts, store, agent, tab, many } = await uploadSetup();

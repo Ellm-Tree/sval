@@ -76,7 +76,7 @@ menupopup:not([sval-stem]) {
   -moz-window-shadow: none;
 }
 
-/* A see-through window's menus are see-through too (decision 0057): each
+/* A see-through window's menus are see-through too: each
  * lays the colour the window's root wears (`--sval-tint-accent`) over the
  * system's backdrop for a menu, which Gecko puts behind a popup whose
  * appearance is a menu's. On macOS that is the menu material, or glass on

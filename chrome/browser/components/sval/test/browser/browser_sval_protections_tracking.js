@@ -172,7 +172,7 @@ add_task(async function the_rest_is_in_privacy_and_protection() {
   ]) {
     Assert.ok(
       !ui.byId(id),
-      `${id} is not offered: it ran on Disconnect's lists (decision 1051)`
+      `${id} is not offered: it ran on Disconnect's lists`
     );
   }
 
@@ -320,7 +320,7 @@ add_task(async function its_addresses_land_on_the_tracking_settings() {
 
 /**
  * The address bar has no padlock: Sval's Privacy and Security button stands
- * in for it (decision 0131).
+ * in for it.
  */
 add_task(async function the_address_bar_shows_none_of_it() {
   await BrowserTestUtils.withNewTab("https://example.com/", async () => {

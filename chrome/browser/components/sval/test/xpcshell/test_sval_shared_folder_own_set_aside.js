@@ -12,7 +12,7 @@ const { OWN_FILE_SET_ASIDE_MS } = ChromeUtils.importESModule(
 /**
  * This device's own file in the shared folder that stays unreadable for
  * `OWN_FILE_SET_ASIDE_MS` is renamed `<name>.damaged-<now>`, and the next step
- * writes a fresh one from the profile (decision 1144). The clock is the `now`
+ * writes a fresh one from the profile. The clock is the `now`
  * each pass is given.
  */
 

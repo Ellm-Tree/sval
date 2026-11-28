@@ -4,7 +4,7 @@
 "use strict";
 
 // The levels, Custom, the allowed domains and the list loader
-// (protections spec §1.2 and §1.3, decision 0102).
+// (protections spec §1.2 and §1.3).
 
 do_get_profile();
 
@@ -180,7 +180,7 @@ add_task(async function levels_load_their_lists() {
 /**
  * The level's lists run as two engines by category, each with the fixes, and
  * the tracker lists tag requests with the owners' exceptions; none of
- * Mozilla's Disconnect-backed features runs (decision 1051).
+ * Mozilla's Disconnect-backed features runs.
  */
 add_task(async function tracker_lists_block_and_tag_apart_from_the_ads() {
   await reset();

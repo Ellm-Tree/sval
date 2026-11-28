@@ -297,7 +297,7 @@ export class SvalSettingsSync {
   /**
    * Writes, once per key, the value this device held when the key began to
    * sync: on a profile older than settings sync, or for a key a later build
-   * added (settings-sync spec §4.2, as decision 0113 amends it).
+   * added (settings-sync spec §4.2).
    *
    * A seed is a change stamped now, so every device takes it as it takes any
    * change. It is written only once a pass has merged what the devices share,

@@ -10,9 +10,10 @@ run checks what is about to be committed once new files are added to git. A file
 under Mozilla's MPL header is Mozilla's and is skipped.
 
 The patterns are the ones a regular expression can decide without judgement:
-an em dash, a Sval issue or pull request number, a line number, words that only
-mean something against a diff, and intensifiers. Whether a comment earns its
-line at all is for review.
+an em dash, a Sval issue or pull request number, a decision record's number, a
+line number, words that only mean something against a diff, and intensifiers.
+A patch's header is read for decision numbers alone, since the rest of a patch
+is Mozilla's code. Whether a comment earns its line at all is for review.
 
     python3 scripts/check-comments.py [--base <rev>]
 
@@ -45,6 +46,8 @@ RULES = [
     ("issue or PR number",
      re.compile(r"(?:^|[\s(\[])(?:[Ss]val/[\w.-]+)?#\d+\b(?![\w-])"
                 r"|\b(?:issue|PR|pull request)\s+#?\d+\b", re.I)),
+    ("decision number",
+     re.compile(r"\bdecisions?\s+(?:record\s+)?\d{3,4}\b|\bdocs/decisions/\d", re.I)),
     ("line number",
      re.compile(r"\blines?\s+\d+\b|\b[\w./-]+\.[A-Za-z]\w*:\d+\b|\bL\d{2,}\b")),
     ("words that need a diff",
@@ -92,8 +95,16 @@ def comment_of(kind, line):
     return None
 
 
+# The lines of a patch file that belong to its diff rather than its header.
+DIFF_LINE = re.compile(r"^(?:[-+ \\]|@@|diff |index |new file|deleted file|similarity |rename |old mode|new mode)")
+
+
 def findings(path, line):
     """The rules `line` of `path` breaks, by name."""
+    if path.startswith("patches/") and path.endswith(".patch"):
+        if DIFF_LINE.match(line):
+            return []
+        return [name for name, rule in RULES if name == "decision number" and rule.search(line)]
     kind = style(path)
     if kind is None or SKIP.search(path):
         return []

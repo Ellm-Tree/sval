@@ -6,7 +6,7 @@ page and its text names what Sval imports; the address bar's "Shortcuts"
 setting is named for what it does, since Sval's new tab draws no tiles; the
 Appearance link to Firefox Home and Home's copy of the default-browser group
 go. The address bar's "Manage bookmarks" and "Open Library" quick actions are
-removed, because Sval has no Library (decision 0099). Each change is a value
+removed, because Sval has no Library. Each change is a value
 in a settings config or a Fluent string, which no chrome API reaches.
 
 diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs

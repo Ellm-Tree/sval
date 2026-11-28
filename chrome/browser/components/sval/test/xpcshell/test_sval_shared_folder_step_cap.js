@@ -6,7 +6,7 @@
 /* import-globals-from shared_folder_head.js */
 
 /**
- * The most one shared step reads from the folder (decision 0032). Someone who
+ * The most one shared step reads from the folder. Someone who
  * can write to the folder fills every document's directory; the step copies
  * nothing past the limit, and the footer's indicator says sync stopped.
  * Under the limit the same folder syncs.

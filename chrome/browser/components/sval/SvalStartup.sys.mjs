@@ -42,7 +42,7 @@ export const SvalStartup = {
     Services.qms.clearStoragesForPrivateBrowsing();
     SvalPreferences.watch();
     // A device publishes nothing to the shared folder before its first time
-    // reading (decision 1714), so it asks for one now.
+    // reading, so it asks for one now.
     SvalClock.start();
     SvalAddonsNav.start();
     SvalHomePage.registerSearchActor();

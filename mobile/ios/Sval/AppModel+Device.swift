@@ -8,7 +8,7 @@ import Observation
 import UIKit
 
 extension AppModel {
-    /// This phone's own Workspace (decision 2254): where it opens, and
+    /// This phone's own Workspace: where it opens, and
     /// where a new tab goes when another device's Workspace is in front.
     var ownWorkspace: OutlineRow? {
         guard let me = syncer?.device else { return nil }
@@ -16,8 +16,7 @@ extension AppModel {
     }
 
     /// Whether tabs in this Workspace can be put in groups: every one but
-    /// the private session's, a device's own Workspace included
-    /// (decision 2254).
+    /// the private session's, a device's own Workspace included.
     func makesGroups(in workspace: String?) -> Bool {
         guard let workspace, row(workspace) != nil else { return false }
         return !isPrivate(workspace)
@@ -91,7 +90,7 @@ extension AppModel {
 
     /// Makes this phone's own Workspace when it has none: on first run, or
     /// after another device deleted it, when it comes back empty under a
-    /// new id (decision 2254).
+    /// new id.
     func keepOwnWorkspace() async {
         await foldOwnWorkspaces()
         guard browsing, syncer != nil, ownWorkspace == nil, !makingOwnWorkspace else { return }
@@ -105,8 +104,8 @@ extension AppModel {
 
     /// Folds every Workspace of this phone's own into the first. A phone
     /// that starts over makes a fresh one before it joins again, and the
-    /// folder then brings back the one its device id made before
-    /// (decision 2232), where each phone keeps one (decision 2254).
+    /// folder then brings back the one its device id made before,
+    /// where each phone keeps one.
     private func foldOwnWorkspaces() async {
         guard let me = syncer?.device else { return }
         let mine = workspaces.filter { $0.device == me }

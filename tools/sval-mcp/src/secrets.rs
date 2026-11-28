@@ -43,7 +43,7 @@ pub trait SecretStore: Send + Sync {
 /// `makePrivateDirectory` limits to the user and SYSTEM, as for Sval's own
 /// files there.
 ///
-/// Spec §3.6 and decision 0088 give the reasoning: a process running as the
+/// Spec §3.6 gives the reasoning: a process running as the
 /// user can already read the profile, so an OS credential store adds nothing
 /// against it.
 pub struct FileStore {

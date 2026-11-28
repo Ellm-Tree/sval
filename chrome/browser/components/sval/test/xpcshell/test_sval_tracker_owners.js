@@ -3,7 +3,7 @@
 
 "use strict";
 
-// The map of trackers' owners (decision 1051).
+// The map of trackers' owners.
 
 const {
   MAX_FIRST_PARTIES_BYTES,

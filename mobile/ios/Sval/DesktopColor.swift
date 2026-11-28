@@ -453,7 +453,7 @@ enum DesktopColor {
         var l: Double?
         var mode: String?
 
-        /// The colour as the tree stores it (decision 0057), rounded as the
+        /// The colour as the tree stores it, rounded as the
         /// desktop's picker rounds it. A hue that rounds up to 360 is 0: the
         /// engine refuses 360.
         var json: String {

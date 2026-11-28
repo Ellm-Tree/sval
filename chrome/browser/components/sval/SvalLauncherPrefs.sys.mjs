@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The Launcher's settings (launcher spec §5, decision 0126): the order of the
+ * The Launcher's settings (launcher spec §5): the order of the
  * address bar's sections and how many rows each lists. Each default is in
  * `app-sval-prefs.js`, and each syncs (`SvalSettingsRegistry.SYNCED_PREFS`).
  */

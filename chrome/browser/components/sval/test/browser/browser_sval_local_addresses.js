@@ -9,7 +9,7 @@
 /* import-globals-from sval_favorites_menu_helpers.js */
 
 /**
- * An address no other device may open (decision 1372). One this device
+ * An address no other device may open. One this device
  * wrote is a pin, a favorite or a tab here as any other is. One another
  * device wrote is never opened: no pin tile, a disabled Favorites item whose
  * only command is Delete, and no tab.

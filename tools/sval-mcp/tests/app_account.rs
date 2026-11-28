@@ -2,7 +2,7 @@
 // Copyright 2026 Ellm Tree, Inc.
 
 //! Every session of one AI app on a profile connects as the one agent the
-//! user allowed (decision 1998), wherever it was launched and however many
+//! user allowed, wherever it was launched and however many
 //! run at once.
 
 mod common;

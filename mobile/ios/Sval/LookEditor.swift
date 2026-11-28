@@ -69,7 +69,7 @@ struct LookEditor: View {
         return nil
     }
 
-    /// Whether this is the phone's own Workspace (decision 2254).
+    /// Whether this is the phone's own Workspace.
     private var ownDevices: Bool {
         editing.map { $0.id == model.ownWorkspace?.id } ?? false
     }

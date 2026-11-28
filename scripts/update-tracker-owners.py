@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 # Copyright 2026 Ellm Tree, Inc.
-"""Refresh the tracker-owner data Sval ships (decision 1051).
+"""Refresh the tracker-owner data Sval ships.
 
     scripts/update-tracker-owners.py
 

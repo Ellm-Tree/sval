@@ -94,8 +94,8 @@ async-trait = "0.1.92"
 [profile.release]
 # Sized for the WASM artifact the desktop fork ships: this crate has no CLI or
 # server consumer that wants a fast release build. `strip` drops debug info.
-# The rest is the standard smallest-binary recipe, because bundle size is a
-# fact decision 0008 (no CRDT) rests on.
+# The rest is the standard smallest-binary recipe, because a small bundle is
+# one reason the engine uses no CRDT.
 opt-level = "z"
 lto = true
 codegen-units = 1

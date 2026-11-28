@@ -4,7 +4,7 @@
 import Foundation
 
 /// Taking another device's sync key, by the pairing code it shows
-/// (spec §6.7, decision 0042) or by the key's backup (key-storage spec,
+/// (spec §6.7) or by the key's backup (key-storage spec,
 /// "Backup and recovery").
 enum Join {
     /// Where offers live in a shared folder (`SvalPairing`'s `sval/pair`).

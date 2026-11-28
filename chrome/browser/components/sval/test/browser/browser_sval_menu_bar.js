@@ -104,9 +104,9 @@ add_task(async function the_menus_stand_between_firefoxs() {
   }
 });
 
-// Firefox gives a build without MOZILLA_OFFICIAL, as every Sval build is
-// (decision 0063), a developer restart in `gBrowserInit._delayedStartup`, so
-// the check runs once that has.
+// Firefox gives a build without MOZILLA_OFFICIAL, as every Sval build is,
+// a developer restart in `gBrowserInit._delayedStartup`, so the check runs
+// once that has.
 add_task(function file_offers_no_developer_restart() {
   Assert.ok(
     gBrowserInit.delayedStartupFinished,
@@ -191,8 +191,7 @@ add_task(async function workspaces_lists_and_switches() {
 
 /**
  * Agents' workspaces follow the user's under a caption, in a menu for each
- * app, each entry named for its task, as the switcher lists them
- * (decision 1998).
+ * app, each entry named for its task, as the switcher lists them.
  */
 add_task(async function workspaces_groups_agents_by_app() {
   const add = async (task, app) => {

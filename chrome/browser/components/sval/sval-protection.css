@@ -28,7 +28,7 @@
   --sval-prot-knob-on: #ffffff;
   --sval-prot-knob-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   /* A wrong connection's colours, used by the button, the connection line,
-   * its card and the certificate view, and nowhere else (decision 0131). */
+   * its card and the certificate view, and nowhere else. */
   --sval-prot-http: #ffc53d;
   --sval-prot-http-bg: rgba(255, 197, 61, 0.1);
   --sval-prot-http-bd: rgba(255, 197, 61, 0.3);
@@ -167,7 +167,7 @@
   }
 }
 
-/* Firefox's shield: Sval's button replaces it (decision 0131). Its element
+/* Firefox's shield: Sval's button replaces it. Its element
    stays in the field, because `gProtectionsHandler` writes it on every load. */
 #tracking-protection-icon-container {
   display: none !important;
@@ -175,7 +175,7 @@
 
 /* Firefox's permission icons in the address field: the site menu lists a
    site's permissions and the site controls show a device in use
-   (`SvalSiteControls`, decision 0132). */
+   (`SvalSiteControls`). */
 #identity-permission-box,
 #blocked-permissions-container {
   display: none !important;

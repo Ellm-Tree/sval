@@ -187,7 +187,7 @@ add_task(async function synced_shows_the_moon_alone() {
 });
 
 /**
- * Spec §3 and decision 0032: a folder that is not there shows at once, and
+ * Spec §3: a folder that is not there shows at once, and
  * one that answers again is synced at once. A folder that is there and does
  * not answer waits for a second failed step, which is the model's
  * (`offline_shows_on_the_second_failed_step` in `test_sval_panel_model.js`).
@@ -407,7 +407,7 @@ add_task(async function a_warning_shows_its_button() {
 });
 
 /**
- * Decision 1714: a pass in which a device's clock set ahead replaced this
+ * A pass in which a device's clock set ahead replaced this
  * device's values is a warning naming that device, with its detail under
  * the label, and the next pass that finds none puts the moon back.
  */

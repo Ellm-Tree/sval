@@ -178,7 +178,7 @@ pub const CODESIGN_TIMEOUT: Duration = Duration::from_secs(20);
 ///
 /// macOS assesses a quarantined app with Gatekeeper the first time it runs,
 /// and records a rejection of a half-written bundle for good, so Sval.app
-/// is only started once it is whole (decision 2052).
+/// is only started once it is whole.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn launch_when_whole(
     dev: bool,

@@ -108,7 +108,7 @@ extension AppModel {
         back["after"] = from.next
         // The picker's address stays on the device that writes it, so it
         // carries the mark the desktop gives every address it never syncs
-        // (decision 1372, `markLocal`).
+        // (`markLocal`).
         var picker: [String: Any] = [
             "kind": "addTab", "parent": split, "name": "", "url": splitPickAddress, "id": UUID().uuidString.lowercased(),
             "local": true,
@@ -172,7 +172,7 @@ extension AppModel {
     func addTab(to parent: String, url: URL, after previous: String? = nil, before next: String? = nil, name: String? = nil,
                 id given: String? = nil) async -> String? {
         // The phone writes only web addresses into synced data: any other
-        // stays on the device it was made on (decision 1372).
+        // stays on the device it was made on.
         guard Self.opensHere(url.absoluteString) else { return nil }
         let id = given ?? UUID().uuidString.lowercased()
         var op: [String: Any] = [
@@ -454,7 +454,7 @@ extension AppModel {
     }
 
     /// Deletes a group, its contents with it or moved up to its parent in
-    /// their order (decision 0077, spec §5.4).
+    /// their order (spec §5.4).
     func deleteGroup(_ row: OutlineRow, keepingContents: Bool) async {
         guard row.kind == .group else { return }
         await edit(["kind": keepingContents ? "removeKeepingChildren" : "remove", "id": row.id])
@@ -478,7 +478,7 @@ extension AppModel {
         await edit(ops)
     }
 
-    /// Deletes a workspace and everything in it (decision 0077), and shows
+    /// Deletes a workspace and everything in it, and shows
     /// the next Workspace in the order.
     func deleteWorkspace(_ id: String) async {
         guard row(id)?.parentId == nil else { return }
@@ -563,8 +563,8 @@ extension AppModel {
     }
 
     /// Whether `workspace` can be deleted from this phone: never the last
-    /// one, and never the phone's own, which it would only make again
-    /// (decision 2254). Another device can delete that one.
+    /// one, and never the phone's own, which it would only make again.
+    /// Another device can delete that one.
     func canDelete(workspace: OutlineRow) -> Bool {
         workspaces.count > 1 && workspace.id != ownWorkspace?.id
     }
@@ -642,7 +642,7 @@ extension AppModel {
     }
 
     /// Closes a tab. Only a tab closes this way: groups and Workspaces are
-    /// deleted by name on the desktop (decision 0077).
+    /// deleted by name on the desktop.
     @discardableResult
     func closeTab(_ row: OutlineRow) async -> Bool {
         guard row.kind == .tab else { return false }

@@ -6,7 +6,7 @@
  * picker spec §2). The text is plain filter syntax, one rule per line, so a
  * line the picker wrote is a line the user can read and edit.
  *
- * A line belongs to a scope, a site or a host under it (decision 1980), when
+ * A line belongs to a scope, a site or a host under it, when
  * the scope is one of its plain domains: the left of `##` or `#?#` in a
  * cosmetic rule, the `domain=` option of a network rule. A site's lines are
  * its own and its hosts', each host grouped under `scopeOfHost`'s site. A

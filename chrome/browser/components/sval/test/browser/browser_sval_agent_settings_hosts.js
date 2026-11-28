@@ -4,7 +4,7 @@
 "use strict";
 
 /**
- * Site rules for one host in an agent's settings (decision 1980): the add
+ * Site rules for one host in an agent's settings: the add
  * row's scope select, and a host's rule listed under its site's, removed and
  * put back on its own.
  */

@@ -3280,7 +3280,7 @@ async function typeInto(field, text, { replace = true } = {}) {
     field.select();
     EventUtils.synthesizeKey("KEY_Backspace", {}, win);
   } else if (!replace) {
-    // A `sval-field`'s focus() selects its text (decision 2713); typing on
+    // A `sval-field`'s focus() selects its text; typing on
     // goes after what it holds.
     const end = field.value.length;
     field.setSelectionRange(end, end);
@@ -3698,7 +3698,7 @@ function contrastRatio(first, second) {
  * inwards, composited. In a window that shows what is behind it, the root's
  * see-through colour stands for the colour the window shows, its colour
  * over the material's middle, which is what the window's text is solved on
- * (decision 0057, `SvalPanel.windowLook`).
+ * (`SvalPanel.windowLook`).
  *
  * @param {Element} el
  * @returns {{r: number, g: number, b: number}}
@@ -4059,7 +4059,7 @@ function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
 
 /**
  * Counts the folder outage in progress as the steps in a row the footer
- * waits for before it shows one (decision 0032), as a step retried in the
+ * waits for before it shows one, as a step retried in the
  * background would, and has every window and page redraw for it.
  */
 function outageRepeats() {

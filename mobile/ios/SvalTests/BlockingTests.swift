@@ -128,7 +128,7 @@ final class PageRuleListsTests: XCTestCase {
         XCTAssertEqual(installed(protected: true), ["last", "mine", "scripts"])
     }
 
-    /// My filters' page rules apply where the lists don't (decision 1993).
+    /// My filters' page rules apply where the lists don't.
     func testAPageWithProtectionsOffKeepsMyFiltersPageRules() {
         XCTAssertEqual(installed(protected: false), ["own", "scripts"])
     }

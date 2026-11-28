@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Secure DNS (decision 0105): one global choice between the network's own
+ * Secure DNS: one global choice between the network's own
  * DNS and encrypted DNS, with or without falling back to the network's.
  * Settings' Protections card and the protection button's panel both read and
  * write it here, so the two always say the same thing.
@@ -161,8 +161,8 @@ const SYNCED_MODES = new Set([
  * How `SvalSettingsSync` treats each Secure DNS pref (`SvalSettingsRegistry`'s
  * `VALUE_RULES`). `accepts` is what a synced value must be to apply; anything
  * else leaves this device's value as it is. `staysOnDevice` marks a value
- * that is never published: a resolver on this device's own network
- * (decision 0105). The other devices then use their own resolver, Quad9 if
+ * that is never published: a resolver on this device's own network.
+ * The other devices then use their own resolver, Quad9 if
  * they have none.
  */
 export const SYNC_RULES = Object.freeze({

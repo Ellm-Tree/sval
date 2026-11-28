@@ -115,7 +115,7 @@ export function bundledShim() {
 
 /**
  * The shim an AI app is given to run. On macOS it is Sval's copy in its
- * application data directory (decision 2052), which `installShim` keeps.
+ * application data directory, which `installShim` keeps.
  * Elsewhere it is the one beside the browser binary.
  *
  * @param {string} [platform]
@@ -195,7 +195,7 @@ async function writeUnlessSame(path, bytes, mode) {
 /**
  * Copies the shim beside the browser binary to `shimPath()`, with the file
  * that names this install beside it, so no AI app runs a program inside
- * Sval.app (decision 2052).
+ * Sval.app.
  *
  * @param {object} [paths] A test's own.
  * @param {string} [paths.from]

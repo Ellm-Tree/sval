@@ -5,8 +5,7 @@ import Foundation
 
 /// The synced search engine's suggestions for what was typed, asked for
 /// as the desktop asks (`UrlbarProviderSearchSuggestions`,
-/// `SearchSuggestionController`), under the same synced settings
-/// (decision 0098).
+/// `SearchSuggestionController`), under the same synced settings.
 enum SearchSuggestions {
     static let enabledKey = "browser.search.suggest.enabled"
     static let limitKey = "browser.sval.launcher.limit.suggestions"

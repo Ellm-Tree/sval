@@ -44,7 +44,7 @@ async function treeNodes() {
 /**
  * Closes the window showing workspace `id` and deletes the workspace when the
  * task ends. A window closing deletes a workspace made for it that nobody
- * touched (decision 0101), so whether there is one left to delete is read
+ * touched, so whether there is one left to delete is read
  * once the closing window's observer has finished.
  *
  * @param {string} id

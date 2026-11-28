@@ -356,7 +356,7 @@ impl SvalDocument {
     /// Every entry in this Archive document as a JSON array, newest first:
     /// `[{ id, url, title, icon, workspace, workspaceName, closedAt, device,
     /// restored, split, pane, restoreIds }]`. `closedAt` is no later than
-    /// `now` (decision 0135).
+    /// `now`.
     pub fn archived(&self, now: f64) -> Result<String, JsValue> {
         let now = parse_timestamp(now).map_err(to_js_err)?;
         archived_json(&self.0, now).map_err(to_js_err)

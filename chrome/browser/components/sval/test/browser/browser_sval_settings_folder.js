@@ -216,7 +216,7 @@ add_task(async function stop_syncing_keeps_the_workspaces() {
 /**
  * A Sync now that finds Sval's files gone from the folder says so at once,
  * as the footer's indicator does: the person pressing it asked what the
- * folder says (messages spec §3, decision 0032).
+ * folder says (messages spec §3).
  */
 add_task(async function sync_now_answers_with_a_gone_folder() {
   await within(SvalPanel.started, 40_000, "the panel's startup");

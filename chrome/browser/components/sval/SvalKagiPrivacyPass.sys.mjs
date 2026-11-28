@@ -3,7 +3,7 @@
 
 /**
  * Kagi's Privacy Pass tokens, which sign private windows in to Kagi (Kagi
- * Privacy Pass spec, decision 0091). Kagi can check that a token comes from a
+ * Privacy Pass spec). Kagi can check that a token comes from a
  * subscriber, and cannot tell which subscriber.
  *
  * This module keeps the stock and refills it. `SvalKagi` spends it, one token

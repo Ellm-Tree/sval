@@ -2,7 +2,7 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The colour section a Workspace or group is coloured with (decision 0057):
+ * The colour section a Workspace or group is coloured with:
  * the presets, a custom colour, and a Workspace's transparency. The
  * Workspace dialog (`workspace-form.js`) and first run's Workspace step draw
  * it; its look is `sval-color-picker.css`, in the colours its host gives it.

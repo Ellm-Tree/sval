@@ -2,7 +2,7 @@
 // Copyright 2026 Ellm Tree, Inc.
 
 //! The helper's life: the handshake, then one request at a time from stdin,
-//! each answered on stdout, until stdin closes (decision 1437).
+//! each answered on stdout, until stdin closes.
 //!
 //! A request can hang in the kernel on a network mount that has gone away,
 //! and nothing in this process can interrupt it. Two threads end the process

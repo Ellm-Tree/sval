@@ -43,7 +43,7 @@
 
   /*
    * A rule's row shows and sets the rule saved under its own name, a site or
-   * a host under its site (decision 1980). The policy's lookups walk from a
+   * a host under its site. The policy's lookups walk from a
    * host to its site (`mostSpecificRule`), so the row reads its own entries
    * directly: what a host follows from its site is shown on the site's row.
    */
@@ -1379,7 +1379,7 @@
     /**
      * The folders a site's uploads are allowed from, each with its scope.
      * Settings narrows a folder or removes it, and never widens one: only an
-     * upload alert, which showed the files, does that (decision 0129).
+     * upload alert, which showed the files, does that.
      *
      * @param {string} id The agent's id.
      * @param {object} policy

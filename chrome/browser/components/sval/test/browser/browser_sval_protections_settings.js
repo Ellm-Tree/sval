@@ -7,7 +7,7 @@
 /* import-globals-from sval_preferences_helpers.js */
 
 /**
- * Privacy and protection (decision 1484): its cards and Firefox's groups in
+ * Privacy and protection: its cards and Firefox's groups in
  * their order, and its Fingerprinting card (protections spec §3.3): every
  * switch writing exactly its RFP target
  * token or its prefs and back, Strict's three states, Restore with Undo, and
@@ -200,7 +200,7 @@ add_task(async function every_switch_writes_its_tokens_or_prefs_and_back() {
 
   for (const id of ids) {
     const item = FP.ITEMS.find(candidate => candidate.id === id);
-    // Strict items and the compatibility fixes start off (decision 1685).
+    // Strict items and the compatibility fixes start off.
     const strict = !FP.isOnByDefault(item);
     Assert.equal(
       strict,

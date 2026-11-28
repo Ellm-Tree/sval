@@ -71,7 +71,7 @@ index 689281d..60cdd89 100644
 +  ["privacy-doh", { category: "privacy", subcategory: "secureDns" }],
 +  ["dnsOverHttps", { category: "privacy", subcategory: "secureDns" }],
 +  // Sval's Protections category is part of Privacy and protection, but for
-+  // its list of sites, which is Sites (Sval decision 1484).
++  // its list of sites, which is Sites.
 +  ["svalProtections", { category: "privacy" }],
 +  [
 +    "svalProtections-tracking",
@@ -83,7 +83,7 @@ index 689281d..60cdd89 100644
 +  ],
 +  ["svalProtections-sites", { category: "svalSites", subcategory: "sites" }],
 +  // Sites holds the permission defaults, and each site's page its
-+  // permissions (Sval decision 1484).
++  // permissions.
 +  ["permissionsData", { category: "svalSites" }],
 +  ["privacy-permissions", { category: "svalSites" }],
 +  ["privacy-permissions-block-popups", { category: "svalSites" }],

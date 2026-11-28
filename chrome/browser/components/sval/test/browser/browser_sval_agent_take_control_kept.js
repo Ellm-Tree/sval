@@ -9,7 +9,7 @@
 
 /**
  * A take is of the agent's whole workspace and is kept (agent-control spec
- * §6, decision 0107): in the device's settings, across a discard
+ * §6): in the device's settings, across a discard
  * and a restore, listed by `list_tabs`, and refused when it could not be
  * kept. It covers every tab, those opened while it holds included, and only
  * the user's Give back ends it. History the user made while holding the

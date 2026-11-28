@@ -8,7 +8,7 @@
 /* import-globals-from sval_agent_sites_helpers.js */
 
 /**
- * The first-visit alert on a host under its site (decision 1980): its
+ * The first-visit alert on a host under its site: its
  * "Remember for" menu starts at the host, and the answer is saved for the
  * scope picked, so a sibling host asks again or follows the site.
  */
