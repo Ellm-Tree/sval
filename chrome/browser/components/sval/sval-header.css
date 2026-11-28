@@ -215,8 +215,9 @@
 
   /* A tinted window's popups and find bar take the scheme of its text with
    it, as the window does, its address pill and text the field `SvalColor`
-   solves for the tint, and its button clusters a shade between the pill and
-   the tint.
+   solves for the tint. A light-text window's button clusters are a wash of
+   its text over the window, so they keep the tint's hue and show through
+   where the window does.
    A light-text window's edges are light washes, a dark-text window's dark
    ones, as the untinted windows' are. */
   :root[data-sval-tint] {
@@ -230,7 +231,7 @@
 
   :root[data-sval-ink="light"] {
     --panel-border-color: rgba(255, 255, 255, 0.18);
-    --sval-cluster-bg: oklch(from var(--sval-tint) calc(l - 0.05) calc(c * 0.7) h);
+    --sval-cluster-bg: rgb(from var(--sval-tint-strong) r g b / 0.12);
     --sval-cluster-border: rgba(255, 255, 255, 0.1);
   }
 
