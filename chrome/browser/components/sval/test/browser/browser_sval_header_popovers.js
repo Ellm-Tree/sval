@@ -57,7 +57,7 @@ const TOLERANCE = 0.5 / window.devicePixelRatio + 1 / 60;
 function faceOf(root) {
   return (
     root.querySelector(
-      ":scope > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack)"
+      ":scope > :is([sval-stem-face], .toolbarbutton-icon, .toolbarbutton-badge-stack)"
     ) ?? root
   );
 }
@@ -668,6 +668,35 @@ add_task(async function the_site_settings_grow_from_their_button() {
         Assert.ok(root.hasAttribute("open"), "open");
         checkGrows(panel, root);
       }
+    );
+  });
+});
+
+add_task(async function the_translate_panel_grows_from_its_chip() {
+  await BrowserTestUtils.withNewTab("https://example.com/", async () => {
+    const button = document.getElementById("translations-button");
+    // `FullPageTranslationsPanel` shows the cell for a page it can
+    // translate, which needs a language model; the stem needs only the
+    // cell on show.
+    button.hidden = false;
+    atTaskEnd(() => (button.hidden = true));
+    const { panel } = FullPageTranslationsPanel.elements;
+    await whileOpen(
+      panel.id,
+      // `FullPageTranslationsPanel`'s own anchoring.
+      () =>
+        PanelMultiView.openPopup(panel, button, {
+          position: "bottomright topright",
+        }),
+      (popup, root) => {
+        Assert.equal(root, button, "the translate cell");
+        Assert.ok(
+          faceOf(root).classList.contains("sval-translate-chip"),
+          "the stem grows from the chip"
+        );
+        checkGrows(popup, root);
+      },
+      popup => PanelMultiView.hidePopup(popup)
     );
   });
 });

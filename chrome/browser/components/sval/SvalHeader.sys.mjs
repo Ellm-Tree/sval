@@ -575,11 +575,12 @@ export function onViewMenuShowing(event) {
 /**
  * The popovers that grow from the button that opened them (messages spec
  * §9.4, `SvalStem`): the header's », notices, extensions, downloads,
- * site-settings and Privacy and Security panels, each reaching 32px past its
- * button.
+ * site-settings, translate and Privacy and Security panels, each reaching
+ * 32px past its button.
  */
 const STEM_HOSTS = new Set([
   "widget-overflow",
+  "full-page-translations-panel",
   NOTICES_PANEL_ID,
   BATTERY_SAVER_PANEL_ID,
   PROTECTION_PANEL_ID,
@@ -706,9 +707,11 @@ function buildTranslateButton(doc) {
   locale.setAttribute("aria-hidden", "true");
   locale.hidden = true;
   // The cell is the cluster's slice; the chip inside takes the hover and
-  // pressed looks, as a toolbar button's icon does.
+  // pressed looks, as a toolbar button's icon does, and is the face its
+  // panel's stem grows from.
   const chip = doc.createXULElement("hbox");
   chip.className = "sval-translate-chip";
+  chip.setAttribute("sval-stem-face", "");
   chip.setAttribute("align", "center");
   chip.setAttribute("pack", "center");
   chip.append(icon, arrows, locale);

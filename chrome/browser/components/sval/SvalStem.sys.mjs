@@ -20,7 +20,8 @@
  * A popover whose button stands inside an element carrying
  * `sval-stem-beside` opens beside the button, on the side facing the
  * window's middle, in place of its own. A pill marked `sval-stem-face` that
- * a button stands alone in is the face the stem grows from.
+ * a button stands alone in is the face the stem grows from, as is a
+ * button's own child marked `sval-stem-face`.
  * The button it grows from is the toolbarbutton around its anchor, as
  * `panel.js` marks `[open]`, or the anchor itself; the face is that
  * button's icon or badge stack, or the whole button. The button carries
@@ -486,15 +487,16 @@ function buttonOf(popup) {
  * @param {Element} button
  * @returns {Element} The part of `button` drawn as a pill: the pill around
  *   it where the button stands alone in one, which marks itself
- *   `sval-stem-face`; else a toolbarbutton's icon or badge stack, or the
- *   whole of any other button.
+ *   `sval-stem-face`; else the child of a button that marks it
+ *   `sval-stem-face`, a toolbarbutton's icon or badge stack, or the whole
+ *   of any other button.
  */
 function faceOf(button) {
   const pill = button.parentElement;
   return (
     (pill?.hasAttribute("sval-stem-face") ? pill : null) ??
     button.querySelector(
-      ":scope > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack)"
+      ":scope > :is([sval-stem-face], .toolbarbutton-icon, .toolbarbutton-badge-stack)"
     ) ??
     button
   );
