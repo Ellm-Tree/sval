@@ -1720,15 +1720,24 @@ async function checkSeeThroughLook(popup, accent, what) {
 const lastWindowShape = new WeakMap();
 
 /**
+ * What each watched popup's window held as the popup showed, read as
+ * `SvalStem` clears `sval-stem-pending`, before a later paint can resize
+ * the window: the shape last given, the window's size and its frame's.
+ */
+const shownWindowShape = new WeakMap();
+
+/**
  * Keeps the shape each popup in `win` gives its window's backdrop
- * (`XULPopupElement.setWindowShape`) until the task ends, for
- * {@link checkFaceInBackdrop}, which no API reads back.
+ * (`XULPopupElement.setWindowShape`) until the task ends, and the shape it
+ * held as it showed, for {@link checkFaceInBackdrop}, which no API reads
+ * back.
  *
  * @param {Window} win
  */
 function watchWindowShapes(win) {
   const watch = event => {
     const popup = event.target;
+    shownWindowShape.delete(popup);
     if (
       typeof popup.setWindowShape !== "function" ||
       Object.hasOwn(popup, "setWindowShape")
@@ -1741,7 +1750,27 @@ function watchWindowShapes(win) {
       lastWindowShape.set(popup, { shape, width, height });
       return give.call(popup, shape);
     };
-    atTaskEnd(() => delete popup.setWindowShape);
+    const shows = new win.MutationObserver(() => {
+      if (
+        popup.getAttribute("sval-stem") === "placed" &&
+        !popup.hasAttribute("sval-stem-pending") &&
+        !shownWindowShape.has(popup)
+      ) {
+        const { width, height } = popup.getOuterScreenRect();
+        const frame = popup.getBoundingClientRect();
+        shownWindowShape.set(popup, {
+          given: lastWindowShape.get(popup),
+          width,
+          height,
+          frame: { width: frame.width, height: frame.height },
+        });
+      }
+    });
+    shows.observe(popup, { attributeFilter: ["sval-stem-pending"] });
+    atTaskEnd(() => {
+      shows.disconnect();
+      delete popup.setWindowShape;
+    });
   };
   win.addEventListener("popupshowing", watch, true);
   atTaskEnd(() => win.removeEventListener("popupshowing", watch, true));
@@ -1790,19 +1819,28 @@ async function checkFaceInBackdrop(popup, what) {
     () => !popup.hasAttribute("sval-stem-pending"),
     `${what} shows`
   );
-  const given = lastWindowShape.get(popup);
+  const shown = shownWindowShape.get(popup);
+  Assert.ok(shown, `${what} was seen to show`);
+  const { given } = shown;
   const shape = given?.shape;
   Assert.ok(shape?.parts?.length, `${what}'s backdrop shape was seen`);
-  const box = popup.getOuterScreenRect();
   // macOS lays the backdrop out once for the window's size when the shape
   // arrives (`SvalShapedBackdropView`), and a popup's window takes its
   // frame's size only at a later paint
-  // (`nsMenuPopupFrame::SchedulePendingWidgetMoveResize`).
+  // (`nsMenuPopupFrame::SchedulePendingWidgetMoveResize`). A popover that
+  // grows once shown is shaped again a frame after its window takes the
+  // new size, so the shape is checked as the popover shows.
   Assert.ok(
-    Math.abs(given.width - box.width) <= 1 &&
-      Math.abs(given.height - box.height) <= 1,
-    `${what}'s backdrop was shaped for its window as it shows (${given.width}x${given.height}, ${box.width}x${box.height})`
+    Math.abs(shown.width - shown.frame.width) <= 1 &&
+      Math.abs(shown.height - shown.frame.height) <= 1,
+    `${what} shows once its window has its frame's size (${shown.width}x${shown.height}, ${shown.frame.width}x${shown.frame.height})`
   );
+  Assert.ok(
+    Math.abs(given.width - shown.width) <= 1 &&
+      Math.abs(given.height - shown.height) <= 1,
+    `${what}'s backdrop was shaped for its window as it shows (${given.width}x${given.height}, ${shown.width}x${shown.height})`
+  );
+  const box = popup.getOuterScreenRect();
   const pill = face.getBoundingClientRect();
   const onScreen = {
     left: win.mozInnerScreenX + pill.left,

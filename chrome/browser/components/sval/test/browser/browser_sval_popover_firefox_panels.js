@@ -200,16 +200,69 @@ async function whileOpen(win, id, open, check, close) {
  * @param {() => any} open
  * @param {(popup: Element) => void} close
  * @param {string} what
+ * @param {(popup: Element) => any} [also] More to check on each opening.
  */
-async function solidThenSeeThrough(win, id, open, close, what) {
+async function solidThenSeeThrough(
+  win,
+  id,
+  open,
+  close,
+  what,
+  also = () => {}
+) {
   await windowSeeThrough(false, win);
-  await whileOpen(win, id, open, popup => checkSolid(popup, what), close);
+  await whileOpen(
+    win,
+    id,
+    open,
+    async popup => {
+      await checkSolid(popup, what);
+      await also(popup);
+    },
+    close
+  );
   await windowSeeThrough(true, win);
   if (!seeThroughWindow(win)) {
     Assert.ok(true, "this window cannot be see-through");
     return;
   }
-  await whileOpen(win, id, open, popup => checkSeeThrough(popup, what), close);
+  await whileOpen(
+    win,
+    id,
+    open,
+    async popup => {
+      await checkSeeThrough(popup, what);
+      await also(popup);
+    },
+    close
+  );
+}
+
+/**
+ * Asserts the » panel, once the header has moved all it will into it, is
+ * as wide as its rows, with none cut off and nothing to scroll across.
+ *
+ * @param {Element} popup
+ * @param {Element} navbar
+ */
+async function checkFitsItsRows(popup, navbar) {
+  await TestUtils.waitForCondition(
+    () => !navbar.overflowable.isHandlingOverflow(),
+    "the header's buttons have moved into the » panel"
+  );
+  await TestUtils.waitForCondition(
+    () => !popup.hasAttribute("sval-stem-pending"),
+    "the » panel shows"
+  );
+  for (const scroller of popup.querySelectorAll(
+    ":scope > panelmultiview, :scope panelview[mainview]"
+  )) {
+    Assert.lessOrEqual(
+      scroller.scrollWidth,
+      scroller.clientWidth,
+      `the » panel's ${scroller.localName} fits its rows across: ${stoodAt(popup)}`
+    );
+  }
 }
 
 add_task(async function the_overflow_panel() {
@@ -237,7 +290,8 @@ add_task(async function the_overflow_panel() {
     "widget-overflow",
     () => navbar.overflowable.show(),
     popup => win.PanelMultiView.hidePopup(popup),
-    "the » panel"
+    "the » panel",
+    popup => checkFitsItsRows(popup, navbar)
   );
 });
 

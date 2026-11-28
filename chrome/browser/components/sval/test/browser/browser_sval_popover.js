@@ -785,3 +785,51 @@ add_task(async function test_a_measure_taken_mid_move_keeps_the_stem() {
   );
   await closePopover(handle);
 });
+
+add_task(async function test_a_popover_growing_as_it_opens_shows_at_its_size() {
+  const handle = made(
+    SvalPopover.create(document, { label: "Test", stem: { hang: true } })
+  );
+  const { popup } = handle;
+  const box = body();
+  popup.append(box);
+  // Rows arrive after the popover opens, one each time Gecko places it
+  // again for its new size, as the » panel's do while the header's buttons
+  // move into it. A popup's window takes its frame's size at a paint after
+  // the frame's (`nsMenuPopupFrame::SchedulePendingWidgetMoveResize`).
+  let rows = 0;
+  const grow = () => {
+    if (popup.state === "open" && rows < 4) {
+      rows++;
+      const row = document.createElementNS(
+        "http://www.w3.org/1999/xhtml",
+        "div"
+      );
+      row.style.height = "30px";
+      box.append(row);
+    }
+  };
+  popup.addEventListener("popupshown", grow);
+  popup.addEventListener("popuppositioned", grow);
+  atTaskEnd(() => {
+    popup.removeEventListener("popupshown", grow);
+    popup.removeEventListener("popuppositioned", grow);
+  });
+  watchWindowShapes(window);
+  await openPopover(handle, () => handle.openFrom(anchor()));
+  await TestUtils.waitForCondition(
+    () =>
+      popup.getAttribute("sval-stem") === "placed" &&
+      !popup.hasAttribute("sval-stem-pending"),
+    "the popover grows its stem and shows"
+  );
+  Assert.greater(rows, 1, "rows arrived as it opened");
+  const shown = shownWindowShape.get(popup);
+  Assert.ok(shown, "it was seen to show");
+  Assert.ok(
+    Math.abs(shown.width - shown.frame.width) <= 1 &&
+      Math.abs(shown.height - shown.frame.height) <= 1,
+    `it shows once its window has its frame's size (${shown.width}x${shown.height}, ${shown.frame.width}x${shown.frame.height})`
+  );
+  await closePopover(handle);
+});

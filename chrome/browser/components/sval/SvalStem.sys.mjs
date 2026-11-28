@@ -649,6 +649,26 @@ function edgeInset(popup, win) {
 }
 
 /**
+ * @param {Element} popup
+ * @param {Window} win The popup's browser window.
+ * @returns {number} How much wider than its content box `popup`'s rows are,
+ *   by what its scrollers hold past their width (`sval-stem.css`). Gecko
+ *   narrows a popup that reaches past its window's edge
+ *   (`nsMenuPopupFrame::GetConstraintRect`), keeping its start, so its
+ *   content ends short of where its rows would take it.
+ */
+function cutAcross(popup, win) {
+  let cut = 0;
+  for (const child of popup.children) {
+    const { overflowX } = win.getComputedStyle(child);
+    if (overflowX === "auto" || overflowX === "scroll") {
+      cut = Math.max(cut, child.scrollWidth - child.clientWidth);
+    }
+  }
+  return cut;
+}
+
+/**
  * Moves `popup` along its button's edge until its content stands
  * {@link edgeInset} inside `win`'s sides, so its shadow fades out within the
  * window and does not end at its edge: across for a popover above or below
@@ -663,7 +683,9 @@ function edgeInset(popup, win) {
  * whichever side it is aligned by
  * (`nsMenuPopupFrame::AdjustPositionForAnchorAlign`), so moving both of an
  * axis by one length moves the popup by that length. A popover longer than
- * the window keeps its start edge in.
+ * the window keeps its start edge in. A popover Gecko narrowed at the
+ * window's edge is moved in by what it lost ({@link cutAcross}), and Gecko
+ * gives it its whole width where it then stands.
  *
  * @param {Element} popup
  * @param {Window} win The popup's browser window.
@@ -707,9 +729,14 @@ function keepInWindow(popup, win, content, face, vertical, around) {
   const dpr = win.devicePixelRatio;
   // Gecko places a popup on whole device pixels (`nsMenuPopupFrame::GetRects`).
   const slack = 0.5 / dpr;
+  // Gecko narrows only a popup that meets the window's edge; a scroller
+  // elsewhere overflows for its own reasons.
+  const reachEnd =
+    content[end] +
+    (!vertical && content[end] >= high - slack ? cutAcross(popup, win) : 0);
   let by = 0;
-  if (content[end] > high + slack) {
-    by = -Math.ceil((content[end] - high) * dpr) / dpr;
+  if (reachEnd > high + slack) {
+    by = -Math.ceil((reachEnd - high) * dpr) / dpr;
   }
   if (content[start] + by < low - slack) {
     by = Math.ceil((low - content[start]) * dpr) / dpr;
@@ -1042,8 +1069,8 @@ function showFace(popup, shown) {
  * @param {boolean} [traceOnly] Whether only to trace the path again where
  *   the popup stands, without moving it or bounding its content, whose size
  *   would change again within the resize observer's own callback.
- * @returns {boolean} Whether it is open and stands where it is drawn,
- *   with nothing left to move.
+ * @returns {boolean} Whether it is open and stands where it is drawn, at
+ *   the size it is drawn for, with nothing left to move.
  */
 function place(popup, traceOnly = false) {
   const button = popup._svalStemButton;
@@ -1080,9 +1107,13 @@ function place(popup, traceOnly = false) {
   // placed by the window.
   let box = popup.getOuterScreenRect();
   const framed = atFrame();
-  // Whether the popup's window stands where its frame does: until it
-  // does, what shows on the screen is where it stood before.
-  let settled = true;
+  // Whether the popup's window stands where its frame does, at its frame's
+  // size: until it does, what shows on the screen is where it stood before,
+  // and a window still at an earlier size shows the backdrop shaped for that
+  // size ({@link shapeWindow}).
+  let settled =
+    Math.abs(box.width - frame.width) <= 1 &&
+    Math.abs(box.height - frame.height) <= 1;
   if (
     !box.width ||
     Math.abs(box.left - framed.left) > 1 ||
@@ -1231,9 +1262,9 @@ const STILL_FRAMES = 2;
 
 /**
  * Places `popup` again each frame until it is open, its window stands where
- * its frame does, and nothing has moved it for {@link STILL_FRAMES} frames
- * running, then shows it; past {@link SETTLE_FRAMES} it shows wherever it
- * stands.
+ * its frame does at its frame's size, and nothing has moved or resized it
+ * for {@link STILL_FRAMES} frames running, then shows it; past
+ * {@link SETTLE_FRAMES} it shows wherever it stands.
  *
  * @param {Element} popup
  * @param {Window} win The popup's browser window.
